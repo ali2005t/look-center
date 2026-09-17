@@ -5,7 +5,8 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "echo Static web deployment - no desktop build required",
+    "build:tauri": "tauri build",
     "start": "electron .",
     "pack": "electron-packager . LOOK-CASHIER --platform=win32 --arch=ia32 --icon=ico/ico.ico --overwrite",
     "build:win10": "electron-builder --win --x64 --ia32 --config.directories.output=install/Windows10-MultiArch",

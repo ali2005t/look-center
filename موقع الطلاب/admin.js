@@ -34,7 +34,10 @@ function renderAgents() {
   agentFilter.innerHTML = '<option value="">كل المسؤولين</option>';
   agentsList.innerHTML = agents.length ? '' : '<p>لا يوجد مسؤولون مفعلون.</p>';
   agents.forEach(agent => {
-    const portalUrl = new URL('index.html', window.location.href);
+    const portalUrl = new URL(window.location.href);
+    portalUrl.pathname = `${portalUrl.pathname.slice(0, portalUrl.pathname.lastIndexOf('/') + 1)}index.html`;
+    portalUrl.hash = '';
+    portalUrl.search = '';
     portalUrl.searchParams.set('agent', agent.id);
     const link = portalUrl.href;
     const qr = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}`;

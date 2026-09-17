@@ -1,0 +1,67 @@
+{
+    "productName": "LOOK CASHIER POS",
+    "version": "2.0.0",
+    "identifier": "com.asassoftware.lookcashier",
+    "build": {
+        "frontendDist": "../src_frontend",
+        "devUrl": "http://localhost:1420",
+        "beforeDevCommand": "",
+        "beforeBuildCommand": ""
+    },
+    "app": {
+        "withGlobalTauri": true,
+        "windows": [
+            {
+                "label": "main",
+                "title": "ASAS look cashier POS",
+                "width": 1200,
+                "height": 800,
+                "resizable": true,
+                "fullscreen": true,
+                "center": true,
+                "visible": false,
+                "url": "splash.html"
+            },
+            {
+                "label": "splash",
+                "url": "preloader.html",
+                "width": 600,
+                "height": 400,
+                "decorations": false,
+                "resizable": false,
+                "alwaysOnTop": true,
+                "center": true,
+                "transparent": true
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": [
+            "icons/icon.ico"
+        ],
+        "copyright": "Copyright © 2025 ASAS Software Solutions",
+        "category": "Education",
+        "shortDescription": "ASAS MARKET POS",
+        "longDescription": "",
+        "externalBin": [],
+        "resources": [],
+        "windows": {
+            "certificateThumbprint": null,
+            "digestAlgorithm": "sha256",
+            "timestampUrl": "",
+            "webviewInstallMode": {
+                "type": "embedBootstrapper"
+            },
+            "wix": {
+                "language": [
+                    "en-US"
+                ]
+            }
+        }
+    }
+}

@@ -1,0 +1,293 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>إدارة المستخدمين</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/users.css" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+
+<body>
+  <header class="main-header">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 2.2em;
+        font-weight: bold;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px #90caf9;
+        padding: 12px 32px;
+        border-radius: 18px;
+        box-shadow: 0 4px 24px #1976d244;
+        display: inline-block;
+      ">
+        <i class="fas fa-graduation-cap" style="margin-left:12px;color:#43a047;"></i>
+        LOOK CENTER
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+  </div>
+  </header>
+  <aside class="sidebar">
+    <ul>
+      <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i
+              class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+      <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register"
+              style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i
+              class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+
+      <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice"
+              style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+      <li data-link="unsubscribed_students.html"><a href="unsubscribed_students.html"><span class="sidebar-icon"><i
+              class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+      <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock"
+              style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+      <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i
+              class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+      <li class="active" data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users"
+              style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+      <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar"
+              style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+      <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave"
+              style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+      <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog"
+              style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+      <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle"
+              style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+    </ul>
+  </aside>
+  <main class="users-content" style="margin-right:220px;">
+    <div class="users-page-heading"><h2 style="color:#1976d2;margin-bottom:28px;font-size:2em;text-align:right;font-weight:bold;">🆕 إضافة مستخدم جديد
+    </h2>
+      <a class="student-portal-link" href="../موقع الطلاب/admin.html" target="_blank">إدارة بوابة الطلاب</a>
+    </div>
+    <form id="add-user-form"
+      style="background:linear-gradient(135deg,#e3f2fd 0%,#f3e5f5 100%);padding:40px 36px;border-radius:22px;box-shadow:0 10px 32px #1976d244;margin-bottom:50px;border:3px solid #bbdefb;max-width:900px;margin-left:auto;margin-right:auto;">
+      <div id="user-form-alert" style="display:none;margin-bottom:12px;"></div>
+
+      <!-- الصف الأول -->
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:28px;">
+        <div class="input-group" style="position:relative;">
+          <label style="display:block;margin-bottom:12px;color:#1565c0;font-weight:bold;font-size:16px;"><i
+              class="fas fa-user" style="margin-left:8px;color:#43a047;"></i>اسم المستخدم</label>
+          <input type="text" id="username" placeholder="مثال: ahmed-hassan"
+            style="width:100%;padding:16px 20px 16px 48px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#fff;transition:all 0.3s;box-sizing:border-box;"
+            required />
+          <i class="fas fa-user-circle" style="position:absolute;right:16px;top:52px;color:#1976d2;font-size:22px;"></i>
+        </div>
+        <div class="input-group" style="position:relative;">
+          <label style="display:block;margin-bottom:12px;color:#1565c0;font-weight:bold;font-size:16px;"><i
+              class="fas fa-envelope" style="margin-left:8px;color:#43a047;"></i>البريد الإلكتروني</label>
+          <input type="text" id="generated-email" placeholder="يتم توليده تلقائياً" readonly
+            style="width:100%;padding:16px 20px 16px 48px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#f7fbff;color:#1976d2;font-weight:bold;cursor:not-allowed;transition:all 0.3s;box-sizing:border-box;" />
+          <i class="fas fa-envelope" style="position:absolute;right:16px;top:52px;color:#1976d2;font-size:22px;"></i>
+        </div>
+      </div>
+
+      <!-- الصف الثاني -->
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:28px;">
+        <div class="input-group" style="position:relative;">
+          <label style="display:block;margin-bottom:12px;color:#1565c0;font-weight:bold;font-size:16px;"><i
+              class="fas fa-id-card" style="margin-left:8px;color:#43a047;"></i>الاسم الكامل</label>
+          <input type="text" id="user-fullname" placeholder="مثال: أحمد حسن محمود"
+            style="width:100%;padding:16px 20px 16px 48px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#fff;transition:all 0.3s;box-sizing:border-box;"
+            required />
+          <i class="fas fa-signature" style="position:absolute;right:16px;top:52px;color:#1976d2;font-size:22px;"></i>
+        </div>
+        <div class="input-group" style="position:relative;">
+          <label style="display:block;margin-bottom:12px;color:#1565c0;font-weight:bold;font-size:16px;"><i
+              class="fas fa-lock" style="margin-left:8px;color:#43a047;"></i>كلمة المرور</label>
+          <input type="password" id="user-password" placeholder="أدخل كلمة مرور قوية"
+            style="width:100%;padding:16px 20px 16px 48px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#fff;transition:all 0.3s;box-sizing:border-box;"
+            required />
+          <i class="fas fa-lock" style="position:absolute;right:16px;top:52px;color:#1976d2;font-size:22px;"></i>
+        </div>
+      </div>
+
+      <!-- الصف الثالث -->
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:28px;">
+        <div class="input-group" style="position:relative;">
+          <label style="display:block;margin-bottom:12px;color:#1565c0;font-weight:bold;font-size:16px;"><i
+              class="fas fa-users" style="margin-left:8px;color:#43a047;"></i>النوع</label>
+          <select id="user-type"
+            style="width:100%;padding:16px 20px 16px 48px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#fff;color:#333;transition:all 0.3s;appearance:none;cursor:pointer;box-sizing:border-box;">
+            <option value="مدير" style="background:#e3f2fd;">📊 مدير</option>
+            <option value="كاشير" style="background:#f3e5f5;">💰 كاشير</option>
+          </select>
+          <i class="fas fa-users-cog"
+            style="position:absolute;right:16px;top:52px;color:#1976d2;font-size:22px;pointer-events:none;"></i>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:16px;margin-top:auto;">
+          <button type="submit"
+            style="flex:1;background:linear-gradient(135deg,#43a047 0%,#2e7d32 100%);color:#fff;padding:18px 32px;border:none;border-radius:12px;cursor:pointer;font-size:18px;font-weight:bold;box-shadow:0 6px 16px #43a04755;transition:all 0.3s;display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;">
+            <i class="fas fa-user-plus"></i> إضافة مستخدم
+          </button>
+          <button type="reset"
+            style="background:#f5f5f5;color:#666;padding:18px 28px;border:2px solid #e0e0e0;border-radius:12px;cursor:pointer;font-size:17px;font-weight:bold;transition:all 0.3s;display:flex;align-items:center;justify-content:center;gap:8px;min-height:56px;">
+            <i class="fas fa-redo"></i> إعادة
+          </button>
+        </div>
+      </div>
+
+      <div id="permissions-row" style="margin:10px 0 0 0;display:none;"></div>
+    </form>
+
+    <section class="users-table-section" style="max-width:900px;margin-left:auto;margin-right:auto;">
+      <h2 style="color:#1976d2;margin-bottom:20px;font-size:1.8em;">👥 المستخدمون الحاليون</h2>
+      <table id="users-table">
+        <thead>
+          <tr
+            style="background:linear-gradient(135deg,#e3f2fd 0%,#bbdefb 100%);font-weight:bold;color:#1565c0;font-size:16px;">
+            <th style="padding:16px;">الاسم</th>
+            <th style="padding:16px;">اسم المستخدم</th>
+            <th style="padding:16px;">النوع</th>
+            <th style="padding:16px;">الحالة</th>
+            <th style="padding:16px;">تفعيل/تعطيل</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- المستخدمون هنا -->
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <div id="logout-modal"
+    style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
+    <div
+      style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
+      <button
+        style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:22px;color:#1976d2;cursor:pointer;"
+        onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.5em;font-weight:bold;letter-spacing:1px;">تسجيل الخروج
+      </h2>
+      <p style="color:#333;margin-bottom:22px;font-size:1.1em;">اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn"
+        style="background:linear-gradient(90deg,#43a047 60%,#1976d2 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;margin-bottom:16px;box-shadow:0 2px 8px #43a04722;transition:background 0.2s;">خروج
+        مؤقت</button><br>
+      <button id="end-shift-btn"
+        style="background:linear-gradient(90deg,#ff9800 60%,#fbc02d 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:background 0.2s;">إنهاء
+        الشيفت</button>
+    </div>
+  </div>
+  <script src="js/notifications.js"></script>
+  <script src="js/electron-nav.js"></script>
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script type="module" src="js/users.js"></script>
+  <script>
+    document.querySelectorAll('.sidebar ul li').forEach(li => {
+      li.addEventListener('click', function (e) {
+        window.location.href = li.getAttribute('data-link');
+      });
+    });
+  </script>
+  <script>
+    function handleMobileTabs() {
+      const tabs = document.querySelector('.mobile-tabs');
+      if (window.innerWidth <= 900) {
+        tabs && (tabs.style.display = 'flex');
+      } else {
+        tabs && (tabs.style.display = 'none');
+      }
+    }
+    window.addEventListener('resize', handleMobileTabs);
+    window.addEventListener('DOMContentLoaded', handleMobileTabs);
+    if (document.querySelector('.mobile-tabs')) {
+      document.querySelectorAll('.mobile-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          window.location.href = btn.getAttribute('data-link');
+        });
+      });
+    }
+  </script>
+  <script type="module">
+    import { allPages } from './js/users.js';
+    const userTypeSelect = document.getElementById('user-type');
+    const permissionsRow = document.getElementById('permissions-row');
+    function renderPerms(type) {
+      if (!permissionsRow) return;
+      permissionsRow.innerHTML = '';
+      if (type === 'مدير' || type === 'كاشير') {
+        let html = '<div style="display:flex;flex-wrap:wrap;gap:12px 18px;">';
+        allPages.forEach(p => {
+          if (type === 'كاشير' && ['dashboard', 'cashier', 'invoices', 'unsubscribed'].indexOf(p.key) === -1) return;
+          html += `<label style='margin-left:10px;'><input type='checkbox' class='perm-checkbox' value='${p.key}' ${type === 'مدير' ? 'checked' : ''}/> ${p.label}</label>`;
+        });
+        html += '</div>';
+        permissionsRow.innerHTML = html;
+        permissionsRow.style.display = 'block';
+      } else {
+        permissionsRow.style.display = 'none';
+      }
+    }
+    userTypeSelect.addEventListener('change', e => renderPerms(e.target.value));
+    document.addEventListener('DOMContentLoaded', () => {
+      renderPerms(userTypeSelect.value);
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var logoutBtn = document.getElementById('logout-btn');
+      var modal = document.getElementById('logout-modal');
+      if (logoutBtn && modal) {
+        logoutBtn.onclick = function (e) {
+          e.preventDefault();
+          modal.style.display = 'flex';
+        };
+        document.getElementById('temp-logout-btn').onclick = function () {
+          modal.style.display = 'none';
+          window.location.href = 'login.html';
+        };
+        document.getElementById('end-shift-btn').onclick = function () {
+          modal.style.display = 'none';
+          window.dispatchEvent(new CustomEvent('endShift'));
+          window.location.href = 'login.html';
+        };
+        modal.onclick = function (e) {
+          if (e.target === modal) modal.style.display = 'none';
+        };
+      }
+    });
+  </script>
+  <footer
+    style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;">
+    <b>Powered by Eng. Lol</b>
+  </footer>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+
+</html>

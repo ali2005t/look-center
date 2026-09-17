@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a1836" />
+  <title>تسجيل الدخول - مركز التعليم</title>
+  <link rel="stylesheet" href="css/login.css?v=look-v5" />
+  <!-- FontAwesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+  <div class="login-header">
+    <img src="img/placeholder-logo.png" class="login-logo" alt="شعار السنتر" />
+    <h1 class="center-name">تسجيل الدخول</h1>
+  </div>
+
+  <div class="login-container">
+    <div class="login-card">
+
+      <div class="login-title-wrap">
+        <h2 class="login-title">تسجيل الدخول</h2>
+      </div>
+
+      <form id="login-form">
+
+        <!-- USERNAME -->
+        <div class="input-group">
+          <span class="input-icon">&#xf007;</span>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="اسم المستخدم"
+            required
+            autocomplete="username"
+          />
+        </div>
+
+        <!-- GENERATED EMAIL -->
+        <div class="input-group">
+          <span class="input-icon">&#xf0e0;</span>
+          <input
+            type="text"
+            id="generated-email"
+            name="generated-email"
+            placeholder="البريد الإلكتروني"
+            readonly
+            tabindex="-1"
+          />
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="input-group password-group">
+          <span class="input-icon">&#xf023;</span>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="كلمة المرور"
+            required
+            autocomplete="current-password"
+          />
+
+          <button
+            type="button"
+            class="toggle-password"
+            id="toggle-password"
+            tabindex="-1"
+          >
+            <i class="fa fa-eye"></i>
+          </button>
+        </div>
+
+        <!-- REMEMBER ME -->
+        <div class="remember-row">
+          <input type="checkbox" id="remember-me" />
+          <label for="remember-me">تذكرني</label>
+        </div>
+
+        <!-- SUBMIT -->
+        <button
+          type="submit"
+        >
+          تسجيل الدخول
+        </button>
+
+        <p id="error-message" class="error"></p>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- موجة SVG سفلية -->
+  <svg class="wave" viewBox="0 0 1440 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path fill="url(#waveGradient1)" fill-opacity="0.18" d="M0,120 C360,180 1080,60 1440,120 L1440,180 L0,180 Z"></path>
+    <path fill="url(#waveGradient2)" fill-opacity="0.28" d="M0,140 C400,100 1040,200 1440,140 L1440,180 L0,180 Z"></path>
+    <path fill="url(#waveGradient3)" fill-opacity="0.38" d="M0,160 C480,220 960,80 1440,160 L1440,180 L0,180 Z"></path>
+
+    <defs>
+      <linearGradient id="waveGradient1" x1="0" y1="0" x2="1440" y2="180">
+        <stop stop-color="#0a1836" />
+        <stop offset="1" stop-color="#1976d2" />
+      </linearGradient>
+
+      <linearGradient id="waveGradient2" x1="0" y1="0" x2="1440" y2="180">
+        <stop stop-color="#1976d2" />
+        <stop offset="1" stop-color="#0a1836" />
+      </linearGradient>
+
+      <linearGradient id="waveGradient3" x1="0" y1="0" x2="1440" y2="180">
+        <stop stop-color="#101c2c" />
+        <stop offset="1" stop-color="#1976d2" />
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js"></script>
+  <script type="module" src="js/login.js"></script>
+
+  <footer class="login-footer">
+    <b>Powered by Eng. Lol</b>
+  </footer>
+  <script src="js/zoom-controls.js"></script>
+</body>
+</html>

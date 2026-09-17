@@ -1,0 +1,201 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a1836" />
+  <title>لوحة التحكم</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+<body>
+  <header class="main-header">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 2.2em;
+        font-weight: bold;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px #90caf9;
+        padding: 12px 32px;
+        border-radius: 18px;
+        box-shadow: 0 4px 24px #1976d244;
+        display: inline-block;
+      ">
+        <i class="fas fa-graduation-cap" style="margin-left:12px;color:#43a047;"></i>
+        LOOK CENTER
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+  
+  <aside class="sidebar">
+    <ul>
+  <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+  <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+
+  <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice" style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+  <li data-link="unsubscribed_students.html"><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+  <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock" style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+  <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+  <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users" style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+  <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar" style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+  <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave" style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+  <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog" style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+  <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle" style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+    </ul>
+  </aside>
+  <main class="dashboard-content" style="margin-right:220px; margin-top:60px;">
+    <div class="dashboard-clock-date-group">
+      <div class="card date-card">
+        <span class="date-label" id="full-date">--/--/----</span>
+      </div>
+        <div class="center-name-3d" id="center-name-3d" style="
+          font-family: 'Montserrat', Arial, sans-serif;
+          font-size: 2.2em;
+          font-weight: bold;
+          letter-spacing: 2px;
+          background: linear-gradient(90deg, #1976d2, #43a047);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          text-shadow: 2px 2px 8px #90caf9;
+          padding: 12px 32px;
+          border-radius: 18px;
+          box-shadow: 0 4px 24px #1976d244;
+          display: inline-block;
+        ">
+          <i class="fas fa-graduation-cap" style="margin-left:12px;color:#43a047;"></i>
+          LOOK CENTER
+        </div>
+      <div class="card clock-card">
+        <span class="clock-3d" id="time">--:--</span>
+      </div>
+    </div>
+    <div class="dashboard-main-cards">
+      <div style="display: grid; grid-template-areas: 'students . income' '. new .' 'today . last'; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 36px; position: relative; min-height: 520px; max-width: 820px; margin: 0 auto; width: 100%;">
+        <div class="card students-card" style="grid-area: students; min-width: 220px; min-height: 150px;">
+          <h3 style="color: white; margin: 0 0 8px 0;">عدد الطلاب اليوم</h3>
+          <div id="today-students" style="color: white; font-size: 32px; font-weight: bold;">--</div>
+        </div>
+        <div class="card income-card" style="grid-area: income; min-width: 220px; min-height: 150px;">
+          <h3 style="color: white; margin: 0 0 8px 0;">أرباح الشهر</h3>
+          <div id="month-income" style="color: white; font-size: 32px; font-weight: bold;">--</div>
+        </div>
+        <div class="card today-income-card" style="grid-area: today; background: linear-gradient(135deg, #1976d2 60%, #0a1836 100%); color: #fff; box-shadow: 0 8px 32px #1976d288, 0 2px 8px #101c2c44; min-width: 220px; min-height: 150px;">
+          <h3 style="color: white; margin: 0 0 8px 0;">أرباح اليوم</h3>
+          <div id="today-income" style="color: white; font-size: 32px; font-weight: bold;">--</div>
+        </div>
+        <div class="card last-bill-card" style="grid-area: last; min-width: 220px; min-height: 150px;">
+          <h3 style="color: white; margin: 0 0 8px 0;">آخر فاتورة</h3>
+          <div id="last-bill" style="color: white; font-size: 32px; font-weight: bold;">--</div>
+        </div>
+        <div class="card new-bill-btn" style="grid-area: new; min-width: 220px; min-height: 150px; z-index: 3; box-shadow: 0 8px 32px #1976d288, 0 2px 8px #101c2c44; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #90caf9 60%, #e3f2fd 100%); border-radius: 22px; border: 2.5px solid #eaf3ff;">
+          <button onclick="window.location.href='cashier.html'" style="color: #1976d2; font-size: 18px; font-weight: bold; background: none; border: none; cursor: pointer; padding: 10px 20px;">إنشاء فاتورة جديدة</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Logout Modal -->
+  <div id="logout-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
+      <button style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:22px;color:#1976d2;cursor:pointer;" onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.5em;font-weight:bold;letter-spacing:1px;">تسجيل الخروج</h2>
+      <p style="color:#333;margin-bottom:22px;font-size:1.1em;">اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn" style="background:linear-gradient(90deg,#43a047 60%,#1976d2 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;margin-bottom:16px;box-shadow:0 2px 8px #43a04722;transition:background 0.2s;">خروج مؤقت</button><br>
+      <button id="end-shift-btn" style="background:linear-gradient(90deg,#ff9800 60%,#fbc02d 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:background 0.2s;">إنهاء الشيفت</button>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="js/electron-nav.js"></script>
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script src="js/simple-mobile-menu.js"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+  <script>
+    // معالج النقر على القائمة الجانبية - بسيط وفعال
+    document.addEventListener('DOMContentLoaded', function() {
+      const sidebarLinks = document.querySelectorAll('.sidebar ul li a');
+      sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const href = this.getAttribute('href');
+          if (href && href.trim()) {
+            // Use Electron API if available
+            if (window.electronAPI && window.electronAPI.navigate) {
+              window.electronAPI.navigate(href);
+            } else {
+              window.location.href = href;
+            }
+          }
+        });
+      });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+    var logoutBtn = document.getElementById('logout-btn');
+    var modal = document.getElementById('logout-modal');
+    if (logoutBtn && modal) {
+      logoutBtn.onclick = function(e) {
+        e.preventDefault();
+        modal.style.display = 'flex';
+      };
+      // خروج مؤقت
+      document.getElementById('temp-logout-btn').onclick = function() {
+        modal.style.display = 'none';
+        window.location.href = 'login.html';
+      };
+      // إنهاء الشيفت
+      document.getElementById('end-shift-btn').onclick = function() {
+        modal.style.display = 'none';
+        window.dispatchEvent(new CustomEvent('endShift'));
+        window.location.href = 'login.html';
+      };
+      // إغلاق النافذة عند الضغط خارجها
+      modal.onclick = function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+      };
+    }
+  });
+  </script>
+  <footer style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;"><b>Powered by Eng. Lol</b></footer>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+</html>
+

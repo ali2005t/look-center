@@ -1,0 +1,61 @@
+{
+  "name": "look-cashier",
+  "version": "2.0.0",
+  "main": "main.js",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "start": "electron .",
+    "pack": "electron-packager . LOOK-CASHIER --platform=win32 --arch=ia32 --icon=ico/ico.ico --overwrite",
+    "build:win10": "electron-builder --win --x64 --ia32 --config.directories.output=install/Windows10-MultiArch",
+    "build:win7": "electron-builder --win --ia32 --config.directories.output=install/Windows7-Legacy",
+    "build:all": "npm run build:win10 && npm run build:win7"
+  },
+  "keywords": [],
+  "author": "ASAS Software Solutions",
+  "license": "ISC",
+  "description": "ASAS MARKET POS - Managed by ASAS Software Solutions",
+  "devDependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/cli": "^2.10.0",
+    "electron": "22.3.27",
+    "electron-builder": "^24.13.3",
+    "electron-packager": "^17.1.2"
+  },
+  "build": {
+    "appId": "com.englol.lookcashier",
+    "productName": "ASAS look cashier POS",
+    "copyright": "Copyright © 2025 ENG.LOL",
+    "files": [
+      "src_frontend/**/*",
+      "electron/**/*",
+      "ico/**/*",
+      "main.js",
+      "!.git/*",
+      "!.env"
+    ],
+    "directories": {
+      "output": "install"
+    },
+    "win": {
+      "icon": "ico/ico.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LOOK CASHIER"
+    }
+  },
+  "electronDownload": {
+    "cache": "$HOME/.electron-cache"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  }
+}

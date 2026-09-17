@@ -1,0 +1,226 @@
+/* Final shared layer for page-specific styles. */
+:root {
+  --look-ink: #141414;
+  --look-mint: #00d6a3;
+  --look-cyan: #05b6d8;
+  --look-amber: #f3b13e;
+  --look-panel: rgba(255, 255, 255, 0.9);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.main-header {
+  border-bottom: 3px solid var(--look-ink) !important;
+}
+
+.main-header #center-name,
+.main-header #logout-btn,
+.main-header .mobile-menu-btn {
+  background: var(--look-mint) !important;
+  border: 2px solid var(--look-ink) !important;
+  box-shadow: 4px 4px 0 var(--look-ink) !important;
+  color: var(--look-ink) !important;
+}
+
+.main-header .mobile-menu-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 38px;
+  cursor: pointer;
+}
+
+.main-header .mobile-menu-btn.is-active {
+  background: var(--look-cyan) !important;
+  transform: translate(-1px, -1px);
+}
+
+.sidebar {
+  border-left: 3px solid var(--look-ink) !important;
+  background: var(--look-panel) !important;
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.main-header .mobile-menu-btn {
+  display: inline-flex !important;
+}
+
+.dashboard-content,
+.users-content,
+.reports-content,
+.expenses-content,
+.settings-content,
+.invoices-content,
+.help-content,
+.subscriptions-content,
+.unsubscribed_students-content,
+.cashier-content,
+.cashier-container,
+.late-students-content,
+.daily-closing-content {
+  transition: margin-right 260ms ease;
+}
+
+body.sidebar-collapsed .sidebar {
+  transform: translateX(100%);
+  box-shadow: none !important;
+}
+
+body.sidebar-collapsed .dashboard-content,
+body.sidebar-collapsed .users-content,
+body.sidebar-collapsed .reports-content,
+body.sidebar-collapsed .expenses-content,
+body.sidebar-collapsed .settings-content,
+body.sidebar-collapsed .invoices-content,
+body.sidebar-collapsed .help-content,
+body.sidebar-collapsed .subscriptions-content,
+body.sidebar-collapsed .unsubscribed_students-content,
+body.sidebar-collapsed .cashier-content,
+body.sidebar-collapsed .cashier-container,
+body.sidebar-collapsed .late-students-content,
+body.sidebar-collapsed .daily-closing-content {
+  margin-right: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: none !important;
+  }
+
+  .sidebar.is-open {
+    display: flex !important;
+    right: 0;
+    transform: translateX(0);
+    width: min(290px, 82vw);
+    height: calc(100% - 68px);
+    top: 68px !important;
+    z-index: 300;
+  }
+
+  body.sidebar-open::after {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: rgba(20, 20, 20, 0.28);
+    content: '';
+  }
+}
+
+@media (min-width: 901px) {
+  .sidebar {
+    display: flex !important;
+  }
+}
+
+.sidebar ul li.active,
+.sidebar ul li:hover {
+  background: var(--look-mint) !important;
+  border-color: var(--look-ink) !important;
+  box-shadow: 4px 4px 0 var(--look-ink) !important;
+  color: var(--look-ink) !important;
+  text-shadow: none !important;
+}
+
+.sidebar ul li a,
+.sidebar ul li a span:not(.sidebar-icon) {
+  color: #000 !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+}
+
+.sidebar ul li.active a,
+.sidebar ul li:hover a,
+.sidebar ul li.active a span:not(.sidebar-icon),
+.sidebar ul li:hover a span:not(.sidebar-icon) {
+  color: #000 !important;
+}
+
+.mobile-menu-list li a,
+.mobile-menu-list li a span {
+  color: #000 !important;
+  font-weight: 800 !important;
+}
+
+.sidebar-icon {
+  background: var(--look-amber) !important;
+  border: 2px solid var(--look-ink) !important;
+  box-shadow: none !important;
+  color: var(--look-ink) !important;
+}
+
+button,
+.btn,
+.grade-btn,
+.sub-btn {
+  border: 2px solid var(--look-ink) !important;
+  border-radius: 6px !important;
+  background: var(--look-mint) !important;
+  box-shadow: 4px 4px 0 var(--look-ink) !important;
+  color: var(--look-ink) !important;
+  font-weight: 900;
+}
+
+button:hover,
+.btn:hover,
+.grade-btn:hover,
+.grade-btn.selected,
+.sub-btn:hover,
+.sub-btn.selected {
+  background: var(--look-cyan) !important;
+  color: var(--look-ink) !important;
+}
+
+form,
+.form-section,
+.table-section,
+.invoice-preview,
+.invoice-preview-modern,
+.settings-content form {
+  border: 2px solid var(--look-ink);
+  border-radius: 6px;
+  background: var(--look-panel);
+  box-shadow: 6px 6px 0 var(--look-ink);
+}
+
+table {
+  border: 2px solid var(--look-ink);
+  box-shadow: 6px 6px 0 var(--look-ink);
+}
+
+table th {
+  background: var(--look-ink) !important;
+  color: #fff !important;
+}
+
+form input,
+form select,
+form textarea,
+#settings-form input[type="text"],
+#settings-form select {
+  border: 2px solid var(--look-ink) !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  color: var(--look-ink);
+}
+
+@media (max-width: 900px) {
+  .cashier-container {
+    margin-right: 0;
+    padding: 18px 12px 32px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cashier-flex-row {
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .form-section,
+  .invoice-preview {
+    width: 100%;
+    min-width: 0;
+  }
+}

@@ -1,0 +1,22 @@
+{
+    "name": "Look Cashier",
+    "short_name": "Cashier",
+    "name_ar": "لووك كاشير",
+    "description": "نظام إدارة الكاشير والاشتراكات",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#1976d2",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

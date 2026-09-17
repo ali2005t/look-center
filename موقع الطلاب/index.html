@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141414">
+  <title>تسجيل بيانات الطالب</title>
+  <link rel="stylesheet" href="portal.css?v=1">
+</head>
+<body>
+  <main class="portal-shell">
+    <section class="portal-card" id="registration-card">
+      <div class="brand-mark">LOOK</div>
+      <p class="eyebrow">بوابة الطلاب</p>
+      <h1>تسجيل بيانات الطالب</h1>
+      <p class="intro">سجّل بياناتك مرة واحدة من الهاتف المرتبط بهذا الرابط.</p>
+
+      <div class="agent-banner" id="agent-banner">جاري التحقق من رابط التسجيل...</div>
+      <div class="notice error" id="portal-error" hidden></div>
+
+      <form id="student-form" hidden>
+        <label>اسم الطالب<input id="student-name" required autocomplete="name"></label>
+        <label>رقم الهاتف<input id="student-phone" required inputmode="tel" autocomplete="tel"></label>
+        <label>الفرقة
+          <select id="student-grade" required>
+            <option value="">اختر الفرقة</option>
+            <option>أولى</option><option>ثانية</option><option>ثالثة</option><option>رابعة</option>
+          </select>
+        </label>
+        <label>نوع الدراسة
+          <select id="study-type" required>
+            <option value="">اختر النوع</option><option>انتظام</option><option>انتساب</option>
+          </select>
+        </label>
+        <fieldset class="portal-options">
+          <legend>اختر الاشتراك</legend>
+          <div id="subscription-options" class="subscription-options">
+            <p>اختر الفرقة أولًا لعرض الاشتراكات والأسعار.</p>
+          </div>
+          <strong class="portal-total">الإجمالي: <span id="selected-total">0</span> ج</strong>
+        </fieldset>
+        <button type="submit">إرسال البيانات</button>
+      </form>
+
+      <div class="notice success" id="success-message" hidden>
+        تم تسجيل بياناتك بنجاح. لا تعِد فتح الرابط من نفس الهاتف لإعادة التسجيل.
+      </div>
+    </section>
+  </main>
+  <script type="module" src="portal.js?v=1"></script>
+</body>
+</html>

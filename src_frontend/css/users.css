@@ -1,0 +1,328 @@
+/* احذف أو علق جميع تعريفات .sidebar وما يتعلق بها هنا، واعتمد فقط على main.css */
+/*
+.sidebar, .sidebar ul, .sidebar ul li, .sidebar ul li.active, .sidebar ul li:hover, .sidebar ul li a, .sidebar ul li .sidebar-icon {
+  all: unset;
+}
+*/
+@import url('main.css');
+
+.users-content {
+  margin-right: 0;
+  padding: 20px 5px;
+}
+
+.users-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.student-portal-link {
+  display: inline-block;
+  padding: 10px 14px;
+  border: 2px solid #141414;
+  border-radius: 6px;
+  background: #00d6a3;
+  box-shadow: 4px 4px 0 #141414;
+  color: #141414;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.student-portal-link:hover {
+  background: #05b6d8;
+}
+
+@media (max-width: 650px) {
+  .users-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+#add-user-form input:focus,
+#add-user-form select:focus,
+#add-user-form textarea:focus {
+  border-color: #1976d2 !important;
+  box-shadow: 0 0 8px rgba(25, 118, 210, 0.3) !important;
+  outline: none;
+}
+
+#add-user-form input:hover,
+#add-user-form select:hover {
+  border-color: #64b5f6;
+}
+
+#add-user-form button[type="submit"] {
+  transition: all 0.3s ease;
+}
+
+#add-user-form button[type="submit"]:hover {
+  box-shadow: 0 6px 20px #43a04755;
+  transform: translateY(-2px);
+}
+
+#add-user-form button[type="submit"]:active {
+  transform: translateY(0);
+}
+
+#add-user-form button[type="reset"]:hover {
+  background: #e8e8e8;
+  border-color: #bdbdbd;
+}
+
+.input-group {
+  margin-bottom: 0;
+}
+#add-user-form button:hover {
+  background: #005f88;
+}
+#add-user-form button:active {
+  background: #003f6b;
+}
+
+h2 {
+  color: #003f6b;
+  font-weight: bold;
+  margin-bottom: 18px;
+}
+
+/* تم تعطيل ستايل الهيدر هنا للاعتماد على main.css فقط */
+/*
+.main-header {
+  background: linear-gradient(135deg, #0a1836 60%, #101c2c 100%);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  box-shadow: 0 2px 8px #1976d222;
+  min-height: 60px;
+}
+*/
+
+/* تمت إزالة أي تأثير sidebar متضارب، والاعتماد فقط على main.css */
+
+/* فرض نوع وحجم الخط للقائمة الجانبية في صفحة المستخدمين */
+.sidebar, .sidebar ul, .sidebar ul li, .sidebar ul li a, .sidebar ul li .sidebar-icon {
+  font-family: 'Cairo', 'Tajawal', 'Vazirmatn', Arial, sans-serif !important;
+  font-size: 18px !important;
+}
+
+.dashboard-content, .users-content, .reports-content, .expenses-content, .settings-content, .invoices-content, .help-content, .subscriptions-content, .unsubscribed_students-content {
+  margin-top: 92px !important;
+}
+
+table {
+  width: 100%;
+  margin: 30px 0 0 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  direction: rtl;
+  table-layout: auto;
+  max-width: unset;
+}
+table th, table td {
+  padding: 14px 10px;
+  border-bottom: 1px solid #e3eaf2;
+  text-align: right;
+  font-size: 16px;
+  word-break: break-word;
+}
+table th {
+  background: linear-gradient(90deg, #0a1836 60%, #101c2c 100%);
+  color: #fff;
+  font-weight: bold;
+  border-bottom: 2px solid #00eaff44;
+}
+table tr:last-child td {
+  border-bottom: none;
+}
+table tbody tr:nth-child(even) {
+  background: #f3f8ff;
+}
+table tbody tr:hover {
+  background: #e3f2fd;
+}
+
+/* تحسين استجابة صفحة المستخدمين للموبايل والشاشات الصغيرة */
+@media (max-width: 900px) {
+  .users-content {
+    padding: 10px 2vw 5px 2vw !important;
+    margin-right: 0 !important;
+  }
+  .sidebar {
+    display: none !important;
+  }
+}
+@media (max-width: 700px) {
+  .users-content {
+    padding: 4vw 1vw 2vw 1vw !important;
+  }
+}
+@media (max-width: 500px) {
+  .users-content {
+    padding: 2vw 0.5vw 1vw 0.5vw !important;
+  }
+}
+@media (min-width: 1600px) {
+  .users-content {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 40px 40px 30px 40px !important;
+  }
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  background: #f7fbff;
+  border-radius: 7px;
+  border: 1.5px solid #cde4ff;
+  margin-bottom: 12px;
+  padding: 0 8px;
+  position: relative;
+  transition: border 0.2s;
+}
+.input-group:focus-within {
+  border: 1.5px solid #1976d2;
+  background: #e3f2fd;
+}
+.input-group .input-icon {
+  font-size: 1.3em;
+  margin-left: 8px;
+  color: #1976d2;
+  opacity: 0.85;
+}
+.input-group input,
+.input-group select {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  font-size: 15px;
+  padding: 12px 8px;
+  color: #003f6b;
+}
+.input-group input:read-only {
+  color: #1976d2;
+  background: none;
+}
+.form-row {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+#user-form-alert {
+  border-radius: 7px;
+  padding: 10px 18px;
+  font-size: 15px;
+  margin-bottom: 10px;
+  display: none;
+}
+#user-form-alert.error {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1.5px solid #ffb300;
+}
+#user-form-alert.success {
+  background: #e8f5e9;
+  color: #388e3c;
+  border: 1.5px solid #43a047;
+}
+.users-table-section {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #1976d222;
+  padding: 24px 18px 18px 18px;
+  margin-top: 30px;
+}
+
+/* CSS للـ Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s all ease-in-out;
+  border-radius: 28px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s all ease-in-out;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+  box-shadow: 0 2px 8px rgba(67, 160, 71, 0.4);
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+input:disabled + .toggle-slider {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* أيقونات داخل الـ Toggle */
+.toggle-slider:after {
+  content: "OFF";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: bold;
+  color: #999;
+  letter-spacing: 0.5px;
+}
+
+input:checked + .toggle-slider:after {
+  content: "ON";
+  left: auto;
+  right: 6px;
+  color: #fff;
+}
+

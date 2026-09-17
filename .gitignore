@@ -1,0 +1,16 @@
+node_modules/
+node/
+install/
+Output/
+.cache/
+LOOK-CASHIER-Installer/
+LOOK-CASHIER-Setup-v2.0.0/
+LOOK-CASHIER-win32-ia32/
+ملفات الثتبيبت/
+src-tauri/target/
+data/
+*.exe
+*.zip
+*.blockmap
+.env
+.DS_Store

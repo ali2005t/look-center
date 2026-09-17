@@ -1,0 +1,541 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التقفيل اليومي</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/daily_closing.css" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      margin: 0;
+      background-color: #f4f8fc;
+      direction: rtl;
+    }
+
+    .filter-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin: 20px auto;
+      padding: 15px;
+      width: 90%;
+      background-color: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+    }
+
+    #filter-btn, #export-btn {
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    #filter-btn:hover, #export-btn:hover {
+      background-color: #1565c0;
+    }
+
+    #daily-closing-table {
+      width: calc(100% - 240px);
+      margin-right: 240px;
+      border-collapse: collapse;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+
+    #daily-closing-table th, #daily-closing-table td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    #daily-closing-table th {
+      background-color: #0a1836;
+      color: white;
+      font-weight: bold;
+    }
+
+    #daily-closing-table tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+
+    #daily-closing-table tr:hover {
+      background-color: #e3f2fd;
+    }
+
+    #daily-closing-table td {
+      color: #333;
+    }
+
+    /* نافذة تسجيل الخروج */
+    #logout-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(25, 118, 210, 0.18);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #logout-modal .modal-content {
+      background: linear-gradient(135deg, #fff 80%, #e3f2fd 100%);
+      padding: 38px 28px;
+      border-radius: 22px;
+      box-shadow: 0 8px 32px #1976d288, 0 2px 8px #101c2c44;
+      text-align: center;
+      max-width: 370px;
+      margin: auto;
+      position: relative;
+    }
+
+    #logout-modal .modal-content button.close {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: #1976d2;
+      cursor: pointer;
+    }
+
+    #logout-modal h2 {
+      color: #1976d2;
+      margin-bottom: 18px;
+      font-size: 1.5em;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    #logout-modal p {
+      color: #333;
+      margin-bottom: 22px;
+      font-size: 1.1em;
+    }
+
+    #logout-modal button {
+      padding: 12px 32px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s;
+    }
+
+    #logout-modal button#temp-logout-btn {
+      background: linear-gradient(90deg, #43a047 60%, #1976d2 100%);
+      color: #fff;
+    }
+
+    #logout-modal button#end-shift-btn {
+      background: linear-gradient(90deg, #ff9800 60%, #fbc02d 100%);
+      color: #fff;
+    }
+
+    /* تحسين مربعات الملخص */
+    #daily-summary > div > div {
+      min-height: 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #daily-summary > div > div p {
+      margin: 5px 0;
+    }
+
+    #daily-summary > div > div p:first-child {
+      font-size: 13px;
+      color: #666;
+    }
+
+    #daily-summary > div > div p:last-child {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* توسيط قسم الملخص */
+    #daily-summary > div:first-child {
+      margin: 0 auto;
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr);
+      justify-items: center;
+      align-items: center;
+    }
+
+    /* استجابة الشاشات الصغيرة */
+    @media (max-width: 1024px) {
+      #daily-closing-table {
+        width: 100% !important;
+        margin-right: 0 !important;
+        overflow-x: auto;
+      }
+
+      #daily-summary > div:first-child {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      #daily-summary > div:first-child {
+        grid-template-columns: 1fr !important;
+      }
+
+      #daily-closing-table th,
+      #daily-closing-table td {
+        padding: 8px;
+        font-size: 12px;
+      }
+    }
+
+    /* نمط الطباعة */
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        background: white;
+      }
+      
+      .sidebar {
+        display: none;
+      }
+      
+      .main-header {
+        display: none;
+      }
+      
+      main {
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+        padding: 20px;
+      }
+      
+      .filter-section {
+        display: none;
+      }
+      
+      #daily-closing-table {
+        width: 100% !important;
+        margin-right: 0 !important;
+        border-collapse: collapse;
+      }
+      
+      #daily-closing-table th,
+      #daily-closing-table td {
+        border: 1px solid #333;
+        padding: 8px;
+        text-align: right;
+        font-size: 11px;
+      }
+      
+      #daily-closing-table th {
+        background-color: #0a1836 !important;
+        color: white !important;
+        font-weight: bold;
+      }
+      
+      #daily-closing-table tr:nth-child(even) {
+        background-color: #f9f9f9 !important;
+      }
+      
+      #daily-summary {
+        width: 100% !important;
+        margin: 20px 0 !important;
+        padding: 15px !important;
+        page-break-inside: avoid;
+      }
+      
+      #daily-summary h3 {
+        font-size: 16px;
+        margin-bottom: 15px;
+      }
+      
+      #daily-summary > div {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr 1fr !important;
+        gap: 10px !important;
+      }
+      
+      #daily-summary > div > div {
+        padding: 10px !important;
+        font-size: 12px;
+        page-break-inside: avoid;
+      }
+      
+      #daily-summary > div > div p:first-child {
+        font-size: 10px;
+      }
+      
+      #daily-summary > div > div p:last-child {
+        font-size: 18px !important;
+      }
+      
+      #logout-modal {
+        display: none !important;
+      }
+      
+      button {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="main-header" style="background: linear-gradient(90deg, #0a1836, #101c2c);">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 2.2em;
+        font-weight: bold;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px #90caf9;
+        padding: 12px 32px;
+        border-radius: 18px;
+        box-shadow: 0 4px 24px #1976d244;
+        display: inline-block;
+      ">
+        <i class="fas fa-calendar-check" style="margin-left:12px;color:#43a047;"></i>
+        التقفيل اليومي
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+<br>
+<br>
+
+<br>
+
+<br>
+
+<br>
+
+<br>
+
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+  
+  <aside class="sidebar">
+    <ul>
+      <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+      <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li class="active" data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+     <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice" style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+  <li><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+  <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock" style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+  <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+  <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users" style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+  <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar" style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+  <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave" style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+  <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog" style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+  <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle" style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <!-- تحسين تصميم قسم التصفية -->
+    <div class="filter-section" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background-color: #0a1836; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); margin: 20px auto; width: 100%;">
+      <label for="filter-date" style="font-weight: bold; color: #1976d2;">تصفية حسب التاريخ:</label>
+      <input type="date" id="filter-date" style="padding: 8px; border: 1px solid #0a1836; border-radius: 5px;" />
+      <div style="display: flex; gap: 10px;">
+        <button id="filter-btn" style="background-color: #085aac; color: #ffffff; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer;">تصفية</button>
+        <button id="export-btn" style="background-color: #eb0909; color: #0a1836; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer;">تصدير البيانات</button>
+      </div>
+    </div>
+
+    <!-- تحديث الجدول لإضافة عمود الإجمالي -->
+    <table id="daily-closing-table">
+      <thead>
+        <tr>
+          <th>اسم المستخدم</th>
+          <th>وقت الدخول</th>
+          <th>وقت الخروج</th>
+          <th>عدد الفواتير (كورسات)</th>
+          <th>عدد الفواتير (ملازم)</th>
+          <th>عدد الفواتير (ملازم فردية)</th>
+          <th>عدد الفواتير (محاضرات فردية)</th>
+          <th>الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody id="daily-closing-table-body">
+        <!-- البيانات ستُملأ ديناميكيًا -->
+      </tbody>
+    </table>
+
+    <!-- إضافة قسم التحصيل اليومي والملخص -->
+    <div id="daily-summary" style="margin-right: auto; margin-left: auto; margin-top: 30px; padding: 20px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); width: 90%; max-width: 1200px;">
+      <h3 style="color: #1976d2; font-weight: bold; text-align: center; margin-bottom: 20px;">ملخص اليوم</h3>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+        <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 15px; border-radius: 8px; text-align: center;">
+          <p style="color: #666; margin: 0; font-size: 0.9em;">إجمالي الفواتير</p>
+          <p id="total-invoices" style="color: #1976d2; font-size: 1.8em; font-weight: bold; margin: 5px 0;">0</p>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #f1f8e9 0%, #c8e6c9 100%); padding: 15px; border-radius: 8px; text-align: center;">
+          <p style="color: #666; margin: 0; font-size: 0.9em;">إجمالي المبيعات</p>
+          <p id="total-sales-amount" style="color: #43a047; font-size: 1.8em; font-weight: bold; margin: 5px 0;">0 ج</p>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%); padding: 15px; border-radius: 8px; text-align: center;">
+          <p style="color: #666; margin: 0; font-size: 0.9em;">عدد المستخدمين</p>
+          <p id="total-users" style="color: #c2185b; font-size: 1.8em; font-weight: bold; margin: 5px 0;">0</p>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+        <button id="export-summary-btn" style="background-color: #ff9800; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+          <i class="fas fa-download"></i> تصدير الملخص
+        </button>
+        <button id="save-closing-btn" style="background-color: #43a047; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+          <i class="fas fa-save"></i> حفظ التقفيل اليومي
+        </button>
+        <button id="print-report-btn" style="background-color: #1976d2; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+          <i class="fas fa-print"></i> طباعة التقرير
+        </button>
+        <button id="send-report-btn" style="background-color: #9c27b0; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+          <i class="fas fa-envelope"></i> إرسال التقرير
+        </button>
+      </div>
+    </div>
+
+    <!-- قسم فواتير فودافون كاش المنفصلة -->
+    <div id="vodafone-section" style="margin-right: auto; margin-left: auto; margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%); border: 3px solid #d32f2f; border-radius: 12px; box-shadow: 0 6px 16px rgba(211, 47, 47, 0.25); width: 100%; max-width: 100%; box-sizing: border-box; display: none;">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px;">
+        <img src="img/Vodafone-Cash-Logo.png" alt="Vodafone Cash" style="height: 55px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));">
+        <h3 style="color: #c62828; font-weight: 900; margin: 0; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+          <span style="background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); color: white; padding: 8px 16px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 8px rgba(211, 47, 47, 0.3);">
+            فودافون كاش
+          </span>
+        </h3>
+      </div>
+      
+      <table id="vodafone-invoices-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+          <tr style="background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); color: white; box-shadow: 0 4px 8px rgba(211, 47, 47, 0.3);">
+            <th style="padding: 14px; text-align: center; border: 2px solid #b71c1c; font-weight: 900; font-size: 15px;">📱 رقم الفاتورة</th>
+            <th style="padding: 14px; text-align: center; border: 2px solid #b71c1c; font-weight: 900; font-size: 15px;">نوع الفاتورة</th>
+            <th style="padding: 14px; text-align: center; border: 2px solid #b71c1c; font-weight: 900; font-size: 15px;">⏰ الساعة</th>
+            <th style="padding: 14px; text-align: center; border: 2px solid #b71c1c; font-weight: 900; font-size: 15px;">👤 المستلم</th>
+            <th style="padding: 14px; text-align: center; border: 2px solid #b71c1c; font-weight: 900; font-size: 15px;">✓ الحالة</th>
+          </tr>
+        </thead>
+        <tbody id="vodafone-invoices-body">
+          <!-- ستُملأ ديناميكيًا -->
+        </tbody>
+      </table>
+
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button id="vodafone-print-btn" style="background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%); color: #fff; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; box-shadow: 0 4px 8px rgba(211, 47, 47, 0.3); transition: all 0.3s; display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-print"></i> طباعة البيانات المصدرة
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- نافذة تسجيل الخروج -->
+  <div id="logout-modal">
+    <div class="modal-content">
+      <button class="close" onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2>تسجيل الخروج</h2>
+      <p>اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn">خروج مؤقت</button><br>
+      <button id="end-shift-btn">إنهاء الشيفت</button>
+    </div>
+  </div>
+
+  <div id="total-sales" style="display: none;"></div>
+
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script src="js/electron-nav.js"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script type="module" src="js/daily_closing.js?v=portal-payments-v4"></script>
+  <script>
+      // الكود الخاص بالتصفية والتصدير تم نقله إلى ملف js/daily_closing.js
+      document.addEventListener('DOMContentLoaded', function() {
+        var logoutBtn = document.getElementById('logout-btn');
+        var modal = document.getElementById('logout-modal');
+        if (logoutBtn && modal) {
+          logoutBtn.onclick = function(e) {
+            e.preventDefault();
+            modal.style.display = 'flex';
+          };
+          document.getElementById('temp-logout-btn').onclick = function() {
+            modal.style.display = 'none';
+            window.location.href = 'login.html';
+          };
+          document.getElementById('end-shift-btn').onclick = function() {
+            modal.style.display = 'none';
+            window.dispatchEvent(new CustomEvent('endShift'));
+            window.location.href = 'login.html';
+          };
+          modal.onclick = function(e) {
+            if (e.target === modal) modal.style.display = 'none';
+          };
+        }
+        
+        // رسالة تجريبية في console
+        console.log('%c✅ تم تحميل صفحة التقفيل اليومي بنجاح', 'color: #43a047; font-size: 14px; font-weight: bold;');
+        console.log('%c💡 جدول فودافون كاش سيظهر عند وجود فواتير فودافون كاش مسجلة', 'color: #1976d2; font-size: 12px;');
+        
+        // معالج النقر على القائمة الجانبية
+        const sidebarLinks = document.querySelectorAll('.sidebar ul li a');
+        sidebarLinks.forEach(link => {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const href = this.getAttribute('href');
+            if (href && href.trim()) {
+              window.location.href = href;
+            }
+          });
+        });
+      });
+    </script>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+</html>

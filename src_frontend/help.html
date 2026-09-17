@@ -1,0 +1,396 @@
+﻿<!-- دليل المساعدة -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" style="text-align:right;">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>دليل المساعدة</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/help.css" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="css/mobile-nav.css" />
+  <link rel="stylesheet" href="css/mobile-dropdown-menu.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <style>
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4); }
+      50% { box-shadow: 0 15px 50px rgba(102, 126, 234, 0.7); }
+    }
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+      50% { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+    }
+    .dua-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+      color: #fff;
+      padding: 60px 45px;
+      text-align: center;
+      margin: 70px auto 40px;
+      border-radius: 20px;
+      max-width: 700px;
+      box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      animation: slideUp 0.8s ease-out, pulse 3s ease-in-out infinite;
+      font-family: 'Segoe UI', 'Tajawal', Tahoma, Geneva, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .dua-title {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 35px;
+      letter-spacing: 2px;
+      animation: glow 2s ease-in-out infinite;
+      color: #ffd700;
+    }
+    .dua-icon {
+      font-size: 40px;
+      margin-right: 15px;
+      display: inline-block;
+      animation: slideUp 0.8s ease-out 0.2s backwards;
+    }
+    .dua-line {
+      font-size: 17px;
+      margin: 12px auto;
+      letter-spacing: 0.5px;
+      line-height: 1.8;
+      animation: slideUp 0.8s ease-out backwards;
+      width: 100%;
+      text-align: center;
+      padding: 0 15px;
+      box-sizing: border-box;
+    }
+    .dua-line1 { animation-delay: 0.1s; margin-top: 15px; }
+    .dua-line2 { animation-delay: 0.3s; color: #ffd700; font-weight: 900; margin-top: 12px; }
+    .dua-line3 { animation-delay: 0.5s; margin-top: 12px; }
+    .dua-line4 { animation-delay: 0.7s; margin-top: 20px; }
+  </style>
+</head>
+<body style="text-align:right;direction:rtl;">
+  <header class="main-header">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 2.2em;
+        font-weight: bold;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px #90caf9;
+        padding: 12px 32px;
+        border-radius: 18px;
+        box-shadow: 0 4px 24px #1976d244;
+        display: inline-block;
+      ">
+        <i class="fas fa-graduation-cap" style="margin-left:12px;color:#43a047;"></i>
+        LOOK CENTER
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+  <main class="help-content" dir="rtl" style="text-align:right;direction:rtl;">
+    <aside class="sidebar">
+      <ul>
+  <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+  <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+     <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+
+  <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice" style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+  <li><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+  <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock" style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+  <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+  <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users" style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+  <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar" style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+  <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave" style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+  <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog" style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+  <li class="active" data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle" style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+      </ul>
+    </aside>
+    <section class="help-main-content" style="text-align:right;direction:rtl;">
+      <div class="help-content-body">
+        <h2 style="color:#1976d2;font-size:1.8em;margin-bottom:10px;"><i class="fas fa-book" style="margin-left:12px;"></i> دليل المساعدة الشامل</h2>
+        <div class="help-card" style="background:linear-gradient(135deg,#e3f2fd 0%,#f3e5f5 100%);border-radius:15px;padding:25px;margin-bottom:35px;font-size:1.05em;color:#333;border-left:5px solid #1976d2;box-shadow:0 4px 15px rgba(25,118,210,0.1);">
+          <p style="margin:0;line-height:1.8;">
+            <strong style="color:#1976d2;">👋 أهلاً وسهلاً بك!</strong><br/>
+            ستجد هنا شرحًا مفصلاً وسهلاً لكل صفحة من صفحات النظام، مع معلومات عملية عن كيفية استخدام كل ميزة. النظام مصمم ليكون سهل الاستخدام، لكن إذا احتجت مساعدة، كل شيء مشروح هنا بوضوح.
+          </p>
+        </div>
+        <!-- القسم الأول: الصفحات الرئيسية -->
+        <div style="background:linear-gradient(90deg,#e3f2fd 0%,#f3e5f5 100%);padding:20px;border-radius:12px;margin-bottom:30px;border-right:5px solid #1976d2;">
+          <h3 style="color:#1976d2;margin-top:0;"><i class="fas fa-th-large" style="margin-left:10px;"></i>الصفحات الرئيسية</h3>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #1976d2;background:linear-gradient(135deg,rgba(25,118,210,0.1) 0%,rgba(25,118,210,0.05) 100%);">
+          <h3 style="color:#1976d2;"><i class="fas fa-tachometer-alt" style="color:#1976d2;margin-left:10px;"></i>لوحة التحكم</h3>
+          <ul style="color:#333;">
+            <li>📊 تعرض ملخص سريع لأهم الإحصائيات (عدد الطلاب، الإيرادات، أحدث الفواتير).</li>
+            <li>👁️ رؤية شاملة وسريعة لحالة السنتر الحالية.</li>
+            <li>⚡ تحديث فوري للبيانات الأساسية.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #43a047;background:linear-gradient(135deg,rgba(67,160,71,0.1) 0%,rgba(67,160,71,0.05) 100%);">
+          <h3 style="color:#43a047;"><i class="fas fa-cash-register" style="color:#43a047;margin-left:10px;"></i>الكاشير</h3>
+          <ul style="color:#333;">
+            <li>💵 إنشاء فواتير جديدة للطلاب المشتركين والغير مشتركين.</li>
+            <li>📝 إضافة اشتراكات أو ملازم فردية بسهولة.</li>
+            <li>🔍 البحث السريع عن طالب وإضافة فاتورة له مباشرة.</li>
+          </ul>
+        </div>
+
+        <!-- القسم الثاني: إدارة الفواتير والطلاب -->
+        <div style="background:linear-gradient(90deg,#fff3e0 0%,#ffe0b2 100%);padding:20px;border-radius:12px;margin:30px 0;border-right:5px solid #ff9800;">
+          <h3 style="color:#ff9800;margin-top:0;"><i class="fas fa-file-alt" style="margin-left:10px;"></i>إدارة الفواتير والطلاب</h3>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #fbc02d;background:linear-gradient(135deg,rgba(251,192,45,0.1) 0%,rgba(251,192,45,0.05) 100%);">
+          <h3 style="color:#f57f17;"><i class="fas fa-file-invoice" style="color:#fbc02d;margin-left:10px;"></i>الطلاب المشتركين</h3>
+          <ul style="color:#333;">
+            <li>📋 استعراض وإدارة جميع فواتير الطلاب المشتركين.</li>
+            <li>🔎 البحث والتصفية المتقدمة حسب الاسم أو الفرقة أو نوع الاشتراك.</li>
+            <li>🖨️ فتح تفاصيل الفاتورة وطباعتها مباشرة.</li>
+            <li>✏️ تعديل وحذف الفواتير بسهولة.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #e53935;background:linear-gradient(135deg,rgba(229,57,53,0.1) 0%,rgba(229,57,53,0.05) 100%);">
+          <h3 style="color:#c62828;"><i class="fas fa-user-minus" style="color:#e53935;margin-left:10px;"></i>فواتير فردية</h3>
+          <ul style="color:#333;">
+            <li>👤 إدارة ملازم أو محاضرات فردية للطلاب غير المشتركين.</li>
+            <li>🔍 البحث والتصفية لسهولة إيجاد الفواتير.</li>
+            <li>💾 حفظ سجل كامل للفواتير الفردية.</li>
+          </ul>
+        </div>
+
+        <!-- القسم الثالث: الإعدادات والاشتراكات -->
+        <div style="background:linear-gradient(90deg,#e0f2f1 0%,#b2dfdb 100%);padding:20px;border-radius:12px;margin:30px 0;border-right:5px solid #00897b;">
+          <h3 style="color:#00897b;margin-top:0;"><i class="fas fa-cog" style="margin-left:10px;"></i>الإعدادات والاشتراكات</h3>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #00897b;background:linear-gradient(135deg,rgba(0,137,123,0.1) 0%,rgba(0,137,123,0.05) 100%);">
+          <h3 style="color:#004d40;"><i class="fas fa-credit-card" style="color:#00897b;margin-left:10px;"></i>الاشتراكات والأسعار</h3>
+          <ul style="color:#333;">
+            <li>💳 ضبط أسعار الكورسات والملازم المختلفة.</li>
+            <li>➕ إضافة أو تعديل اشتراكات جديدة.</li>
+            <li>📊 تحديد الأسعار لكل فرقة دراسية.</li>
+            <li>📱 إدارة الاشتراكات ونشرها وإخفاؤها.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #455a64;background:linear-gradient(135deg,rgba(69,90,100,0.1) 0%,rgba(69,90,100,0.05) 100%);">
+          <h3 style="color:#263238;"><i class="fas fa-sliders-h" style="color:#455a64;margin-left:10px;"></i>الإعدادات</h3>
+          <ul style="color:#333;">
+            <li>🏢 ضبط بيانات السنتر (الاسم، العنوان، الشعار).</li>
+            <li>📱 تحديث أرقام الهاتف والبريد الإلكتروني.</li>
+            <li>⚙️ إعدادات النظام العامة والخيارات المتقدمة.</li>
+          </ul>
+        </div>
+
+        <!-- القسم الرابع: التقارير والمستخدمين -->
+        <div style="background:linear-gradient(90deg,#f3e5f5 0%,#e1bee7 100%);padding:20px;border-radius:12px;margin:30px 0;border-right:5px solid #7e57c2;">
+          <h3 style="color:#7e57c2;margin-top:0;"><i class="fas fa-users" style="margin-left:10px;"></i>التقارير والمستخدمين</h3>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #0288d1;background:linear-gradient(135deg,rgba(2,136,209,0.1) 0%,rgba(2,136,209,0.05) 100%);">
+          <h3 style="color:#01579b;"><i class="fas fa-chart-bar" style="color:#0288d1;margin-left:10px;"></i>التقارير</h3>
+          <ul style="color:#333;">
+            <li>📈 استخراج تقارير الأرباح والإيرادات الشاملة.</li>
+            <li>📊 توزيع الطلاب حسب الاشتراكات والفرقات.</li>
+            <li>💹 تحليل متقدم للإيرادات والمصروفات.</li>
+            <li>📥 تحميل التقارير بصيغ مختلفة.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #f57c00;background:linear-gradient(135deg,rgba(245,124,0,0.1) 0%,rgba(245,124,0,0.05) 100%);">
+          <h3 style="color:#e65100;"><i class="fas fa-users" style="color:#f57c00;margin-left:10px;"></i>إدارة المستخدمين</h3>
+          <ul style="color:#333;">
+            <li>👥 إضافة وتعديل وحذف المستخدمين.</li>
+            <li>🔐 التحكم الدقيق في الصلاحيات والأدوار.</li>
+            <li>✅ تفعيل أو تعطيل الحسابات.</li>
+            <li>🛡️ إدارة أذونات العمليات المختلفة.</li>
+          </ul>
+        </div>
+
+        <!-- القسم الخامس: العمليات اليومية -->
+        <div style="background:linear-gradient(90deg,#ffebee 0%,#ffcdd2 100%);padding:20px;border-radius:12px;margin:30px 0;border-right:5px solid #c2185b;">
+          <h3 style="color:#c2185b;margin-top:0;"><i class="fas fa-calendar-check" style="margin-left:10px;"></i>العمليات اليومية</h3>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #c2185b;background:linear-gradient(135deg,rgba(194,24,91,0.1) 0%,rgba(194,24,91,0.05) 100%);">
+          <h3 style="color:#880e4f;"><i class="fas fa-money-bill-wave" style="color:#c2185b;margin-left:10px;"></i>المصروفات</h3>
+          <ul style="color:#333;">
+            <li>💸 تسجيل المصروفات اليومية بكل سهولة.</li>
+            <li>📝 استعراض وتنظيم ملخص المصروفات الشامل.</li>
+            <li>🔍 البحث والتصفية المتقدمة للمصروفات.</li>
+            <li>📊 عرض إحصائيات المصروفات الشهرية.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #8e24aa;background:linear-gradient(135deg,rgba(142,36,170,0.1) 0%,rgba(142,36,170,0.05) 100%);">
+          <h3 style="color:#4a148c;"><i class="fas fa-clock" style="color:#8e24aa;margin-left:10px;"></i>الطلاب المتأخرين في الدفع</h3>
+          <ul style="color:#333;">
+            <li>⚠️ عرض قائمة الطلاب الذين تأخروا عن السداد.</li>
+            <li>🎨 ملون حسب درجة التأخير (أحمر/أصفر/أخضر).</li>
+            <li>💰 معلومات عن المبلغ المتبقي والفترة المتبقية.</li>
+            <li>🔔 تنبيهات سريعة للمتأخرين.</li>
+          </ul>
+        </div>
+
+        <div class="help-card" style="border-right:5px solid #ff9800;background:linear-gradient(135deg,rgba(255,152,0,0.1) 0%,rgba(255,152,0,0.05) 100%);">
+          <h3 style="color:#e65100;"><i class="fas fa-calendar-check" style="color:#ff9800;margin-left:10px;"></i>التقفيل اليومي</h3>
+          <ul style="color:#333;">
+            <li>✅ تقفيل الحسابات اليومية بشكل آمن وموثوق.</li>
+            <li>📊 عرض ملخص شامل للإيرادات اليومية.</li>
+            <li>🖨️ طباعة التقرير النهائي للمراجعة والأرشفة.</li>
+            <li>📱 ربط مع فاتورة فودافون للتسديدات الإلكترونية.</li>
+          </ul>
+        </div>
+        
+        <!-- رسالة دعاء جميلة للمطور -->
+        <div class="dua-section">
+          <p class="dua-title">
+            <span class="dua-icon">🙏</span>
+            برجاء الدعاء للمطور
+          </p>
+          <p class="dua-line dua-line1">شكراً لاستخدام نظام LOOK CASHIER</p>
+          <p class="dua-line dua-line2" style="font-size:18px;font-weight:bold;color:#ffd700;">Eng. LoL ✨</p>
+          <p class="dua-line dua-line3" style="color:#e0d5ff;">💡 نتمنى أن يكون النظام مفيداً لك</p>
+          <p class="dua-line dua-line4" style="font-size:14px;color:#c9c3ff;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.2);">جزاك الله خيراً على استخدامك النظام</p>
+        </div>
+      </div>
+    </section>
+  </main>
+<div id="logout-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
+      <button style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:22px;color:#1976d2;cursor:pointer;" onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.5em;font-weight:bold;letter-spacing:1px;">تسجيل الخروج</h2>
+      <p style="color:#333;margin-bottom:22px;font-size:1.1em;">اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn" style="background:linear-gradient(90deg,#43a047 60%,#1976d2 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;margin-bottom:16px;box-shadow:0 2px 8px #43a04722;transition:background 0.2s;">خروج مؤقت</button><br>
+      <button id="end-shift-btn" style="background:linear-gradient(90deg,#ff9800 60%,#fbc02d 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:background 0.2s;">إنهاء الشيفت</button>
+    </div>
+  </div>
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script src="js/electron-nav.js"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script type="module" src="js/help.js"></script>
+  <script>
+  function handleMobileTabs() {
+    const tabs = document.querySelector('.mobile-tabs');
+    if(window.innerWidth <= 900) {
+      tabs && (tabs.style.display = 'flex');
+    } else {
+      tabs && (tabs.style.display = 'none');
+    }
+  }
+  window.addEventListener('resize', handleMobileTabs);
+  window.addEventListener('DOMContentLoaded', handleMobileTabs);
+  if(document.querySelector('.mobile-tabs')) {
+    document.querySelectorAll('.mobile-tabs .tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        window.location.href = btn.getAttribute('data-link');
+      });
+    });
+  }
+  // منطق إظهار الكارت المناسب فقط
+  // تم تعطيل الكود الخاص بالsidebar القديم لأنه غير مستخدم في التصميم الحالي
+  /*
+  const sidebarList = document.getElementById('help-sidebar-list');
+  const cards = {
+    permissions: document.getElementById('help-card-permissions'),
+    pages: document.getElementById('help-card-pages')
+  };
+  function showCard(key) {
+    Object.keys(cards).forEach(k => cards[k].style.display = 'none');
+    if(cards[key]) cards[key].style.display = 'block';
+  }
+  sidebarList.querySelectorAll('li').forEach(li => {
+    li.onclick = function() {
+      sidebarList.querySelectorAll('li').forEach(x=>x.classList.remove('active'));
+      li.classList.add('active');
+      showCard(li.getAttribute('data-section'));
+    };
+  });
+  // إظهار أول كارت افتراضيًا
+  showCard('permissions');
+  sidebarList.querySelector('li[data-section="permissions"]').classList.add('active');
+  */
+  document.addEventListener('DOMContentLoaded', function() {
+    var logoutBtn = document.getElementById('logout-btn');
+    var modal = document.getElementById('logout-modal');
+    if (logoutBtn && modal) {
+      logoutBtn.onclick = function(e) {
+        e.preventDefault();
+        modal.style.display = 'flex';
+      };
+      document.getElementById('temp-logout-btn').onclick = function() {
+        modal.style.display = 'none';
+        window.location.href = 'login.html';
+      };
+      document.getElementById('end-shift-btn').onclick = function() {
+        modal.style.display = 'none';
+        window.dispatchEvent(new CustomEvent('endShift'));
+        window.location.href = 'login.html';
+      };
+      modal.onclick = function(e) {
+        if (e.target === modal) modal.style.display = 'none';
+      };
+    }
+    
+    // معالج النقر على القائمة الجانبية
+    const sidebarLinks = document.querySelectorAll('.sidebar ul li a');
+    sidebarLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const href = this.getAttribute('href');
+        if (href && href.trim()) {
+          window.location.href = href;
+        }
+      });
+    });
+  });
+</script>
+<footer style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;"><b>Powered by Eng. Lol</b></footer>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+</html>
+
+
+
+
+

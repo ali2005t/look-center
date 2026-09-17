@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الكاشير</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/cashier.css" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v4" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+
+<body>
+
+  <!-- الهيدر -->
+  <header class="main-header">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 1.8em;
+        font-weight: bold;
+        letter-spacing: 1px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 1px 1px 4px #90caf9;
+        padding: 8px 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px #1976d244;
+        display: inline-block;
+      ">
+        مرحباً جاري التحميل...
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="demo-mode-btn" class="demo-mode-btn" title="تفعيل الوضع التجريبي">الوضع التجريبي</button>
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+
+
+
+  <!-- القائمة الجانبية -->
+  <aside class="sidebar">
+    <ul>
+      <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i
+              class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+      <li class="active" data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i
+              class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i
+              class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+
+      <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice"
+              style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus"
+              style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+      <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock"
+              style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+      <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i
+              class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+      <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users"
+              style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+      <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar"
+              style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+      <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave"
+              style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+      <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog"
+              style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+      <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle"
+              style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- المحتوى -->
+  <main class="cashier-container" style="margin-right:220px;">
+    <div class="cashier-top-group">
+      <section class="grades-section">
+        <div class="grade-btn" data-grade="أولى">أولى</div>
+        <div class="grade-btn" data-grade="ثانية">ثانية</div>
+        <div class="grade-btn" data-grade="ثالثة">ثالثة</div>
+        <div class="grade-btn" data-grade="رابعة">رابعة</div>
+      </section>
+
+      <section class="subscriptions-section" id="subs-section" style="display:none;">
+        <div class="sub-btn" data-type="اشتراك كورسات">اشتراك كورسات</div>
+        <div class="sub-btn" data-type="اشتراك ملازم">اشتراك ملازم</div>
+        <div class="sub-btn" data-type="محاضرات فردية">محاضرات فردية</div>
+        <div class="sub-btn" data-type="ملازم فردية">ملازم فردية</div>
+      </section>
+      <div id="items-container">
+        <table id="items-table" style="width:100%; display:none;">
+          <thead>
+            <tr>
+              <th>اسم العنصر</th>
+              <th>السعر</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr id="items-placeholder">
+              <td colspan="3" style="color:#888;">اختر الفرقة والنوع لعرض العناصر</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="cashier-flex-row">
+      <section class="form-section">
+        <form id="invoice-form">
+          <div class="form-fields-group">
+            <div class="form-group" id="student-group">
+              <input type="text" placeholder="اسم الطالب" id="student-name" name="student" />
+            </div>
+            <div class="form-group" id="phone-group">
+              <input type="tel" placeholder="رقم الهاتف" id="phone" name="phone" />
+            </div>
+            <input type="text" id="grade" name="grade" readonly placeholder="الفرقة" />
+            <select id="study-type" name="studyType">
+              <option disabled selected>انتظام / انتساب</option>
+              <option value="انتظام">انتظام</option>
+              <option value="انتساب">انتساب</option>
+            </select>
+            <input type="text" id="sub-type" name="subType" readonly placeholder="نوع الاشتراك" />
+          </div>
+          <div id="selected-items-box">
+            <b style="color:#0077aa;">العناصر المختارة:</b>
+            <span id="selected-items-list"></span>
+          </div>
+          <div class="payment-methods">
+            <label>طريقة الدفع:</label>
+            <select id="payment-method" name="paymentMethod">
+              <option value="نقدي">نقدي</option>
+              <option value="فودافون كاش">فودافون كاش</option>
+              <option value="تقسيط">تقسيط</option>
+            </select>
+          </div>
+          <div id="installment-fields" style="display:none; margin:10px 0 0 0;">
+            <label style="display:block;margin-bottom:4px;color:#1976d2;font-weight:bold;">بيانات التقسيط:</label>
+            <input type="number" id="installment-total" name="installmentTotal" placeholder="إجمالي المبلغ (جنيه)"
+              min="0" style="margin-bottom:6px;" />
+            <input type="number" id="installment-paid" name="installmentPaid" placeholder="المبلغ المدفوع (جنيه)"
+              min="0" style="margin-bottom:6px;" />
+            <input type="number" id="installment-remaining" name="installmentRemaining"
+              placeholder="المبلغ المتبقي (جنيه)" min="0" style="margin-bottom:6px;" readonly />
+          </div>
+          <textarea id="notes" name="notes" placeholder="ملاحظات الدفع / التقسيط"></textarea>
+
+          <!-- قسم تسليم كروت الأونلاين — بيظهر تلقائياً لو الاشتراك بيه كروت مرتبطة -->
+          <div id="online-card-delivery-box"
+            style="display:none;background:#e3f2fd;border-radius:10px;padding:12px 16px;margin:10px 0;border:1px solid #90caf9;">
+            <b style="color:#1976d2;">🃏 كروت الأونلاين:</b>
+            <div id="online-card-delivery-list" style="margin-top:8px;"></div>
+          </div>
+
+          <div class="action-buttons">
+            <button type="submit" id="add-invoice-btn">إضافة الفاتورة</button>
+          </div>
+        </form>
+        <!-- نافذة منبثقة للطباعة -->
+        <div id="print-modal"
+          style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,0.25);z-index:9999;align-items:center;justify-content:center;">
+          <div
+            style="background:#fff;border-radius:16px;box-shadow:0 4px 32px #1976d255;padding:32px 24px;max-width:350px;margin:auto;text-align:center;">
+            <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.3em;">هل تريد طباعة الفاتورة؟</h2>
+            <div style="display:flex;gap:18px;justify-content:center;">
+              <button id="confirm-print"
+                style="background:#43a047;color:#fff;padding:10px 24px;border:none;border-radius:8px;font-size:16px;font-weight:bold;box-shadow:0 2px 8px #43a04722;cursor:pointer;">نعم</button>
+              <button id="cancel-print"
+                style="background:#e53935;color:#fff;padding:10px 24px;border:none;border-radius:8px;font-size:16px;font-weight:bold;box-shadow:0 2px 8px #e5393522;cursor:pointer;">لا</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="invoice-preview" id="preview-box">
+        <!-- سيتم توليد معاينة الفاتورة هنا بشكل عصري وتفاعلي -->
+        <div id="print-invoice" style="display:none;">
+          <div style="text-align:center;padding:10px 0;">
+            <img id="print-logo" src="img/placeholder-logo.png" alt="شعار السنتر"
+              style="width:60px;display:block;margin:auto 0 8px auto;" />
+            <div style="font-size:1.2em;font-weight:bold;color:#1976d2;margin-bottom:10px;">اسم السنتر</div>
+            <div style="margin-bottom:8px;">
+              <div style="font-size:1em;color:#333;">01012345678</div>
+              <div style="font-size:1em;color:#333;">01123456789</div>
+              <div style="font-size:1em;color:#333;">01234567890</div>
+            </div>
+            <div id="print-data" style="font-size:1.1em;color:#333;line-height:1.7;margin:0 auto;text-align:center;">
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- نافذة تسجيل الخروج -->
+  <div id="logout-modal"
+    style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
+    <div
+      style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
+      <button
+        style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:22px;color:#1976d2;cursor:pointer;"
+        onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.5em;font-weight:bold;letter-spacing:1px;">تسجيل الخروج
+      </h2>
+      <p style="color:#333;margin-bottom:22px;font-size:1.1em;">اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn"
+        style="background:linear-gradient(90deg,#43a047 60%,#1976d2 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;margin-bottom:16px;box-shadow:0 2px 8px #43a04722;transition:background 0.2s;">خروج
+        مؤقت</button><br>
+      <button id="end-shift-btn"
+        style="background:linear-gradient(90deg,#ff9800 60%,#fbc02d 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:background 0.2s;">إنهاء
+        الشيفت</button>
+    </div>
+  </div>
+
+  <footer
+    style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;">
+    <b>Powered by Eng. Lol</b>
+  </footer>
+
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script type="module" src="js/cashier.js"></script>
+  <script>
+    // معالج النقر على القائمة الجانبية - بسيط وفعال
+    document.addEventListener('DOMContentLoaded', function () {
+      const sidebarLinks = document.querySelectorAll('.sidebar ul li a');
+      sidebarLinks.forEach(link => {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const href = this.getAttribute('href');
+          if (href && href.trim()) {
+            window.location.href = href;
+          }
+        });
+      });
+    });
+
+    // إظهار التابات في وضع الهاتف فقط
+    function handleMobileTabs() {
+      const tabs = document.querySelector('.mobile-tabs');
+      if (window.innerWidth <= 900) {
+        tabs && (tabs.style.display = 'flex');
+      } else {
+        tabs && (tabs.style.display = 'none');
+      }
+    }
+    window.addEventListener('resize', handleMobileTabs);
+    window.addEventListener('DOMContentLoaded', handleMobileTabs);
+    // التنقل بين الصفحات
+    if (document.querySelector('.mobile-tabs')) {
+      document.querySelectorAll('.mobile-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          window.location.href = btn.getAttribute('data-link');
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var logoutBtn = document.getElementById('logout-btn');
+      var modal = document.getElementById('logout-modal');
+      if (logoutBtn && modal) {
+        logoutBtn.onclick = function (e) {
+          e.preventDefault();
+          modal.style.display = 'flex';
+        };
+        document.getElementById('temp-logout-btn').onclick = function () {
+          modal.style.display = 'none';
+          window.location.href = 'login.html';
+        };
+        document.getElementById('end-shift-btn').onclick = function () {
+          modal.style.display = 'none';
+          window.dispatchEvent(new CustomEvent('endShift'));
+          window.location.href = 'login.html';
+        };
+        modal.onclick = function (e) {
+          if (e.target === modal) modal.style.display = 'none';
+        };
+      }
+    });
+  </script>
+  <script src="js/mobile-nav.js"></script>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+
+</html>

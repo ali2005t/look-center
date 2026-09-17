@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>إدارة بوابة الطلاب</title>
+  <link rel="stylesheet" href="portal.css?v=1">
+  <link rel="stylesheet" href="admin.css?v=1">
+</head>
+<body>
+  <main class="admin-shell">
+    <header class="admin-header">
+      <div class="brand-lockup">
+        <div class="brand-arabic">مركـــــــــــز <span>لــــــــوك</span></div>
+        <div class="brand-english">LOOK</div>
+        <h1 id="portal-title">بوابة المسؤولين</h1>
+      </div>
+      <div class="header-actions"><button id="logout-button" class="secondary-button" hidden>تسجيل الخروج</button></div>
+    </header>
+
+    <section id="login-panel" class="admin-panel login-panel">
+      <p class="eyebrow">بوابة المستخدمين</p>
+      <h2>تسجيل الدخول</h2>
+      <form id="admin-login-form">
+        <label>اسم المستخدم أو البريد<input id="admin-email" required autocomplete="username"></label>
+        <label>كلمة المرور<input id="admin-password" type="password" required autocomplete="current-password"></label>
+        <button type="submit">دخول</button>
+      </form>
+      <div class="notice error" id="login-error" hidden></div>
+    </section>
+
+    <section id="dashboard-panel" hidden>
+      <div class="stats-grid">
+        <article><strong id="total-students">0</strong><span>طلابك المسجلون</span></article>
+        <article><strong id="paid-students">0</strong><span>تم الدفع</span></article>
+        <article><strong id="unpaid-students">0</strong><span>لم يتم الدفع</span></article>
+        <article><strong id="today-students">0</strong><span>تسجيلات اليوم</span></article>
+        <article><strong id="today-payments">0 ج</strong><span>مدفوعات اليوم</span></article>
+        <article><strong id="total-payments">0 ج</strong><span>إجمالي المدفوعات</span></article>
+      </div>
+
+      <section class="admin-panel">
+        <div class="panel-heading"><h2>رابط تسجيل الطلاب</h2><button id="refresh-button" class="secondary-button">تحديث</button></div>
+        <div id="agents-list" class="agents-list"></div>
+      </section>
+
+      <section class="admin-panel">
+        <div class="panel-heading"><h2>تسجيلات الطلاب</h2><select id="agent-filter"><option value="">كل المسؤولين</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>الطالب</th><th>الهاتف</th><th>الفرقة</th><th>المسؤول</th><th>التسجيل</th><th>المبلغ</th><th>الدفع</th></tr></thead><tbody id="students-body"></tbody></table></div>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="admin.js?v=1"></script>
+</body>
+</html>

@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#141414">
   <title>تسجيل بيانات الطالب</title>
-  <link rel="stylesheet" href="portal.css?v=2">
+  <script>
+    const portalBase = new URL(window.location.href);
+    if (!portalBase.pathname.endsWith('/')) portalBase.pathname += '/';
+    const portalStylesheet = document.createElement('link');
+    portalStylesheet.rel = 'stylesheet';
+    portalStylesheet.href = new URL('portal.css?v=3', portalBase).href;
+    document.head.appendChild(portalStylesheet);
+  </script>
 </head>
 <body>
   <main class="portal-shell">
@@ -47,6 +54,13 @@
       </div>
     </section>
   </main>
-  <script type="module" src="portal.js?v=2"></script>
+  <script type="module">
+    const portalBase = new URL(window.location.href);
+    if (!portalBase.pathname.endsWith('/')) portalBase.pathname += '/';
+    const portalScript = document.createElement('script');
+    portalScript.type = 'module';
+    portalScript.src = new URL('portal.js?v=3', portalBase).href;
+    document.body.appendChild(portalScript);
+  </script>
 </body>
 </html>

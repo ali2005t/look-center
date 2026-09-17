@@ -34,8 +34,9 @@ function renderAgents() {
   agentFilter.innerHTML = '<option value="">كل المسؤولين</option>';
   agentsList.innerHTML = agents.length ? '' : '<p>لا يوجد مسؤولون مفعلون.</p>';
   agents.forEach(agent => {
-    const projectBase = window.location.pathname.split('/موقع الطلاب/')[0];
-    const link = `${window.location.origin}${projectBase}/موقع الطلاب/index.html?agent=${encodeURIComponent(agent.id)}`;
+    const portalUrl = new URL('index.html', window.location.href);
+    portalUrl.searchParams.set('agent', agent.id);
+    const link = portalUrl.href;
     const qr = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}`;
     const card = document.createElement('article');
     card.className = 'agent-card';

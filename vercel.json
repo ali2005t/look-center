@@ -3,5 +3,12 @@
   "framework": null,
   "outputDirectory": ".",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/موقع الطلاب",
+      "destination": "/موقع الطلاب/",
+      "permanent": false
+    }
+  ]
 }

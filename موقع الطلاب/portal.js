@@ -16,6 +16,13 @@ const optionsBox = document.getElementById('subscription-options');
 const totalBox = document.getElementById('selected-total');
 let availableSubscriptions = [];
 
+function withTimeout(promise, label, timeoutMs = 12000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`انتهت مهلة الاتصال أثناء ${label}`)), timeoutMs))
+  ]);
+}
+
 function showError(message) {
   errorBox.textContent = message;
   errorBox.hidden = false;
@@ -42,7 +49,7 @@ async function loadAgent() {
     return;
   }
 
-  const agentSnapshot = await getDoc(doc(db, 'users', agentId));
+  const agentSnapshot = await withTimeout(getDoc(doc(db, 'users', agentId)), 'التحقق من المسؤول');
   if (!agentSnapshot.exists()) {
     showError('هذا الرابط غير صالح أو لم يعد متاحًا.');
     return;
@@ -55,10 +62,10 @@ async function loadAgent() {
   }
 
   agentBanner.textContent = `التسجيل عن طريق: ${agent.fullname || agent.username || 'المسؤول'}`;
-  const subscriptionsSnapshot = await getDocs(collection(db, 'subscriptions'));
+  const subscriptionsSnapshot = await withTimeout(getDocs(collection(db, 'subscriptions')), 'تحميل الاشتراكات');
   availableSubscriptions = subscriptionsSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   renderSubscriptionOptions();
-  const existingRegistration = await getDocs(query(collection(db, 'studentRegistrations'), where('deviceToken', '==', deviceToken)));
+  const existingRegistration = await withTimeout(getDocs(query(collection(db, 'studentRegistrations'), where('deviceToken', '==', deviceToken))), 'التحقق من التسجيل السابق');
   if (localStorage.getItem(deviceKey) === 'registered' || !existingRegistration.empty) {
     agentBanner.textContent = 'تم التسجيل من هذا الهاتف بالفعل';
     successBox.hidden = false;
@@ -112,5 +119,8 @@ form.addEventListener('submit', async (event) => {
 
 loadAgent().catch((error) => {
   console.error(error);
-  showError('تعذر التحقق من رابط التسجيل.');
+  const reason = error.code === 'permission-denied'
+    ? 'صلاحيات Firebase تمنع الوصول إلى بيانات التسجيل.'
+    : error.message || 'تعذر الاتصال بقاعدة البيانات.';
+  showError(`تعذر التحقق من رابط التسجيل: ${reason}`);
 });

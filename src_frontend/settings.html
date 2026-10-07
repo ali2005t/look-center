@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>الإعدادات</title>
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/settings.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/settings.css?v=settings-v2" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
 </head>
 
@@ -57,8 +57,6 @@
       <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
     </ul>
   </nav>
-    </div>
-  </header>
   <aside class="sidebar">
     <ul>
   <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
@@ -78,26 +76,67 @@
   </aside>
 
   <main class="settings-content" style="margin-right:220px;">
-    <h2>إعدادات النظام</h2>
+    <div class="settings-intro">
+      <span class="settings-intro-icon"><i class="fas fa-sliders-h" aria-hidden="true"></i></span>
+      <div>
+        <span class="settings-kicker">LOOK CENTER · CONFIGURATION</span>
+        <h1>إعدادات النظام</h1>
+        <p>حدّث بيانات المركز ووسائل التواصل وإعدادات بوابة VIP من مكان واحد.</p>
+      </div>
+    </div>
     <form id="settings-form">
-      <label>اسم السنتر:
-        <input type="text" id="center-name-input" />
-      </label>
-      <label>تغيير الشعار:
-        <input type="file" id="center-logo-input" />
-      </label>
-      <label>رقم الهاتف 1:
-        <input type="text" id="center-phone-1" placeholder="01xxxxxxxxx" />
-      </label>
-      <label>رقم الهاتف 2:
-        <input type="text" id="center-phone-2" placeholder="اختياري" />
-      </label>
-      <label>رقم الهاتف 3:
-        <input type="text" id="center-phone-3" placeholder="اختياري" />
-      </label>
-      <label>عنوان السنتر:
-        <input type="text" id="center-address" placeholder="العنوان بالتفصيل" />
-      </label>
+      <section class="settings-section">
+        <div class="settings-section-heading">
+          <span><i class="fas fa-building" aria-hidden="true"></i></span>
+          <div><h2>بيانات المركز</h2><p>الاسم والشعار اللذان يظهران في صفحات النظام والفواتير.</p></div>
+        </div>
+        <div class="settings-fields">
+          <label>اسم السنتر:
+            <input type="text" id="center-name-input" />
+          </label>
+          <label>تغيير الشعار:
+            <input type="file" id="center-logo-input" accept="image/*" />
+            <small id="center-logo-status">يتم تصغير الشعار تلقائياً قبل حفظه.</small>
+          </label>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="settings-section-heading">
+          <span><i class="fas fa-address-card" aria-hidden="true"></i></span>
+          <div><h2>بيانات التواصل</h2><p>أرقام الهاتف والعنوان المعروض في بيانات المركز.</p></div>
+        </div>
+        <div class="settings-fields">
+          <label>رقم الهاتف 1:
+            <input type="text" id="center-phone-1" placeholder="01xxxxxxxxx" />
+          </label>
+          <label>رقم الهاتف 2:
+            <input type="text" id="center-phone-2" placeholder="اختياري" />
+          </label>
+          <label>رقم الهاتف 3:
+            <input type="text" id="center-phone-3" placeholder="اختياري" />
+          </label>
+          <label class="settings-field-full">عنوان السنتر:
+            <input type="text" id="center-address" placeholder="العنوان بالتفصيل" />
+          </label>
+        </div>
+      </section>
+      <section class="settings-section vip-settings-section">
+        <div class="settings-section-heading">
+          <span><i class="fas fa-crown" aria-hidden="true"></i></span>
+          <div><h2>إعدادات VIP</h2><p>بيانات الدخول والاسترداد الخاصة ببوابة الأستاذ.</p></div>
+        </div>
+        <label>تابع الأستاذ:
+          <input type="text" id="vip-assigned-teacher" placeholder="مثال: أستاذ أحمد" />
+        </label>
+        <label>كلمة مرور دخول VIP:
+          <input type="password" id="vip-access-password" minlength="4" placeholder="اتركها فارغة للإبقاء على الحالية" autocomplete="new-password" />
+        </label>
+        <small id="vip-password-status">يمكنك تعيين كلمة مرور جديدة من هنا.</small>
+        <label>رقم هاتف استرداد كلمة المرور:
+          <input type="tel" id="vip-recovery-phone" placeholder="رقم الهاتف المسجل للاسترداد" />
+        </label>
+        <small>استرداد كلمة المرور يتطلب مطابقة رقم الهاتف واسم الأستاذ المسجلين. لا يتم إرسال رسالة SMS.</small>
+      </section>
       <div class="actions-row">
         <button type="submit" id="save-settings-btn" style="background:#1976d2;min-width:120px;">حفظ الإعدادات</button>
       </div>
@@ -114,7 +153,7 @@
   </div>
   <footer style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;"><b>Powered by Eng. Lol</b></footer>
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/electron-nav.js"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
   <script type="module" src="js/settings.js"></script>
@@ -137,52 +176,6 @@
     });
   }
 
-  let logoBase64 = null;
-  document.getElementById('center-logo-input').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if(file) {
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        logoBase64 = evt.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-  document.getElementById('settings-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const name = document.getElementById('center-name-input').value.trim();
-    if(name) localStorage.setItem('centerName', name);
-    if(logoBase64) localStorage.setItem('centerLogo', logoBase64);
-    window.dispatchEvent(new Event('storage'));
-    // حفظ في Firebase
-    try {
-      const { db } = await import('./js/firebase.js');
-      const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      await setDoc(doc(db, 'settings', 'main'), {
-        centerName: name,
-        centerLogo: logoBase64 || localStorage.getItem('centerLogo') || '',
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      if (window.showNotification) {
-        showNotification('تم حفظ الإعدادات بنجاح', 'success');
-      } else {
-        // إذا لم يكن notifications.js محملاً بعد، انتظر تحميله ثم أظهر الإشعار
-        window._pendingSettingsSuccess = true;
-      }
-    } catch (err) {
-      if (window.showNotification) {
-        showNotification('حدث خطأ أثناء حفظ الإعدادات', 'error');
-      } else {
-        // إزالة alert واستبدالها بإشعار مخصص
-        window._pendingSettingsError = true;
-      }
-    }
-  });
-  // عند تحميل الصفحة: ملء الحقول بالقيم المحفوظة
-  window.addEventListener('DOMContentLoaded', function() {
-    const name = localStorage.getItem('centerName');
-    if(name) document.getElementById('center-name-input').value = name;
-  });
   // التأكد من تحميل notifications.js
   if (!window.showNotification) {
     const script = document.createElement('script');
@@ -244,6 +237,3 @@
 </body>
 
 </html>
-
-
-

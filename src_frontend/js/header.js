@@ -7,57 +7,6 @@ window.addEventListener('DOMContentLoaded', function () {
       .catch(err => console.log('SW Error', err));
   }
 
-  // === PWA INSTALLATION LOGIC ===
-  let deferredPrompt;
-  const headerInstallBtn = document.getElementById('pwa-install-header-btn');
-  const installId = 'pwa-install-btn';
-
-  const triggerInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User response to install prompt: ${outcome}`);
-      deferredPrompt = null;
-      if (headerInstallBtn) headerInstallBtn.style.display = 'none';
-      const sidebarBtn = document.getElementById(installId);
-      if (sidebarBtn) sidebarBtn.style.display = 'none';
-    } else {
-      alert('المتصفح لا يسمح بالتثبيت حالياً. تأكد من استخدام Chrome أو Edge وأن الموقع يعمل ب HTTPS.');
-    }
-  };
-
-  if (headerInstallBtn) {
-    headerInstallBtn.addEventListener('click', triggerInstall);
-  }
-
-  // إنشاء زر السايدبار برضه للاحتياط
-  const sidebarUl = document.querySelector('.sidebar ul');
-  if (sidebarUl && !document.getElementById(installId)) {
-    const installLi = document.createElement('li');
-    installLi.id = installId;
-    installLi.innerHTML = `
-      <a href="#" style="background: #e8f5e9; color: #2e7d32; border: 1px dashed #2e7d32; border-radius: 8px; margin: 10px 15px; padding: 10px; display: flex; align-items: center; gap: 10px; text-decoration: none; justify-content: center; font-weight: bold;">
-        <i class="fas fa-download"></i>
-        <span>تثبيت البرنامج</span>
-      </a>
-    `;
-    sidebarUl.appendChild(installLi);
-    installLi.addEventListener('click', triggerInstall);
-  }
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    console.log('PWA Prompt Captured');
-  });
-
-  window.addEventListener('appinstalled', (evt) => {
-    console.log('App was installed');
-    if (headerInstallBtn) headerInstallBtn.style.display = 'none';
-    const installLi = document.getElementById(installId);
-    if (installLi) installLi.style.display = 'none';
-  });
-
   const mobileMenuBtn = document.getElementById('mobile-menu-btn');
   const mobileMenu = document.querySelector('.mobile-menu');
   const menuLinks = document.querySelectorAll('.mobile-menu-list a');
@@ -97,61 +46,277 @@ window.addEventListener('DOMContentLoaded', function () {
 
 // اختصارات لوحة المفاتيح العامة
 window.addEventListener('keydown', function (e) {
+  const key = String(e.key || '').toLowerCase();
+
+  if (e.code === 'F5' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+    const invoiceForm = document.getElementById('invoice-form');
+    const addInvoiceButton = document.getElementById('add-invoice-btn');
+    if (invoiceForm && addInvoiceButton) {
+      e.preventDefault();
+      if (!e.repeat && !addInvoiceButton.disabled) addInvoiceButton.click();
+    }
+    return;
+  }
+
+  const shortcutPages = {
+    F1: 'cashier.html',
+    F2: 'invoices.html',
+    F3: 'unsubscribed_students.html',
+    F4: 'vip.html',
+    F6: 'dashboard.html',
+    F7: 'daily_closing.html',
+    F8: 'late_students.html',
+    F9: 'subscriptions.html',
+    F10: 'reports.html',
+    F11: 'expenses.html'
+  };
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && shortcutPages[e.code]) {
+    e.preventDefault();
+    if (e.repeat) return;
+
+    let permissions = [];
+    try {
+      permissions = JSON.parse(localStorage.getItem('userPermissions') || '[]');
+    } catch (error) {
+      console.error('Could not read permissions for keyboard navigation:', error);
+    }
+    const destination = shortcutPages[e.code];
+    const pageKey = getPageKey(destination);
+    const isManager = localStorage.getItem('userType') === 'مدير';
+    if (isManager || (Array.isArray(permissions) && permissions.includes(pageKey))) {
+      window.location.href = destination;
+    } else if (typeof window.showNotification === 'function') {
+      window.showNotification('ليس لديك صلاحية لفتح هذه الصفحة', 'error');
+    }
+    return;
+  }
+
   // Ctrl+P: طباعة
-  if (e.ctrlKey && e.key.toLowerCase() === 'p') {
+  if (e.ctrlKey && key === 'p') {
     e.preventDefault();
     window.print();
   }
   // Ctrl+N: إضافة فاتورة جديدة (ينتقل للكاشير)
-  if (e.ctrlKey && e.key.toLowerCase() === 'n') {
+  if (e.ctrlKey && key === 'n') {
     e.preventDefault();
     window.location.href = 'cashier.html';
   }
   // Ctrl+F: بحث سريع (يركز على أول input بحث موجود)
-  if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+  if (e.ctrlKey && key === 'f') {
     e.preventDefault();
     const searchInput = document.querySelector('input[type="search"], input[placeholder*="بحث"], input[placeholder*="search"]');
     if (searchInput) searchInput.focus();
   }
   // Ctrl+E: تصدير بيانات (ينقر زر التصدير إذا موجود)
-  if (e.ctrlKey && e.key.toLowerCase() === 'e') {
+  if (e.ctrlKey && key === 'e') {
     e.preventDefault();
     const exportBtn = document.getElementById('export-btn') || document.getElementById('export-excel-btn');
     if (exportBtn) exportBtn.click();
   }
   // Ctrl+Q: تسجيل خروج
-  if (e.ctrlKey && e.key.toLowerCase() === 'q') {
+  if (e.ctrlKey && key === 'q') {
     e.preventDefault();
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) logoutBtn.click();
   }
   // Ctrl+B: إظهار/إخفاء القائمة الجانبية
-  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+  if (e.ctrlKey && key === 'b') {
     e.preventDefault();
     const sidebar = document.querySelector('.sidebar');
     if (sidebar) {
       sidebar.style.display = (sidebar.style.display === 'none') ? '' : 'none';
     }
   }
-});
-// حماية الصفحات من دخول الكاشير لغير صفحة الكاشير
-function blockCashierOnOtherPages() {
-  try {
-    let userType = localStorage.getItem('userType');
-    if (userType) userType = userType.trim().toLowerCase();
-    const allowedPages = ['cashier.html'];
-    const currentPage = window.location.pathname.split('/').pop().toLowerCase();
-    if ((userType === 'كاشير' || userType === 'cashier') && !allowedPages.includes(currentPage)) {
-      document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;width:100vw;"><div style="background:#fff;padding:48px 32px;border-radius:18px;box-shadow:0 4px 32px #1976d244;text-align:center;max-width:400px;margin:auto;"><div style="font-size:2em;color:#1976d2;font-weight:bold;margin-bottom:18px;">لا تحاول بالتدخل فيما لايعينك</div><div style="font-size:1.3em;color:#43a047;margin-bottom:12px;">تابع عملك يا صديقي <span style='font-size:2em;'>😊</span></div></div></div>`;
-      document.body.style.background = '#e3f2fd';
-    }
-  } catch (e) { console.error('blockCashierOnOtherPages error:', e); }
-}
-window.addEventListener('DOMContentLoaded', blockCashierOnOtherPages);
+}, true);
 import { signOut, getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { db } from "./firebase.js";
+
+const permissionPages = {
+  dashboard: 'dashboard.html',
+  cashier: 'cashier.html',
+  vip: 'vip.html',
+  daily_closing: 'daily_closing.html',
+  invoices: 'invoices.html',
+  unsubscribed: 'unsubscribed_students.html',
+  late_students: 'late_students.html',
+  subscriptions: 'subscriptions.html',
+  users: 'users.html',
+  reports: 'reports.html',
+  expenses: 'expenses.html',
+  settings: 'settings.html',
+  help: 'help.html'
+};
+
+const navigationPageDetails = {
+  dashboard: { label: 'لوحة التحكم', icon: 'fa-tachometer-alt', color: '#1976d2' },
+  cashier: { label: 'الكاشير', icon: 'fa-cash-register', color: '#43a047' },
+  vip: { label: 'VIP', icon: 'fa-crown', color: '#ffb300' },
+  daily_closing: { label: 'التقفيل اليومي', icon: 'fa-calendar-check', color: '#ff9800' },
+  invoices: { label: 'الطلاب المشتركين', icon: 'fa-file-invoice', color: '#fbc02d' },
+  unsubscribed: { label: 'فواتير فردية', icon: 'fa-user-minus', color: '#e53935' },
+  late_students: { label: 'الطلاب المتأخرين', icon: 'fa-clock', color: '#8e24aa' },
+  subscriptions: { label: 'الاشتراكات والأسعار', icon: 'fa-credit-card', color: '#00897b' },
+  users: { label: 'إدارة المستخدمين', icon: 'fa-users', color: '#f57c00' },
+  reports: { label: 'التقارير', icon: 'fa-chart-bar', color: '#0288d1' },
+  expenses: { label: 'المصروفات', icon: 'fa-money-bill-wave', color: '#c2185b' },
+  settings: { label: 'الإعدادات', icon: 'fa-cog', color: '#455a64' },
+  help: { label: 'دليل المساعدة', icon: 'fa-question-circle', color: '#7e57c2' }
+};
+
+const navigationShortcuts = {
+  cashier: ['F1'],
+  invoices: ['F2'],
+  unsubscribed: ['F3'],
+  vip: ['F4'],
+  dashboard: ['F6'],
+  daily_closing: ['F7'],
+  late_students: ['F8'],
+  subscriptions: ['F9'],
+  reports: ['F10'],
+  expenses: ['F11']
+};
+
+function getPageKey(href) {
+  try {
+    const page = new URL(href, window.location.href).pathname.split('/').pop().toLowerCase();
+    return Object.keys(permissionPages).find(key => permissionPages[key] === page) || '';
+  } catch (error) {
+    console.error('Could not determine navigation permission:', error);
+    return '';
+  }
+}
+
+function synchronizeNavigation() {
+  const currentPage = window.location.pathname.split('/').pop().toLowerCase();
+  document.querySelectorAll('.sidebar ul, .mobile-menu-list').forEach(list => {
+    list.querySelectorAll(':scope > li').forEach(item => {
+      const link = item.querySelector('a[href]');
+      const key = link ? getPageKey(link.getAttribute('href')) : '';
+      if (!key) return;
+      item.dataset.link = permissionPages[key];
+      const isCurrentPage = permissionPages[key] === currentPage;
+      item.classList.toggle('active', isCurrentPage);
+      if (list.classList.contains('mobile-menu-list')) {
+        link.classList.toggle('active', isCurrentPage);
+      }
+    });
+
+    const applyShortcutHints = () => {
+      list.querySelectorAll(':scope > li a[href]').forEach(link => {
+        const pageKey = getPageKey(link.getAttribute('href'));
+        const shortcuts = navigationShortcuts[pageKey] || [];
+        link.querySelectorAll('.keyboard-shortcut-hint').forEach(hint => hint.remove());
+        shortcuts.forEach(shortcut => {
+          const hint = document.createElement('span');
+          hint.className = 'keyboard-shortcut-hint';
+          hint.textContent = shortcut;
+          hint.setAttribute('aria-label', `اختصار لوحة المفاتيح ${shortcut}`);
+          link.appendChild(hint);
+        });
+      });
+    };
+    applyShortcutHints();
+
+    const details = navigationPageDetails.vip;
+    let item = list.querySelector('a[href="vip.html"]')?.closest('li');
+    if (!item) {
+      item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = permissionPages.vip;
+      const icon = document.createElement('i');
+      const label = document.createElement('span');
+      if (list.classList.contains('mobile-menu-list')) {
+        link.append(icon, label);
+      } else {
+        const iconWrapper = document.createElement('span');
+        iconWrapper.className = 'sidebar-icon';
+        iconWrapper.appendChild(icon);
+        link.append(iconWrapper, label);
+      }
+      item.appendChild(link);
+    }
+    item.dataset.link = permissionPages.vip;
+    const link = item.querySelector('a');
+    link.href = permissionPages.vip;
+    const icon = link.querySelector('i');
+    icon.className = `fas ${details.icon}`;
+    icon.style.color = details.color;
+    const label = link.querySelector('span:not(.sidebar-icon)');
+    label.textContent = details.label;
+    const isCurrentPage = currentPage === permissionPages.vip;
+    item.classList.toggle('active', isCurrentPage);
+    link.classList.toggle('active', isCurrentPage);
+    const cashierItem = list.querySelector('a[href="cashier.html"]')?.closest('li');
+    if (cashierItem) {
+      if (cashierItem.nextElementSibling !== item) cashierItem.after(item);
+    } else {
+      if (item.parentElement !== list) list.appendChild(item);
+    }
+    applyShortcutHints();
+  });
+}
+
+function updateNavigation(permissions, isManager) {
+  document.querySelectorAll('.sidebar li, .mobile-menu-list li').forEach(item => {
+    const link = item.querySelector('a[href]');
+    const key = link ? getPageKey(link.getAttribute('href')) : '';
+    if (key) item.style.display = isManager || permissions.includes(key) ? '' : 'none';
+  });
+}
+
+function redirectToAllowedPage(permissions) {
+  const destination = Object.keys(permissionPages).find(key => permissions.includes(key));
+  window.location.replace(destination ? permissionPages[destination] : 'login.html');
+}
+
+async function applyPagePermissions(user) {
+  const currentPage = window.location.pathname.split('/').pop().toLowerCase();
+  const currentPageKey = getPageKey(currentPage);
+
+  if (!currentPageKey) return;
+  if (!user) {
+    window.location.replace('login.html');
+    return;
+  }
+
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const userRecord = usersSnapshot.docs.find(userDoc =>
+      String(userDoc.data().email || '').trim().toLowerCase() === String(user.email || '').trim().toLowerCase()
+    );
+    if (!userRecord) {
+      localStorage.removeItem('userPermissions');
+      localStorage.removeItem('userType');
+      redirectToAllowedPage([]);
+      return;
+    }
+
+    const profile = userRecord.data();
+    const permissions = Array.isArray(profile.permissions) ? profile.permissions : [];
+    const isManager = profile.type === 'مدير';
+    localStorage.setItem('userPermissions', JSON.stringify(permissions));
+    localStorage.setItem('userType', profile.type || '');
+    updateNavigation(permissions, isManager);
+
+    if (!isManager && !permissions.includes(currentPageKey)) {
+      redirectToAllowedPage(permissions);
+    }
+  } catch (error) {
+    console.error('Could not verify page permissions:', error);
+    const notice = document.createElement('div');
+    notice.setAttribute('role', 'alert');
+    notice.style.cssText = 'position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:#0f172acc;';
+    notice.innerHTML = '<section style="max-width:420px;padding:30px;border-radius:18px;background:#fff;text-align:center;box-shadow:0 18px 50px #0004;font-family:Arial,sans-serif"><h2 style="margin:0 0 12px;color:#17345c">تعذر التحقق من الصلاحيات</h2><p style="margin:0 0 20px;color:#475569;line-height:1.8">تحقق من اتصال الإنترنت ثم سجّل الدخول مرة أخرى.</p><a href="login.html" style="display:inline-block;padding:11px 20px;border-radius:9px;background:#1976d2;color:#fff;text-decoration:none;font-weight:bold">العودة لتسجيل الدخول</a></section>';
+    document.body.appendChild(notice);
+  }
+}
+
+onAuthStateChanged(getAuth(), applyPagePermissions);
 
 // تفعيل زر تسجيل الخروج في جميع الصفحات
 window.addEventListener("DOMContentLoaded", function () {
+  synchronizeNavigation();
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", function (event) {
@@ -162,35 +327,15 @@ window.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
-  // تفعيل إخفاء عناصر القائمة الجانبية حسب الصلاحيات
   try {
-    const perms = JSON.parse(localStorage.getItem('userPermissions') || '[]');
-    if (perms.length && document.querySelector('.sidebar ul')) {
-      const allLis = document.querySelectorAll('.sidebar ul li');
-      allLis.forEach(li => {
-        const link = li.getAttribute('data-link');
-        if (link) {
-          // استخراج key من اسم الصفحة
-          let key = '';
-          if (link.includes('dashboard')) key = 'dashboard';
-          else if (link.includes('cashier')) key = 'cashier';
-          else if (link.includes('invoices')) key = 'invoices';
-          else if (link.includes('unsubscribed')) key = 'unsubscribed';
-          else if (link.includes('subscriptions')) key = 'subscriptions';
-          else if (link.includes('users')) key = 'users';
-          else if (link.includes('reports')) key = 'reports';
-          else if (link.includes('expenses')) key = 'expenses';
-          else if (link.includes('settings')) key = 'settings';
-          else if (link.includes('help')) key = 'help';
-          else if (link.includes('daily_closing')) key = 'daily_closing';
-          else if (link.includes('late_students')) key = 'late_students';
-          // إصلاح: تحقق من وجود المفتاح الصحيح
-          if (key && !perms.includes(key)) li.style.display = 'none';
-          else li.style.display = '';
-        }
-      });
+    const cachedPermissions = JSON.parse(localStorage.getItem('userPermissions') || '[]');
+    const cachedType = localStorage.getItem('userType') || '';
+    if (Array.isArray(cachedPermissions)) {
+      updateNavigation(cachedPermissions, cachedType === 'مدير');
     }
-  } catch (e) { }
+  } catch (error) {
+    console.error('Could not read cached navigation permissions:', error);
+  }
 });
 
 // Debugging: Log hidden sidebar items
@@ -245,16 +390,6 @@ async function updateCenterHeader() {
 }
 window.addEventListener('storage', updateCenterHeader);
 window.addEventListener('DOMContentLoaded', updateCenterHeader);
-
-// Temporary: Add 'daily_closing' to user permissions if not present
-window.addEventListener('DOMContentLoaded', function () {
-  const perms = JSON.parse(localStorage.getItem('userPermissions') || '[]');
-  if (!perms.includes('daily_closing')) {
-    perms.push('daily_closing');
-    localStorage.setItem('userPermissions', JSON.stringify(perms));
-    console.log('Updated permissions:', perms);
-  }
-});
 
 // Function to show notifications
 function showNotification(message, type = "success") {
@@ -518,5 +653,3 @@ if (!document.getElementById('sidebar-animation-styles')) {
   `;
   document.head.appendChild(style);
 }
-
-

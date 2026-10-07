@@ -1,5 +1,5 @@
 import { auth } from "./firebase.js";
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const form = document.getElementById("login-form");
 const errorMessage = document.getElementById("error-message");
@@ -25,7 +25,7 @@ form.addEventListener("submit", async (e) => {
   const rememberMe = document.getElementById("remember-me").checked;
 
   try {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(auth, email, password);
     const signedInUsername = usernameInput.value.trim() || email.replace(/@lookcenter\.com$/i, '');
     localStorage.setItem('currentUsername', signedInUsername);
     localStorage.setItem('currentUserEmail', email);
@@ -43,33 +43,49 @@ form.addEventListener("submit", async (e) => {
       const u = docSnap.data();
       if (u.email === email) userDoc = u;
     });
-    if (userDoc && userDoc.permissions && Array.isArray(userDoc.permissions)) {
-      localStorage.setItem('userPermissions', JSON.stringify(userDoc.permissions));
-      // توجيه المستخدم لأول صفحة مسموحة
-      const pageMap = {
-        'dashboard': 'dashboard.html',
-        'cashier': 'cashier.html',
-        'invoices': 'invoices.html',
-        'unsubscribed': 'unsubscribed_students.html',
-        'subscriptions': 'subscriptions.html',
-        'users': 'users.html',
-        'reports': 'reports.html',
-        'expenses': 'expenses.html',
-        'settings': 'settings.html',
-        'help': 'help.html'
-      };
-      for (let i = 0; i < userDoc.permissions.length; i++) {
-        const key = userDoc.permissions[i];
-        if (pageMap[key]) {
-          window.location.href = pageMap[key];
-          return;
-        }
-      }
+    if (!userDoc || !Array.isArray(userDoc.permissions)) {
+      await signOut(auth);
+      localStorage.removeItem('userPermissions');
+      localStorage.removeItem('userType');
+      errorMessage.textContent = "لم يتم العثور على صلاحيات لهذا المستخدم. تواصل مع المدير.";
+      errorMessage.style.display = "block";
+      return;
     }
-    // fallback: إذا لم توجد صلاحيات
-    window.location.href = "dashboard.html";
+
+    const permissions = userDoc.permissions;
+    const pageMap = {
+      dashboard: 'dashboard.html',
+      cashier: 'cashier.html',
+      vip: 'vip.html',
+      daily_closing: 'daily_closing.html',
+      invoices: 'invoices.html',
+      unsubscribed: 'unsubscribed_students.html',
+      late_students: 'late_students.html',
+      subscriptions: 'subscriptions.html',
+      users: 'users.html',
+      reports: 'reports.html',
+      expenses: 'expenses.html',
+      settings: 'settings.html',
+      help: 'help.html'
+    };
+    const firstAllowedPage = permissions.find(permission => pageMap[permission]);
+    if (!firstAllowedPage) {
+      await signOut(auth);
+      localStorage.removeItem('userPermissions');
+      localStorage.removeItem('userType');
+      errorMessage.textContent = "لا توجد صفحات مسموحة لهذا المستخدم. اطلب من المدير ضبط الصلاحيات.";
+      errorMessage.style.display = "block";
+      return;
+    }
+
+    localStorage.setItem('userPermissions', JSON.stringify(permissions));
+    localStorage.setItem('userType', userDoc.type || '');
+    window.location.href = pageMap[firstAllowedPage];
   } catch (error) {
-    errorMessage.textContent = "البريد أو كلمة المرور غير صحيحة.";
+    console.error('Login failed:', error);
+    errorMessage.textContent = error.code?.startsWith('auth/')
+      ? "البريد أو كلمة المرور غير صحيحة."
+      : "تعذر تحميل بيانات المستخدم. تحقق من الاتصال ثم حاول مرة أخرى.";
     errorMessage.style.display = "block";
   }
 });
@@ -107,4 +123,3 @@ if (togglePasswordBtn && passwordInput) {
     passwordInput.focus();
   });
 }
-

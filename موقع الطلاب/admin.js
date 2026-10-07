@@ -8,6 +8,10 @@ const loginError = document.getElementById('login-error');
 const agentsList = document.getElementById('agents-list');
 const studentsBody = document.getElementById('students-body');
 const agentFilter = document.getElementById('agent-filter');
+const portalUrlForm = document.getElementById('portal-url-form');
+const portalPublicUrlInput = document.getElementById('portal-public-url');
+const portalUrlStatus = document.getElementById('portal-url-status');
+const portalPublicUrlKey = 'studentPortalPublicUrl';
 let registrations = [];
 let agents = [];
 let payments = [];
@@ -17,6 +21,22 @@ let isManager = false;
 const showLoginError = (message) => { loginError.textContent = message; loginError.hidden = false; };
 const formatDate = (value) => value?.toDate ? value.toDate().toLocaleString('ar-EG') : '-';
 const isToday = (value) => value?.toDate && value.toDate().toDateString() === new Date().toDateString();
+
+function getStudentPortalBaseUrl() {
+  const configuredUrl = portalPublicUrlInput.value.trim();
+  const pageUrl = configuredUrl
+    ? new URL(configuredUrl)
+    : new URL('./index.html', window.location.href);
+  const isHttp = pageUrl.protocol === 'http:' || pageUrl.protocol === 'https:';
+  const isLoopback = pageUrl.hostname === 'localhost' ||
+    pageUrl.hostname === '127.0.0.1' ||
+    pageUrl.hostname === '::1';
+  if (!isHttp || isLoopback) return null;
+
+  pageUrl.hash = '';
+  pageUrl.search = '';
+  return pageUrl;
+}
 
 function renderStats() {
   const filtered = agentFilter.value ? registrations.filter(item => item.agentId === agentFilter.value) : registrations;
@@ -33,17 +53,33 @@ function renderStats() {
 function renderAgents() {
   agentFilter.innerHTML = '<option value="">كل المسؤولين</option>';
   agentsList.innerHTML = agents.length ? '' : '<p>لا يوجد مسؤولون مفعلون.</p>';
+  let portalBaseUrl = null;
+  try {
+    portalBaseUrl = getStudentPortalBaseUrl();
+  } catch (error) {
+    console.error('Invalid student portal URL:', error);
+    portalUrlStatus.textContent = 'رابط صفحة التسجيل غير صالح.';
+    portalUrlStatus.style.color = '#b42318';
+  }
+
+  if (!portalBaseUrl) {
+    const notice = document.createElement('p');
+    notice.className = 'notice error';
+    notice.textContent = 'روابط QR غير متاحة على localhost أو عند فتح البرنامج كملف. انشر صفحة موقع الطلاب على الإنترنت، ثم أدخل رابط index.html المنشور واحفظه.';
+    agentsList.prepend(notice);
+  } else if (!portalUrlStatus.textContent.includes('غير صالح')) {
+    portalUrlStatus.textContent = 'سيُستخدم هذا الرابط لإنشاء روابط QR.';
+    portalUrlStatus.style.color = '';
+  }
+
   agents.forEach(agent => {
-    const portalUrl = new URL(window.location.href);
-    portalUrl.pathname = `${portalUrl.pathname.slice(0, portalUrl.pathname.lastIndexOf('/') + 1)}index.html`;
-    portalUrl.hash = '';
-    portalUrl.search = '';
-    portalUrl.searchParams.set('agent', agent.id);
-    const link = portalUrl.href;
-    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}`;
+    const portalUrl = portalBaseUrl ? new URL(portalBaseUrl.href) : null;
+    if (portalUrl) portalUrl.searchParams.set('agent', agent.id);
+    const link = portalUrl?.href || '';
+    const qr = link ? `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}` : '';
     const card = document.createElement('article');
     card.className = 'agent-card';
-    card.innerHTML = `<h3>${agent.fullname || agent.username || 'مسؤول'}</h3><div>اسم المستخدم: ${agent.username || '-'}</div><div>عدد الطلاب: ${registrations.filter(item => item.agentId === agent.id).length}</div><img class="agent-qr" src="${qr}" alt="QR ${agent.username || ''}"><code>${link}</code><button class="copy-link" data-link="${link}">نسخ الرابط</button>`;
+    card.innerHTML = `<h3>${agent.fullname || agent.username || 'مسؤول'}</h3><div>اسم المستخدم: ${agent.username || '-'}</div><div>عدد الطلاب: ${registrations.filter(item => item.agentId === agent.id).length}</div>${link ? `<img class="agent-qr" src="${qr}" alt="QR ${agent.studentPortalCode || agent.username || ''}"><code>${link}</code><button class="copy-link" data-link="${link}">نسخ الرابط</button>` : '<p>انشر صفحة التسجيل أولًا لإصدار QR صالح.</p>'}`;
     agentsList.appendChild(card);
     const option = document.createElement('option'); option.value = agent.id; option.textContent = agent.fullname || agent.username || agent.id; agentFilter.appendChild(option);
   });
@@ -52,6 +88,32 @@ function renderAgents() {
     button.textContent = 'تم النسخ';
   }));
 }
+
+portalPublicUrlInput.value = localStorage.getItem(portalPublicUrlKey) || '';
+portalUrlForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const value = portalPublicUrlInput.value.trim();
+  try {
+    if (value) {
+      const parsedUrl = new URL(value);
+      const isHttp = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+      const isLoopback = parsedUrl.hostname === 'localhost' ||
+        parsedUrl.hostname === '127.0.0.1' ||
+        parsedUrl.hostname === '::1';
+      if (!isHttp || isLoopback || !parsedUrl.pathname.toLowerCase().endsWith('/index.html')) {
+        throw new Error('أدخل رابطًا عامًا يبدأ بـ http(s) وينتهي بـ /index.html.');
+      }
+    }
+
+    localStorage.setItem(portalPublicUrlKey, value);
+    portalUrlStatus.textContent = value ? 'تم حفظ رابط الموقع.' : 'تمت إزالة الرابط المحفوظ.';
+    portalUrlStatus.style.color = '#16803c';
+    renderAgents();
+  } catch (error) {
+    portalUrlStatus.textContent = error.message || 'رابط الموقع غير صالح.';
+    portalUrlStatus.style.color = '#b42318';
+  }
+});
 
 function renderStudents() {
   const names = new Map(agents.map(agent => [agent.id, agent.fullname || agent.username || '-']));

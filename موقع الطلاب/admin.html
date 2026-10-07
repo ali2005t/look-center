@@ -41,6 +41,13 @@
 
       <section class="admin-panel">
         <div class="panel-heading"><h2>رابط تسجيل الطلاب</h2><button id="refresh-button" class="secondary-button">تحديث</button></div>
+        <form id="portal-url-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:0 0 12px;">
+          <label style="grid-column:1/-1;">رابط صفحة تسجيل الطالب المنشورة على الإنترنت
+            <input id="portal-public-url" type="url" inputmode="url" placeholder="https://example.com/موقع الطلاب/index.html" dir="ltr" style="width:100%;box-sizing:border-box;">
+          </label>
+          <button type="submit" class="secondary-button">حفظ رابط الموقع</button>
+          <span id="portal-url-status" role="status" style="align-self:center;"></span>
+        </form>
         <div id="agents-list" class="agents-list"></div>
       </section>
 

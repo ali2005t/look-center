@@ -102,6 +102,19 @@ h2 {
   font-weight: 700;
 }
 
+.vip-badge {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 3px 9px;
+  border: 1px solid #f2c300;
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, #fff4a3 0 6px, #ffe16b 6px 12px);
+  color: #d50000;
+  font-size: 0.82em;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
 #invoices-table .portal-registration-row .items-cell {
   min-width: 150px;
   max-width: 210px;

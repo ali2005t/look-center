@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>صفحة VIP</title>
+    <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+    <link rel="stylesheet" href="css/vip.css?v=vip-v3" />
+    <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  </head>
+  <body>
+    <header class="main-header">
+      <div class="header-left">
+        <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+        <span class="vip-header-title">صفحة VIP</span>
+      </div>
+      <div class="header-right">
+        <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+        <button id="logout-btn">تسجيل الخروج</button>
+      </div>
+    </header>
+
+    <nav class="mobile-menu">
+      <ul class="mobile-menu-list">
+        <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+        <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+        <li><a href="vip.html"><i class="fas fa-crown"></i><span>VIP</span></a></li>
+        <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+        <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+        <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+        <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين في الدفع</span></a></li>
+        <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+        <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+        <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+        <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+        <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+        <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+      </ul>
+    </nav>
+
+    <aside class="sidebar">
+      <ul>
+        <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt"></i></span><span>لوحة التحكم</span></a></li>
+        <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register"></i></span><span>الكاشير</span></a></li>
+        <li class="active" data-link="vip.html"><a href="vip.html"><span class="sidebar-icon"><i class="fas fa-crown"></i></span><span>VIP</span></a></li>
+        <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i class="fas fa-calendar-check"></i></span><span>التقفيل اليومي</span></a></li>
+        <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice"></i></span><span>الطلاب المشتركين</span></a></li>
+        <li data-link="unsubscribed_students.html"><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus"></i></span><span>فواتير فردية</span></a></li>
+        <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+        <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i class="fas fa-credit-card"></i></span><span>الاشتراكات والأسعار</span></a></li>
+        <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users"></i></span><span>إدارة المستخدمين</span></a></li>
+        <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar"></i></span><span>التقارير</span></a></li>
+        <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave"></i></span><span>المصروفات</span></a></li>
+        <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog"></i></span><span>الإعدادات</span></a></li>
+        <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle"></i></span><span>دليل المساعدة</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="vip-page" style="margin-right:220px;">
+      <div id="vip-access-block">
+        <div class="vip-login-layout">
+          <section class="vip-login-brand">
+            <div class="vip-brand-mark"><i class="fas fa-crown" aria-hidden="true"></i></div>
+            <span class="vip-brand-kicker">LOOK CENTER <span>·</span> ACCESS</span>
+            <h1>بوابة <strong>VIP</strong></h1>
+            <p>دخول خاص بمبيعات الأستاذ.</p>
+            <div class="vip-session-note"><i class="fas fa-clock" aria-hidden="true"></i><span>تُقفل الجلسة بعد 3 دقائق من الخمول</span></div>
+          </section>
+
+          <section class="vip-login-card">
+            <div class="vip-login-heading">
+              <span>مرحباً بعودتك</span>
+              <h2>تسجيل الدخول</h2>
+            </div>
+            <div class="field">
+              <label for="vip-teacher-input">اسم الأستاذ</label>
+              <input type="text" id="vip-teacher-input" placeholder="اكتب اسم الأستاذ" autocomplete="username" />
+            </div>
+            <div class="field">
+              <label for="vip-password-input">كلمة المرور</label>
+              <input type="password" id="vip-password-input" placeholder="أدخل كلمة المرور" autocomplete="current-password" />
+            </div>
+            <div class="vip-login-actions">
+              <button id="vip-enter-btn" class="primary-btn"><span>دخول إلى VIP</span><i class="fas fa-arrow-left" aria-hidden="true"></i></button>
+              <button id="vip-cancel-btn" class="secondary-btn">مسح الحقول</button>
+            </div>
+            <button type="button" id="vip-forgot-password-btn" class="vip-forgot-btn">نسيت كلمة المرور؟</button>
+            <div id="vip-recovery-panel" class="vip-recovery-panel hidden">
+              <h3>استرداد كلمة المرور</h3>
+              <p>تحقق من بيانات الأستاذ ورقم الاسترداد.</p>
+              <div class="field">
+                <label for="vip-recovery-teacher">اسم الأستاذ</label>
+                <input type="text" id="vip-recovery-teacher" placeholder="اسم الأستاذ" />
+              </div>
+              <div class="field">
+                <label for="vip-recovery-phone">رقم هاتف الاسترداد</label>
+                <input type="tel" id="vip-recovery-phone" placeholder="رقم الهاتف" />
+              </div>
+              <div class="field">
+                <label for="vip-recovery-new-password">كلمة المرور الجديدة</label>
+                <input type="password" id="vip-recovery-new-password" minlength="4" placeholder="4 أحرف على الأقل" autocomplete="new-password" />
+              </div>
+              <div class="field">
+                <label for="vip-recovery-confirm-password">تأكيد كلمة المرور</label>
+                <input type="password" id="vip-recovery-confirm-password" minlength="4" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" />
+              </div>
+              <div class="field inline-row">
+                <button type="button" id="vip-recover-password-btn" class="primary-btn">تعيين كلمة المرور</button>
+                <button type="button" id="vip-cancel-recovery-btn" class="secondary-btn">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="vip-main-panel" class="hidden">
+        <div class="vip-top-actions">
+          <button class="vip-tab-btn active" data-tab="students"><i class="fas fa-user-graduate"></i> الطلاب المشتركين</button>
+          <button class="vip-tab-btn" data-tab="sales"><i class="fas fa-wallet"></i> المبيعات</button>
+          <button class="vip-tab-btn" data-tab="reports"><i class="fas fa-chart-bar"></i> التقارير</button>
+          <button class="vip-tab-btn" data-tab="daily"><i class="fas fa-calendar-check"></i> قفل اليومي</button>
+          <button class="vip-tab-btn highlight" id="vip-open-cashier-btn"><i class="fas fa-cash-register"></i> البيع</button>
+        </div>
+
+        <section id="vip-content" class="vip-content"></section>
+      </div>
+    </main>
+
+    <script type="module" src="js/firebase.js"></script>
+    <script type="module" src="js/header.js?v=permissions-v10"></script>
+    <script src="js/mobile-dropdown-menu.js"></script>
+    <script type="module" src="js/vip.js?v=vip-v3"></script>
+  </body>
+</html>

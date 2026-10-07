@@ -17,9 +17,11 @@ const userCreationAuth = getAuth(secondaryApp);
 const allPages = [
   { key: 'dashboard', label: 'لوحة التحكم', file: 'dashboard.html' },
   { key: 'cashier', label: 'الكاشير', file: 'cashier.html' },
+  { key: 'vip', label: 'VIP', file: 'vip.html' },
   { key: 'daily_closing', label: 'التقفيل اليومي', file: 'daily_closing.html' },
   { key: 'invoices', label: 'الطلاب المشتركين', file: 'invoices.html' },
   { key: 'unsubscribed', label: 'فواتير فردية', file: 'unsubscribed_students.html' },
+  { key: 'late_students', label: 'الطلاب المتأخرين', file: 'late_students.html' },
   { key: 'subscriptions', label: 'الاشتراكات والأسعار', file: 'subscriptions.html' },
   { key: 'users', label: 'إدارة المستخدمين', file: 'users.html' },
   { key: 'reports', label: 'التقارير', file: 'reports.html' },
@@ -30,6 +32,7 @@ const allPages = [
 
 // صلاحيات العمليات الإضافية
 const operationPermissions = [
+  { key: 'add_booklet_stock', label: '📦 إضافة مخزون الملازم من لوحة التحكم', category: 'عمليات' },
   { key: 'delete_invoice', label: '🗑️ حذف الفواتير', category: 'عمليات' },
   { key: 'create_subscriber_invoice', label: '➕ إنشاء فواتير الطلاب المشتركين', category: 'عمليات' },
   { key: 'edit_invoice', label: '✏️ تعديل الفواتير', category: 'عمليات' },
@@ -64,10 +67,17 @@ addUserForm.addEventListener("submit", async (e) => {
   const email = generatedEmailInput.value;
   const password = document.getElementById("user-password").value;
   const type = document.getElementById("user-type").value;
+  const studentPortalCode = document.getElementById('student-portal-code').value.trim();
+  if (studentPortalCode && currentUserDocs.docs.some(userDoc =>
+    String(userDoc.data().studentPortalCode || '').trim().toLowerCase() === studentPortalCode.toLowerCase()
+  )) {
+    window.showNotification('كود بوابة الطالب مستخدم بالفعل. اختر كودًا آخر.', 'error');
+    return;
+  }
   let permissions = [];
 
   // جمع صلاحيات الصفحات
-  const permsInputs = document.querySelectorAll('.perm-checkbox');
+  const permsInputs = addUserForm.querySelectorAll('.perm-checkbox');
   if (permsInputs.length) {
     permissions = Array.from(permsInputs).filter(x => x.checked).map(x => x.value);
   } else if (type === 'مدير') {
@@ -77,7 +87,7 @@ addUserForm.addEventListener("submit", async (e) => {
   }
 
   // جمع صلاحيات العمليات
-  const operationInputs = document.querySelectorAll('.operation-checkbox');
+  const operationInputs = addUserForm.querySelectorAll('.operation-checkbox');
   if (operationInputs.length) {
     const operationPerms = Array.from(operationInputs).filter(x => x.checked).map(x => x.value);
     permissions = [...permissions, ...operationPerms];
@@ -106,6 +116,7 @@ addUserForm.addEventListener("submit", async (e) => {
     email,
     password,
     type,
+    studentPortalCode,
     permissions,
     active: true
   });
@@ -208,6 +219,8 @@ async function loadUsers() {
           <h3 style='margin-bottom:18px;'>تعديل بيانات المستخدم</h3>
           <input id='edit-fullname' value='${user.fullname}' placeholder="الاسم الكامل" style='width:100%;margin-bottom:10px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
           <input id='edit-username' value='${user.username}' placeholder="اسم المستخدم" style='width:100%;margin-bottom:10px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
+          <label for='edit-student-portal-code' style='display:block;margin:8px 0;'>الكود الذي يظهر للطالب عند فتح QR</label>
+          <input id='edit-student-portal-code' placeholder="مثال: K-102" style='width:100%;margin-bottom:10px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
           <select id='edit-type' style='width:100%;margin-bottom:15px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
             <option value='مدير' ${user.type === 'مدير' ? 'selected' : ''}>مدير</option>
             <option value='كاشير' ${user.type === 'كاشير' ? 'selected' : ''}>كاشير</option>
@@ -221,24 +234,48 @@ async function loadUsers() {
         </div>
       `;
       document.body.appendChild(modal);
+      modal.querySelector('#edit-student-portal-code').value = user.studentPortalCode || '';
       document.getElementById('cancel-edit-user').onclick = () => modal.remove();
       document.getElementById('save-edit-user').onclick = async () => {
         const newFullname = document.getElementById('edit-fullname').value;
         const newUsername = document.getElementById('edit-username').value;
+        const newStudentPortalCode = modal.querySelector('#edit-student-portal-code').value.trim();
         const newType = document.getElementById('edit-type').value;
-        const pagePerms = Array.from(document.querySelectorAll('.perm-checkbox')).filter(x => x.checked).map(x => x.value);
-        const operPerms = Array.from(document.querySelectorAll('.operation-checkbox')).filter(x => x.checked).map(x => x.value);
+        const pagePerms = Array.from(modal.querySelectorAll('.perm-checkbox')).filter(x => x.checked).map(x => x.value);
+        const operPerms = Array.from(modal.querySelectorAll('.operation-checkbox')).filter(x => x.checked).map(x => x.value);
         const newPerms = [...pagePerms, ...operPerms];
         if (!newFullname || !newUsername || !newType) return window.showNotification('يرجى ملء كل الحقول', 'error');
-        await updateDoc(doc(db, "users", id), {
-          fullname: newFullname,
-          username: newUsername,
-          type: newType,
-          permissions: newPerms
-        });
-        window.showNotification('تم حفظ التعديلات بنجاح', 'success');
-        modal.remove();
-        loadUsers();
+        const duplicatePortalCode = snapshot.docs.some(userSnap =>
+          userSnap.id !== id &&
+          String(userSnap.data().studentPortalCode || '').trim().toLowerCase() === newStudentPortalCode.toLowerCase() &&
+          newStudentPortalCode
+        );
+        if (duplicatePortalCode) {
+          return window.showNotification('كود بوابة الطالب مستخدم بالفعل. اختر كودًا آخر.', 'error');
+        }
+        const saveButton = modal.querySelector('#save-edit-user');
+        saveButton.disabled = true;
+        try {
+          await updateDoc(doc(db, "users", id), {
+            fullname: newFullname,
+            username: newUsername,
+            studentPortalCode: newStudentPortalCode,
+            type: newType,
+            permissions: newPerms
+          });
+          const authUser = getAuth().currentUser;
+          if (authUser?.email?.toLowerCase() === String(user.email || '').toLowerCase()) {
+            localStorage.setItem('userPermissions', JSON.stringify(newPerms));
+            localStorage.setItem('userType', newType);
+          }
+          window.showNotification('تم حفظ التعديلات بنجاح', 'success');
+          modal.remove();
+          loadUsers();
+        } catch (error) {
+          console.error('Could not save user permissions:', error);
+          window.showNotification('تعذر حفظ التعديلات. تحقق من الاتصال ثم حاول مرة أخرى.', 'error');
+          saveButton.disabled = false;
+        }
       };
     };
   });
@@ -352,7 +389,7 @@ export function renderSidebar(permissions) {
   });
 }
 
-export { allPages };
+export { allPages, operationPermissions };
 
 window.addEventListener("DOMContentLoaded", loadUsers);
 
@@ -362,4 +399,3 @@ if (!window.showNotification) {
   script.src = 'js/notifications.js';
   document.head.appendChild(script);
 }
-

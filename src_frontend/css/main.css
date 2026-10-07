@@ -278,6 +278,27 @@ body {
   cursor: pointer;
   pointer-events: auto !important;
 }
+.sidebar ul li a .keyboard-shortcut-hint,
+.mobile-menu-list li a .keyboard-shortcut-hint,
+.action-buttons #add-invoice-btn .keyboard-shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  background: #ffe082;
+  color: #172033;
+  font: 700 11px/1.4 Arial, sans-serif;
+  text-shadow: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.sidebar ul li a .keyboard-shortcut-hint,
+.mobile-menu-list li a .keyboard-shortcut-hint {
+  margin-right: auto;
+}
 .sidebar-icon {
   width: 28px;
   height: 28px;
@@ -296,14 +317,6 @@ body {
 .sidebar ul li.active .sidebar-icon, .sidebar ul li:hover .sidebar-icon {
   color: #fff;
   box-shadow: 0 0 24px #00eaffcc, 0 0 16px #7c4dffcc;
-}
-.sidebar ul li[data-link="late_students.html"] {
-  display: flex !important;
-  /* تأكد من ظهور العنصر وعدم إخفائه */
-  visibility: visible !important;
-  opacity: 1 !important;
-  height: auto !important;
-  pointer-events: auto !important;
 }
 /* ===== RESPONSIVE DESIGN FOR MOBILE DEVICES ===== */
 
@@ -1749,4 +1762,3 @@ button:hover,
     gap: 10px;
   }
 }
-

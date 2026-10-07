@@ -219,6 +219,7 @@ async function loadDailyClosingData(dateFilter = null) {
     
     invoicesSnapshot.forEach(docSnap => {
       const invoice = docSnap.data();
+      if (invoice.isVip === true) return;
       let invDate = invoice.date;
       if (invDate && typeof invDate.toDate === "function") {
         invDate = invDate.toDate();

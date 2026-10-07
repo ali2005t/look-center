@@ -144,6 +144,37 @@ body.sidebar-collapsed .daily-closing-content {
   font-weight: 800 !important;
 }
 
+.sidebar ul li a .keyboard-shortcut-hint,
+.mobile-menu-list li a .keyboard-shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-right: auto;
+  padding: 2px 6px;
+  border: 1px solid var(--look-ink);
+  border-radius: 5px;
+  background: var(--look-amber);
+  color: var(--look-ink) !important;
+  font: 700 10px/1.4 'Cairo', 'Tajawal', Arial, sans-serif !important;
+  text-shadow: none !important;
+  white-space: nowrap;
+}
+
+.action-buttons #add-invoice-btn .keyboard-shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  background: var(--look-amber);
+  color: var(--look-ink);
+  font: 700 11px/1.4 'Cairo', 'Tajawal', Arial, sans-serif;
+  vertical-align: middle;
+}
+
 .sidebar-icon {
   background: var(--look-amber) !important;
   border: 2px solid var(--look-ink) !important;

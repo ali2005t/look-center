@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>إدارة المستخدمين</title>
-  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
   <link rel="stylesheet" href="css/users.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
 </head>
 
@@ -161,6 +161,14 @@
         </div>
       </div>
 
+      <div class="input-group" style="position:relative;margin-bottom:20px;">
+        <label for="student-portal-code" style="display:block;margin-bottom:10px;color:#1565c0;font-weight:bold;font-size:16px;">
+          كود يظهر للطالب عند فتح رابط QR (اختياري)
+        </label>
+        <input type="text" id="student-portal-code" placeholder="مثال: K-102"
+          style="width:100%;padding:14px 18px;border:2px solid #bbdefb;border-radius:12px;font-size:16px;background:#fff;box-sizing:border-box;" />
+      </div>
+
       <div id="permissions-row" style="margin:10px 0 0 0;display:none;"></div>
     </form>
 
@@ -204,9 +212,9 @@
   <script src="js/notifications.js"></script>
   <script src="js/electron-nav.js"></script>
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
-  <script type="module" src="js/users.js"></script>
+  <script type="module" src="js/users.js?v=inventory-v1"></script>
   <script>
     document.querySelectorAll('.sidebar ul li').forEach(li => {
       li.addEventListener('click', function (e) {
@@ -234,7 +242,7 @@
     }
   </script>
   <script type="module">
-    import { allPages } from './js/users.js';
+    import { allPages, operationPermissions } from './js/users.js?v=inventory-v1';
     const userTypeSelect = document.getElementById('user-type');
     const permissionsRow = document.getElementById('permissions-row');
     function renderPerms(type) {
@@ -243,8 +251,12 @@
       if (type === 'مدير' || type === 'كاشير') {
         let html = '<div style="display:flex;flex-wrap:wrap;gap:12px 18px;">';
         allPages.forEach(p => {
-          if (type === 'كاشير' && ['dashboard', 'cashier', 'invoices', 'unsubscribed'].indexOf(p.key) === -1) return;
+          if (type === 'كاشير' && ['dashboard', 'cashier', 'invoices', 'unsubscribed', 'late_students'].indexOf(p.key) === -1) return;
           html += `<label style='margin-left:10px;'><input type='checkbox' class='perm-checkbox' value='${p.key}' ${type === 'مدير' ? 'checked' : ''}/> ${p.label}</label>`;
+        });
+        html += '</div><h4 style="margin:16px 0 10px;color:#ff9800;">صلاحيات العمليات:</h4><div style="display:flex;flex-wrap:wrap;gap:12px 18px;">';
+        operationPermissions.forEach(p => {
+          html += `<label style='margin-left:10px;'><input type='checkbox' class='operation-checkbox' value='${p.key}' ${type === 'مدير' ? 'checked' : ''}/> ${p.label}</label>`;
         });
         html += '</div>';
         permissionsRow.innerHTML = html;

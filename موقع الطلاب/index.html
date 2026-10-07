@@ -5,14 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#141414">
   <title>تسجيل بيانات الطالب</title>
-  <script>
-    const portalBase = new URL(window.location.href);
-    if (!portalBase.pathname.endsWith('/')) portalBase.pathname += '/';
-    const portalStylesheet = document.createElement('link');
-    portalStylesheet.rel = 'stylesheet';
-    portalStylesheet.href = new URL('portal.css?v=3', portalBase).href;
-    document.head.appendChild(portalStylesheet);
-  </script>
+  <link rel="stylesheet" href="./portal.css?v=4">
 </head>
 <body>
   <main class="portal-shell">
@@ -46,6 +39,9 @@
           </div>
           <strong class="portal-total">الإجمالي: <span id="selected-total">0</span> ج</strong>
         </fieldset>
+        <label>ملاحظات / ملاحظات التسجيل
+          <textarea id="student-notes" rows="3" placeholder="اختياري: أي ملاحظات أو تفاصيل إضافية"></textarea>
+        </label>
         <button type="submit">إرسال البيانات</button>
       </form>
 
@@ -54,13 +50,6 @@
       </div>
     </section>
   </main>
-  <script type="module">
-    const portalBase = new URL(window.location.href);
-    if (!portalBase.pathname.endsWith('/')) portalBase.pathname += '/';
-    const portalScript = document.createElement('script');
-    portalScript.type = 'module';
-    portalScript.src = new URL('portal.js?v=3', portalBase).href;
-    document.body.appendChild(portalScript);
-  </script>
+  <script type="module" src="./portal.js?v=4"></script>
 </body>
 </html>

@@ -132,6 +132,64 @@ h2 {
   }
 }
 
+.custom-date-range {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #d8e7df;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.custom-date-range label {
+  color: #43574f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.custom-date-range input {
+  min-height: 38px;
+  padding: 6px 9px;
+  border: 1px solid #cbdad2;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.filter-range-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reports-visualizations {
+  margin-top: 28px;
+  padding: 22px;
+  border: 1px solid #e2ebe6;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(18, 55, 44, 0.06);
+}
+
+.reports-visualizations > h3 {
+  margin: 0 0 14px;
+  color: #173d38;
+  font-size: 20px;
+}
+
+.reports-visualizations #reports-charts {
+  margin: 0;
+  gap: 16px;
+}
+
+.reports-visualizations .chart-block,
+.reports-visualizations canvas {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .sidebar {
   position: fixed;
   right: 0;

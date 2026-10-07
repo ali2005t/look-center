@@ -5,9 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الكاشير</title>
-  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
   <link rel="stylesheet" href="css/cashier.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v4" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
 </head>
 
@@ -47,6 +47,7 @@
     <ul class="mobile-menu-list">
       <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
       <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="vip.html"><i class="fas fa-crown"></i><span>VIP</span></a></li>
       <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
       <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
       <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
@@ -69,6 +70,7 @@
               class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
       <li class="active" data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i
               class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li data-link="vip.html"><a href="vip.html"><span class="sidebar-icon"><i class="fas fa-crown" style="color:#ffb300;"></i></span><span>VIP</span></a></li>
       <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i
               class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
 
@@ -95,6 +97,21 @@
 
   <!-- المحتوى -->
   <main class="cashier-container" style="margin-right:220px;">
+    <section class="student-lookup-panel" aria-labelledby="student-lookup-title">
+      <div class="student-lookup-heading">
+        <span class="student-lookup-icon"><i class="fas fa-search" aria-hidden="true"></i></span>
+        <div>
+          <h2 id="student-lookup-title">البحث عن طالب</h2>
+          <p>ابحث بالاسم أو رقم الهاتف لعرض ملف الطالب وسجل اشتراكاته وفواتيره.</p>
+        </div>
+      </div>
+      <label class="student-lookup-input-wrap" for="student-lookup-input">
+        <i class="fas fa-search" aria-hidden="true"></i>
+        <input id="student-lookup-input" type="search" autocomplete="off" placeholder="اكتب اسم الطالب أو رقم هاتفه" aria-controls="student-lookup-results" />
+      </label>
+      <div id="student-lookup-results" class="student-lookup-results" role="listbox" aria-live="polite"></div>
+    </section>
+
     <div class="cashier-top-group">
       <section class="grades-section">
         <div class="grade-btn" data-grade="أولى">أولى</div>
@@ -165,6 +182,27 @@
             <input type="number" id="installment-remaining" name="installmentRemaining"
               placeholder="المبلغ المتبقي (جنيه)" min="0" style="margin-bottom:6px;" readonly />
           </div>
+          <div id="vip-discount-fields" style="display:none; background:#fff8e1; border:1px solid #ffca28; border-radius:10px; padding:12px; margin:10px 0;">
+            <label style="display:block;margin-bottom:8px;color:#b26a00;font-weight:bold;">VIP - تعديل السعر</label>
+            <div class="form-fields-group" style="display:grid; grid-template-columns:repeat(2,minmax(120px,1fr)); gap:10px;">
+              <div class="form-group">
+                <label for="vip-original-price">السعر الأصلي</label>
+                <input type="number" id="vip-original-price" min="0" placeholder="السعر الأصلي" />
+              </div>
+              <div class="form-group">
+                <label for="vip-discount-amount">الخصم</label>
+                <input type="number" id="vip-discount-amount" min="0" placeholder="قيمة الخصم" />
+              </div>
+            </div>
+            <div class="form-group vip-final-price-group" style="margin-top:10px;">
+              <label for="vip-final-price">سعر البيع النهائي (اكتبه هنا)</label>
+              <input type="number" id="vip-final-price" min="0" placeholder="اكتب المبلغ الذي ستبيعه به" />
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <input type="text" id="vip-reason" placeholder="سبب VIP / الخصم / مجاني" />
+            </div>
+          </div>
+
           <textarea id="notes" name="notes" placeholder="ملاحظات الدفع / التقسيط"></textarea>
 
           <!-- قسم تسليم كروت الأونلاين — بيظهر تلقائياً لو الاشتراك بيه كروت مرتبطة -->
@@ -175,7 +213,7 @@
           </div>
 
           <div class="action-buttons">
-            <button type="submit" id="add-invoice-btn">إضافة الفاتورة</button>
+            <button type="submit" id="add-invoice-btn">إضافة الفاتورة <span class="keyboard-shortcut-hint" aria-label="اختصار لوحة المفاتيح F5">F5</span></button>
           </div>
         </form>
         <!-- نافذة منبثقة للطباعة -->
@@ -213,6 +251,13 @@
     </div>
   </main>
 
+  <div id="student-profile-modal" class="student-profile-modal" hidden>
+    <section class="student-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="student-profile-name">
+      <button type="button" id="close-student-profile" class="student-profile-close" aria-label="إغلاق الملف">&times;</button>
+      <div id="student-profile-content"></div>
+    </section>
+  </div>
+
   <!-- نافذة تسجيل الخروج -->
   <div id="logout-modal"
     style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
@@ -239,9 +284,9 @@
   </footer>
 
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
-  <script type="module" src="js/cashier.js"></script>
+  <script type="module" src="js/cashier.js?v=inventory-v1"></script>
   <script>
     // معالج النقر على القائمة الجانبية - بسيط وفعال
     document.addEventListener('DOMContentLoaded', function () {

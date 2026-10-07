@@ -1,6 +1,6 @@
 // js/invoices.js
 import { db } from "./firebase.js";
-import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, addDoc, increment, Timestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, addDoc, runTransaction, Timestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { collection as collection2, getDocs as getDocs2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc as doc2, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -11,6 +11,7 @@ const modal = document.getElementById("invoice-details-modal");
 // متغيرات لتخزين الفواتير الكل والفواتير المصفاة
 let allInvoices = [];
 let filteredInvoices = [];
+let loadRequestId = 0;
 
 // متغير عالمي لاسم المستلم
 let currentRecipient = '-';
@@ -41,6 +42,49 @@ function portalSubscriptionFallback(registration) {
   return registration.selectedSubscriptions?.length || registration.subscriptions?.length || registration.selectedItems?.length
     ? ''
     : 'بيانات الاشتراك غير محفوظة';
+}
+
+function normalizeSubscriptionReference(value) {
+  if (value && typeof value === 'object') value = value.id || value.name || value.value;
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function normalizeGrade(grade) {
+  let value = String(grade || '').trim().replace(/^الفرقة\s*/, '').replace(/^ال/, '').replace(/\s+/g, ' ');
+  value = value.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه');
+  return value;
+}
+
+function getLinkedNotesForInvoice(invoice, subscriptionDocs) {
+  const parentItems = invoice.isPortalRegistration
+    ? (invoice.selectedSubscriptions || [])
+    : (invoice.items?.length ? invoice.items : invoice.indivNotes || []);
+  const parentReferences = new Set(parentItems.flatMap(item => [item.id, item.name])
+    .map(normalizeSubscriptionReference).filter(Boolean));
+  const invoiceGrade = normalizeGrade(invoice.grade);
+  const previousDelivery = new Map((invoice.indivNotes || []).map(note => [note.noteId || note.name, note.delivered === true]));
+
+  return subscriptionDocs
+    .filter(docSnap => {
+      const note = docSnap.data();
+      const linkedReference = normalizeSubscriptionReference(note.linkedSubscription);
+      const noteGrade = normalizeGrade(note.grade);
+      return String(note.type || '').trim() === 'ملازم فردية'
+        && (!invoiceGrade || !noteGrade || noteGrade === invoiceGrade)
+        && parentReferences.has(linkedReference);
+    })
+    .map(docSnap => {
+      const note = docSnap.data();
+      return {
+        noteId: docSnap.id,
+        name: note.name,
+        price: note.price || 0,
+        delivered: previousDelivery.get(docSnap.id) === true || previousDelivery.get(note.name) === true,
+        sortOrder: Number(note.sortOrder) || Number.MAX_SAFE_INTEGER
+      };
+    })
+    .sort((first, second) => first.sortOrder - second.sortOrder
+      || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' }));
 }
 
 // جلب اسم المستخدم الحالي من فايربيس (Firestore) بناءً على uid من Auth
@@ -78,6 +122,8 @@ async function loadInvoices() {
     return;
   }
 
+  const requestId = ++loadRequestId;
+
   if (!realtimeStarted) {
     realtimeStarted = true;
     onSnapshot(collection(db, 'invoices'), () => loadInvoices());
@@ -86,11 +132,24 @@ async function loadInvoices() {
   }
 
   tableBody.innerHTML = "<tr><td colspan='10'>جاري التحميل...</td></tr>";
-  const [snapshot, portalSnapshot, usersSnapshot] = await Promise.all([
-    getDocs(collection(db, "invoices")),
-    getDocs(collection(db, "studentRegistrations")),
-    getDocs(collection(db, "users"))
-  ]);
+  let snapshots;
+  try {
+    snapshots = await Promise.all([
+      getDocs(collection(db, "invoices")),
+      getDocs(collection(db, "studentRegistrations")),
+      getDocs(collection(db, "users")),
+      getDocs(collection(db, "subscriptions"))
+    ]);
+  } catch (error) {
+    console.error('Could not load invoices:', error);
+    if (requestId === loadRequestId) {
+      tableBody.innerHTML = "<tr><td colspan='15'>تعذر تحميل الفواتير. تحقق من الاتصال ثم أعد المحاولة.</td></tr>";
+    }
+    return;
+  }
+  if (requestId !== loadRequestId) return;
+  const [snapshot, portalSnapshot, usersSnapshot, subscriptionsSnapshot] = snapshots;
+  const subscriptionDocs = subscriptionsSnapshot.docs;
   const userNames = new Map();
   usersSnapshot.forEach(userDoc => {
     const user = userDoc.data();
@@ -115,7 +174,8 @@ async function loadInvoices() {
     if (Number.isFinite(storedNumber)) highestInvoiceNumber = Math.max(highestInvoiceNumber, storedNumber);
     allInvoices.push({
       id: docSnap.id,
-      num: num,
+      num: inv.num ?? num,
+      isVip: inv.isVip === true,
       student: inv.student || '-',
       phone: inv.phone || '',
       subType: type,
@@ -126,9 +186,10 @@ async function loadInvoices() {
       date: inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-',
       status: inv.status || 'تم الحفظ',
       recipient: inv.recipient || '-',
-      notes: inv.notes || '-',
+      notes: inv.notes || 'لا توجد',
       linkedSubTypes: inv.linkedSubTypes || [],
       indivNotes: inv.indivNotes || [],   // للملازم: قائمة الملازم المرتبطة وحالة تسليمها
+      linkedNotes: getLinkedNotesForInvoice({ ...inv, grade: inv.grade || '-' }, subscriptionDocs),
       onlineCardsDelivery: inv.onlineCardsDelivery || [] // للكروت الأونلاين
     });
     counters[type] = num + 1;
@@ -152,6 +213,7 @@ async function loadInvoices() {
       subType: classifyPortalSubscriptions(visibleSubscriptions),
       items: [],
       payment: registration.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع',
+      paymentMethod: registration.paymentMethod || registration.payment || 'نقدي',
       paymentStatus: registration.paymentStatus || 'unpaid',
       paidAmount: Number(registration.paidAmount || 0),
       requestedAmount: Number(registration.requestedAmount || 0),
@@ -163,10 +225,11 @@ async function loadInvoices() {
       status: 'تسجيل طالب',
       agentId: registration.agentId || '-',
       recipient: userNames.get(registration.agentId) || registration.agentId || '-',
-      notes: 'تسجيل من بوابة الطلاب',
+      notes: registration.notes || registration.note || registration.remark || 'تسجيل من الموقع',
       linkedSubTypes: [],
-      indivNotes: [],
-      onlineCardsDelivery: []
+      indivNotes: registration.indivNotes || [],
+      linkedNotes: getLinkedNotesForInvoice({ ...registration, isPortalRegistration: true, selectedSubscriptions: visibleSubscriptions }, subscriptionDocs),
+      onlineCardsDelivery: registration.onlineCardsDelivery || []
     });
   });
   filteredInvoices = [...allInvoices];
@@ -194,49 +257,51 @@ function renderInvoicesTable() {
     const isGroup = inv.student && inv.student !== '-' && inv.subType !== 'محاضرات فردية' && inv.subType !== 'ملازم فردية';
     const phoneCell = isGroup ? (inv.phone || '-') : '-';
     const itemsText = (inv.items && inv.items.length) ? inv.items.map(x => x.name).join('، ') : '-';
+    const isNotesSubscription = inv.subType === 'ملازم' || inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم وكورسات';
     const portalItemsText = inv.isPortalRegistration && inv.selectedSubscriptions?.length
-      ? inv.selectedSubscriptions.map(item => `${item.name} (${item.type.replace('اشتراك ', '')})`).join('، ')
+      ? inv.selectedSubscriptions.map(item => item.name).filter(Boolean).join('، ')
       : itemsText;
     // تحسين مظهر المستلم
     let recipientCell = `<span class="recipient-cell" style="display:inline-block;padding:4px 12px;border-radius:8px;background:linear-gradient(90deg,#e3f2fd 60%,#bbdefb 100%);color:#1976d2;font-weight:bold;font-size:1em;box-shadow:0 1px 4px #90caf922;">${inv.recipient && inv.recipient !== '-' ? inv.recipient : '<span style=\'color:#b3b3b3\'>غير محدد</span>'}</span>`;
     const tr = document.createElement("tr");
     if (inv.isPortalRegistration) tr.className = 'portal-registration-row';
-    let actions = inv.isPortalRegistration
-      ? `<label class="portal-payment-control"><span>تغيير الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus !== 'paid' ? 'selected' : ''}>لم يدفع</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>`
-      : `<button class='open-invoice-btn' data-id='${inv.id}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;'>قراءة</button>`;
+    let actions = `<button class='open-invoice-btn' data-id='${inv.id}' data-portal='${inv.isPortalRegistration ? 'true' : 'false'}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>فتح</button>`;
+    if (inv.isPortalRegistration) {
+      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus !== 'paid' ? 'selected' : ''}>لم يدفع</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
+    }
     if (canDeleteInvoice) {
       actions += `<button class='delete-invoice-btn' data-id='${inv.id}' style='background:#f44336;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;'>حذف</button>`;
     }
     // ملخص تسليم الملازم
     let deliverySummary = '-';
-    if ((inv.subType === 'ملازم' || inv.subType === 'اشتراك ملازم') && inv.indivNotes && inv.indivNotes.length > 0) {
-      const total = inv.indivNotes.length;
-      const delivered = inv.indivNotes.filter(n => n.delivered).length;
+    if (isNotesSubscription) {
+      const total = inv.linkedNotes?.length || 0;
+      const delivered = (inv.linkedNotes || []).filter(n => n.delivered).length;
       const allDone = delivered === total;
-      deliverySummary = `<span style="font-weight:bold;color:${allDone ? '#388e3c' : '#e65100'};background:${allDone ? '#e8f5e9' : '#fff3e0'};padding:3px 10px;border-radius:8px;">${delivered}/${total} ✔</span>`;
+      deliverySummary = `<span style="font-weight:bold;color:${allDone && total ? '#388e3c' : '#e65100'};background:${allDone && total ? '#e8f5e9' : '#fff3e0'};padding:3px 10px;border-radius:8px;">إجمالي ${total}، مستلم ${delivered}</span>`;
     }
 
     // ملخص تسليم الكروت
     let cardSummary = '-';
     if (inv.onlineCardsDelivery && inv.onlineCardsDelivery.length > 0) {
       const total = inv.onlineCardsDelivery.length;
-      const delivered = inv.onlineCardsDelivery.filter(c => c.delivered).length;
+      const delivered = inv.onlineCardsDelivery.filter(c => c.delivered === true || c.isDelivered === true).length;
       const allDone = delivered === total;
       cardSummary = `<span style="font-weight:bold;color:${allDone ? '#1976d2' : '#d32f2f'};background:${allDone ? '#e3f2fd' : '#ffebee'};padding:3px 10px;border-radius:8px;">${delivered}/${total} 🃏</span>`;
     }
 
     tr.innerHTML = `
       <td>${inv.num}</td>
-      <td>${inv.student}</td>
+      <td>${inv.student}${inv.isVip ? ' <span class="vip-badge">VIP</span>' : ''}</td>
       <td>${phoneCell}</td>
       <td class="items-cell">${portalItemsText || inv.subscriptionFallback || '-'}</td>
       <td class="type-cell">${inv.subType}</td>
       <td>${inv.grade}</td>
-      <td class="amount-cell">${inv.isPortalRegistration ? `${inv.paymentStatus === 'paid' ? inv.paidAmount : inv.requestedAmount} ج` : `${(inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)} ج`}</td>
+      <td class="amount-cell">${inv.isPortalRegistration ? `${inv.paymentStatus === 'paid' ? inv.paidAmount : inv.requestedAmount} ج` : `${inv.isVip ? (inv.vipFinalPrice ?? (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)) : (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)} ج`}</td>
       <td>${inv.isPortalRegistration ? `<strong class="portal-status ${inv.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${inv.payment}</strong>` : inv.payment}</td>
       <td>${inv.studyType}</td>
       <td>${inv.date}</td>
-      <td>${inv.notes || '-'}</td>
+      <td>${inv.isPortalRegistration ? (inv.notes && String(inv.notes).trim() ? `${inv.notes} — من الموقع` : 'تسجيل من الموقع') : (inv.notes || 'لا توجد')}</td>
       <td>${recipientCell}</td>
       <td style='text-align:center;'>${deliverySummary}</td>
       <td style='text-align:center;'>${cardSummary}</td>
@@ -247,7 +312,7 @@ function renderInvoicesTable() {
   // إعادة ربط الأحداث
   document.querySelectorAll('.open-invoice-btn').forEach(btn => {
     btn.onclick = () => {
-      showInvoiceModal(btn.getAttribute('data-id'));
+      showInvoiceModal(btn.getAttribute('data-id'), btn.dataset.portal === 'true');
       showNotification('تم فتح تفاصيل الفاتورة', 'info');
     };
   });
@@ -313,11 +378,21 @@ function renderInvoicesTable() {
         window.showNotification('لا يوجد مبلغ محفوظ لهذا الاشتراك', 'error');
         return;
       }
+      let paymentMethod = registration?.paymentMethod || 'نقدي';
+      if (status === 'paid') {
+        paymentMethod = await choosePaymentMethod(paymentMethod);
+        if (!paymentMethod) {
+          select.value = select.dataset.previous;
+          return;
+        }
+      }
       try {
         select.disabled = true;
         await updateDoc(doc(db, 'studentRegistrations', select.dataset.id), {
           paymentStatus: status,
           paidAmount: status === 'paid' ? amount : 0,
+          payment: status === 'paid' ? paymentMethod : 'لم يدفع',
+          paymentMethod: status === 'paid' ? paymentMethod : null,
           paidAt: status === 'paid' ? Timestamp.now() : null
         });
         if (status === 'paid') {
@@ -326,6 +401,8 @@ function renderInvoicesTable() {
             agentId: registration?.agentId || registration?.recipient || '-',
             studentName: registration?.student || '-',
             amount,
+            payment: paymentMethod,
+            paymentMethod,
             paidAt: Timestamp.now(),
             source: 'invoices-page'
           });
@@ -337,6 +414,26 @@ function renderInvoicesTable() {
         select.value = select.dataset.previous;
         window.showNotification('تعذر تحديث حالة الدفع', 'error');
       }
+    });
+  });
+
+}
+
+function choosePaymentMethod(currentMethod = 'نقدي') {
+  return new Promise(resolve => {
+    const old = document.getElementById('payment-method-picker');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'payment-method-picker';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    overlay.innerHTML = `<div style="background:#fff;width:min(360px,90vw);padding:24px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);text-align:center;direction:rtl;"><h3 style="margin:0 0 18px;color:#1976d2;">اختار طريقة الدفع</h3><div style="display:grid;gap:10px;"><button data-method="نقدي" style="padding:11px;border:0;border-radius:7px;background:#2e7d32;color:#fff;font-weight:bold;cursor:pointer;">نقدي</button><button data-method="محفظة" style="padding:11px;border:0;border-radius:7px;background:#1976d2;color:#fff;font-weight:bold;cursor:pointer;">محفظة</button><button data-method="تقسيط" style="padding:11px;border:0;border-radius:7px;background:#ef6c00;color:#fff;font-weight:bold;cursor:pointer;">تقسيط</button><button data-method="cancel" style="padding:8px;border:1px solid #aaa;border-radius:7px;background:#fff;color:#555;cursor:pointer;">إلغاء</button></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('[data-method]').forEach(button => {
+      button.onclick = () => {
+        const method = button.dataset.method;
+        overlay.remove();
+        resolve(method === 'cancel' ? null : method || currentMethod);
+      };
     });
   });
 }
@@ -389,61 +486,84 @@ function filterInvoices() {
 }
 
 // عرض نافذة تفاصيل الفاتورة
-async function showInvoiceModal(id) {
+async function showInvoiceModal(id, isPortalRegistration = false) {
   // جلب الفاتورة مباشرة من قاعدة البيانات لضمان تحديث البيانات
-  const invDoc = await getDoc(doc(db, "invoices", id));
+  const invDoc = await getDoc(doc(db, isPortalRegistration ? "studentRegistrations" : "invoices", id));
   if (!invDoc.exists()) return alert("لم يتم العثور على الفاتورة!");
   const inv = invDoc.data();
-  // إصلاح تعريف isNotesSubscription
-  const isNotesSubscription = inv.subType && (inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم');
-
-  // جلب جميع الملازم المرتبطة بنفس الفرقة من الاشتراكات والأسعار
-  let allNotesList = [];
-  if ((inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم') && inv.grade) {
-    if (Array.isArray(inv.indivNotes) && inv.indivNotes.length > 0) {
-      // indivNotes موجودة: استخدمها مباشرة
-      allNotesList = inv.indivNotes.map(n => ({ name: n.name, price: n.price, delivered: n.delivered || false }));
-    } else {
-      // indivNotes مش موجودة (فاتورة قديمة): اجلب الملازم الفردية الحالية من subscriptions
-      const subsSnap = await getDocs(collection(db, "subscriptions"));
-      subsSnap.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.type === 'ملازم فردية' && data.grade === inv.grade && (data.published === undefined || data.published)) {
-          allNotesList.push({ name: data.name, price: data.price, delivered: false });
+  if (isPortalRegistration) {
+    const subscriptions = normalizePortalSubscriptions(inv);
+    inv.selectedSubscriptions = subscriptions;
+    inv.student = inv.studentName || '-';
+    inv.phone = inv.phone || '-';
+    inv.subType = classifyPortalSubscriptions(subscriptions);
+    inv.items = subscriptions.map(item => ({ name: item.name, price: item.price }));
+    inv.payment = inv.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع';
+    inv.payment = inv.paymentMethod || (inv.paymentStatus === 'paid' ? 'نقدي' : 'نقدي');
+    inv.num = inv.invoiceNumber || '-';
+    inv.grade = inv.grade || '-';
+    inv.studyType = inv.studyType || '-';
+    inv.date = inv.registeredAt || '-';
+    inv.notes = inv.notes || inv.note || inv.remark || '';
+    if (inv.agentId) {
+      try {
+        const agentDoc = await getDoc(doc(db, 'users', inv.agentId));
+        if (agentDoc.exists()) {
+          const agent = agentDoc.data();
+          inv.recipient = agent.username || agent.fullname || agent.name || agent.email || inv.agentId;
         }
-      });
-      // احفظ القائمة في الفاتورة علشان المرة الجاية تتحمل منها
-      if (allNotesList.length > 0) {
-        try {
-          await updateDoc(doc(db, 'invoices', id), { indivNotes: allNotesList });
-        } catch (e) { console.warn('Could not save indivNotes:', e); }
+      } catch (error) {
+        console.warn('Could not load portal registration recipient:', error);
       }
     }
+    inv.recipient = inv.recipient || inv.agentId || currentRecipient || '-';
   }
+  // إصلاح تعريف isNotesSubscription
+  const isNotesSubscription = inv.subType && (inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم' || inv.subType === 'ملازم وكورسات');
+
+  // Load only individual notes linked to the selected subscription.
+  let allNotesList = [];
+  if (isNotesSubscription && inv.grade) {
+    const subsSnap = await getDocs(collection(db, "subscriptions"));
+    allNotesList = getLinkedNotesForInvoice(inv, subsSnap.docs);
+    if (!allNotesList.length && Array.isArray(inv.indivNotes)) {
+      allNotesList = inv.indivNotes;
+    }
+    if (allNotesList.length > 0) {
+      try {
+        await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { indivNotes: allNotesList });
+      } catch (e) { console.warn('Could not save indivNotes:', e); }
+    }
+  }
+  const invoiceDisplayItems = inv.items || [];
+  const invoiceTotal = (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   // مربعات استلام الملازم في اشتراك ملازم
   let notesDeliveryBoxes = '';
   // استخدم allNotesList مباشرة للعداد والعرض
   let notesArr = allNotesList.length > 0 ? allNotesList : [];
-  if ((inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم') && notesArr.length > 0) {
+  if (isNotesSubscription && notesArr.length > 0) {
     const deliveredCount = notesArr.filter(x => x.delivered).length;
     const remainingCount = notesArr.length - deliveredCount;
-    notesDeliveryBoxes = `<div style='margin:18px 0 0 0;'>
+    notesDeliveryBoxes = `<div style='margin:6px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;line-height:1.2;'>
+          <b style='color:#1565c0;'>إجمالي الملازم المرتبطة: ${notesArr.length}</b>
       <b style='color:#1976d2;'>عدد الملازم المستلمة: ${deliveredCount}</b>
-      <span style='margin-right:18px;color:#e53935;'>الملازم المتبقية: ${remainingCount}</span>
+      <span style='color:#e53935;'>الملازم المتبقية: ${remainingCount}</span>
     </div>`;
+  } else if (isNotesSubscription) {
+    notesDeliveryBoxes = `<div style='margin:6px 0 0;color:#c62828;font-size:12px;font-weight:bold;'>لم يستلم ملازم بعد</div>`;
   }
   // --- مربعات استلام الملازم الفردية حسب الفرقة ---
   let indivNotesBoxes = '';
-  if ((inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم') && allNotesList.length > 0) {
-    indivNotesBoxes = `<div style='margin:18px 0 0 0;'>
-      <b style='color:#1976d2;'>جميع الملازم المرتبطة بالفرقة:</b>
-      <div class='indiv-notes-list' style="display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:10px;margin-top:10px;">
+  if (isNotesSubscription && allNotesList.length > 0) {
+    indivNotesBoxes = `<div style='margin:6px 0 0;'>
+      <b style='color:#1976d2;'>حالة تسليم الملازم:</b>
+      <div class='indiv-notes-list' style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;box-sizing:border-box;gap:6px;margin-top:5px;">
         ${allNotesList.map((x, i) =>
-      `<div class='indiv-note-box' style="background:#fff;padding:10px;border-radius:10px;border:1px solid #e0e0e0;text-align:center;">
-            <div style="font-weight:bold;font-size:0.9em;margin-bottom:5px;">${x.name}</div>
-            <input type='checkbox' class='indiv-note-delivered-checkbox' data-idx='${i}' ${x.delivered ? 'checked' : ''} style="width:18px;height:18px;">
-            <div style="font-size:0.8em;color:${x.delivered ? '#2e7d32' : '#d32f2f'}">${x.delivered ? 'تم' : 'لم'} يستلم</div>
-          </div>`
+      `<label class='indiv-note-box' style="background:#fff;padding:7px 5px;border-radius:8px;border:1px solid #e0e0e0;text-align:center;line-height:1.2;cursor:pointer;user-select:none;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px;min-width:0;width:100%;box-sizing:border-box;overflow:hidden;">
+        <span style="font-weight:bold;font-size:0.82em;grid-column:1/-1;overflow-wrap:anywhere;">${x.name}</span>
+        <input type='checkbox' class='indiv-note-delivered-checkbox' data-idx='${i}' aria-label='تم استلام ${x.name}' ${x.delivered ? 'checked' : ''} style="width:20px;height:20px;justify-self:center;cursor:pointer;accent-color:#2e7d32;">
+        <span class='indiv-note-delivered-status' style="font-size:0.75em;color:${x.delivered ? '#2e7d32' : '#d32f2f'};overflow-wrap:anywhere;">${x.delivered ? 'تم الاستلام' : 'لم يستلم'}</span>
+          </label>`
     ).join('')}
       </div>
     </div>`;
@@ -454,42 +574,65 @@ async function showInvoiceModal(id) {
   let indivCardsBoxes = '';
 
   // لو الفاتورة قديمة ومعندهاش onlineCardsDelivery، نحاول نجيب الكروت المناسبة (للاشتراكات)
-  if ((!inv.onlineCardsDelivery || inv.onlineCardsDelivery.length === 0) &&
-    (inv.subType && (inv.subType.includes('اشتراك') || inv.subType === 'كورسات' || inv.subType === 'ملازم'))) {
+  const hasOnlineCardsSubscriptionType = inv.subType && (
+    inv.subType.includes('اشتراك') ||
+    inv.subType.includes('كورسات') ||
+    inv.subType.includes('ملازم')
+  );
+
+  if (!Array.isArray(inv.onlineCardsDelivery) && hasOnlineCardsSubscriptionType) {
     const cardsSnap = await getDocs(collection(db, "onlineCards"));
     const autoCards = [];
+    const invoiceItems = isPortalRegistration
+      ? ([inv.selectedSubscriptions, inv.subscriptions, inv.selectedItems].find(items => Array.isArray(items) && items.length) || [])
+      : (inv.items || []);
+    const invoiceSubscriptionIds = new Set(invoiceItems.map(item => item.id).filter(Boolean));
     cardsSnap.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.type === 'للاشتراكات') {
-        autoCards.push({ id: docSnap.id, name: data.name, type: data.type, perSub: data.perSub || 1, delivered: false });
-      }
+      if (data.type !== 'للاشتراكات') return;
+      const linkedIds = Array.isArray(data.linkedSubscriptionIds) ? data.linkedSubscriptionIds : [];
+      if (linkedIds.length && !linkedIds.some(linkedId => invoiceSubscriptionIds.has(linkedId))) return;
+      const matchingCount = linkedIds.length
+        ? invoiceItems.filter(item => linkedIds.includes(item.id)).length
+        : invoiceItems.length;
+      if (!matchingCount) return;
+      autoCards.push({
+        id: docSnap.id,
+        cardId: docSnap.id,
+        name: data.name,
+        type: data.type,
+        perSub: data.perSub || 1,
+        quantity: matchingCount * (data.perSub || 1),
+        delivered: false,
+        linkedSubscriptionIds: invoiceItems
+          .filter(item => !linkedIds.length || linkedIds.includes(item.id))
+          .map(item => item.id)
+          .filter(Boolean)
+      });
     });
     if (autoCards.length > 0) {
       inv.onlineCardsDelivery = autoCards;
       // حفظها في الفاتورة مستقبلاً
       try {
-        await updateDoc(doc(db, 'invoices', id), { onlineCardsDelivery: autoCards });
+        await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { onlineCardsDelivery: autoCards });
       } catch (e) { console.warn('Could not auto-save onlineCardsDelivery:', e); }
     }
   }
 
-  const onlineCardsArr = inv.onlineCardsDelivery || [];
+  const onlineCardsArr = (inv.onlineCardsDelivery || []).map(card => ({
+    ...card,
+    cardId: card.cardId || card.id,
+    delivered: card.delivered === true || card.isDelivered === true
+  }));
   if (onlineCardsArr.length > 0) {
-    const delCount = onlineCardsArr.filter(x => x.delivered).length;
-    const remCount = onlineCardsArr.length - delCount;
-    cardDeliverySummary = `<div style='margin:18px 0 0 0;padding-top:12px;border-top:1px dashed #90caf9;'>
-      <b style='color:#1565c0;'>عدد كروت الأونلاين المستلمة: ${delCount}</b>
-      <span style='margin-right:18px;color:#d32f2f;'>المتبقي: ${remCount}</span>
-    </div>`;
-
     indivCardsBoxes = `<div style='margin:12px 0 0 0;'>
-      <b style='color:#1565c0;'>كروت الأونلاين المرتبطة بالفاتورة:</b>
+      <b style='color:#1565c0;'>كروت الأونلاين:</b>
       <div class='indiv-cards-list' style="display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:10px;margin-top:10px;">
         ${onlineCardsArr.map((x, i) =>
       `<div class='indiv-card-box' style="background:#fff;padding:10px;border-radius:10px;border:2px solid ${x.delivered ? '#1976d2' : '#ffebee'};text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.05);">
             <div style="font-weight:bold;font-size:0.9em;margin-bottom:5px;color:#1565c0;">${x.name}</div>
             <input type='checkbox' class='card-delivered-checkbox' data-idx='${i}' ${x.delivered ? 'checked' : ''} style="width:20px;height:20px;accent-color:#1976d2;">
-            <div style="font-size:0.8em;font-weight:bold;margin-top:4px;color:${x.delivered ? '#1976d2' : '#d32f2f'}">${x.delivered ? 'تـــم التسليم' : 'لـم يستلم'}</div>
+            <div style="font-size:0.8em;font-weight:bold;margin-top:4px;color:${x.delivered ? '#1976d2' : '#d32f2f'}">${x.delivered ? 'استلم كارت أونلاين' : 'لم يستلم الكارت الأونلاين'}</div>
           </div>`
     ).join('')}
       </div>
@@ -507,19 +650,43 @@ async function showInvoiceModal(id) {
   if (!logoUrl || logoUrl === 'null' || logoUrl === 'undefined') {
     logoUrl = 'img/placeholder-logo.png';
   }
+  if (!/^(data:|https?:|file:)/i.test(logoUrl)) {
+    logoUrl = new URL(logoUrl, window.location.href).href;
+  }
   // تشكيل أرقام السنتر مع فاصل -
   const phones = [centerPhone1, centerPhone2, centerPhone3].filter(p => p && p.trim());
-  const phonesDisplay = phones.length > 0 ? `<i class='fa fa-phone' style='margin-left:6px;color:#388e3c;'></i>${phones.join(' - ')}` : '';
-  let phoneHtml = phonesDisplay ? `<div style='font-size:1.05rem;color:#1976d2;display:flex;align-items:center;justify-content:center;'>${phonesDisplay}</div>` : '';
+  const primaryCenterPhone = phones[0] || '';
+  function normalizeWhatsAppNumber(rawPhone) {
+    if (!rawPhone) return '';
+    let digits = String(rawPhone).replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.startsWith('+')) digits = digits.slice(1);
+    if (digits.startsWith('20') && digits.length >= 12) return digits;
+    if (digits.startsWith('0') && digits.length === 11) return `20${digits.slice(1)}`;
+    if (digits.length === 10 && !digits.startsWith('0')) return `20${digits}`;
+    return digits;
+  }
+  const normalizedCenterPhone = normalizeWhatsAppNumber(primaryCenterPhone);
+  const centerWhatsAppUrl = normalizedCenterPhone ? `https://wa.me/${normalizedCenterPhone}` : '';
+  const centerWhatsAppQr = centerWhatsAppUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(centerWhatsAppUrl)}` : '';
+  let phoneHtml = centerWhatsAppQr ? `
+    <a href='${centerWhatsAppUrl}' target='_blank' rel='noopener' style='position:relative;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;'>
+      <img src='${centerWhatsAppQr}' alt='WhatsApp QR' style='display:block;width:22px;height:22px;border:2px solid #000;border-radius:6px;background:#fff;padding:1px;box-shadow:none;' />
+      <span style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;width:8px;height:8px;border-radius:50%;background:#fff;border:1px solid #000;box-shadow:0 1px 3px rgba(0,0,0,.15);'>
+        <svg viewBox='0 0 24 24' width='6' height='6' style='fill:#25d366;'><path d='M19.05 4.95A9.89 9.89 0 0 0 12.02 2a9.9 9.9 0 0 0-8.81 14.96L2 22l5.2-1.35A9.9 9.9 0 0 0 12.02 22a9.9 9.9 0 0 0 6.96-2.99A9.9 9.9 0 0 0 19.05 4.95ZM12.02 20.2a8.2 8.2 0 0 1-4.18-1.13l-.3-.18-3.08.8.82-3L5.1 16.8a8.2 8.2 0 1 1 13.46-6.8 8.17 8.17 0 0 1-6.54 10.2Zm4.54-6.2c-.25-.12-1.46-.72-1.69-.8-.23-.08-.4-.12-.57.12-.17.25-.65.8-.8 1-.15.17-.3.2-.55.07-.25-.12-1.05-.38-2-1.23-.74-.66-1.23-1.48-1.38-1.73-.15-.25-.02-.38.11-.5.11-.11.25-.3.38-.45.12-.15.17-.25.25-.42.08-.17.04-.32-.02-.45-.07-.12-.57-1.38-.79-1.89-.2-.48-.42-.42-.57-.42h-.49c-.17 0-.45.07-.68.32-.23.25-.88.86-.88 2.1 0 1.23.9 2.44.1 2.56.18.3.39.46.66.7.27.18.94.54 1.76 1.3.78.7 1.33 1.08 1.81 1.4.26.17.47.15.64.09.2-.06.65-.27.93-.52.28-.25.36-.46.46-.76.08-.3.08-.56-.03-.68-.1-.12-.23-.2-.45-.32Z'/></svg>
+      </span>
+    </a>
+  ` : '';
   modal.innerHTML = `
     <div style="background:linear-gradient(120deg,#e3f2fd 60%,#fff 100%);border-radius:18px;box-shadow:0 6px 32px #90caf988,0 2px 8px #e3e3e3cc;padding:32px 18px 18px 18px;max-width:520px;min-width:340px;position:relative;max-height:90vh;overflow-y:auto;">
       <button id='close-invoice-modal' style='position:absolute;left:18px;top:18px;background:transparent;border:none;font-size:22px;color:#1976d2;cursor:pointer;z-index:10;' title='إغلاق'>&#10006;</button>
       <h2 style='margin-bottom:18px;color:#1976d2;text-align:center;font-weight:bold;font-size:1.3em;'>تفاصيل الفاتورة</h2>
       <div id="printable-invoice" style="text-align:center;padding:0 8px;">
-        <div style='margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid #1976d2;'>
-          <img src="${logoUrl}" alt="شعار السنتر" style="display:block;margin:0 auto 10px auto;max-width:120px;max-height:120px;border-radius:8px;" />
-          <div style='font-size:1.4rem;font-weight:bold;color:#1565c0;text-align:center;margin-bottom:6px;'>${centerName}</div>
-          <div style='font-size:1.15rem;font-weight:bold;color:#1976d2;margin:10px 0;text-align:center;padding:8px;background:#e3f2fd;border-radius:6px;'>رقم الفاتورة: ${(typeof inv.num !== 'undefined' && inv.num !== null) ? inv.num : '-'}</div>
+        <div style='margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #1976d2;'>
+          <img src="${logoUrl}" alt="شعار السنتر" style="display:block;margin:0 auto 8px auto;max-width:120px;max-height:120px;border-radius:8px;" />
+          ${inv.isVip ? `<div class="vip-print-badge">VIP</div>` : ''}
+          <div style='font-size:1.3rem;font-weight:bold;color:#1976d2;margin:8px 0 0;text-align:center;padding:7px 8px;background:#e3f2fd;border-radius:6px;'>رقم الفاتورة: ${(typeof inv.num !== 'undefined' && inv.num !== null) ? inv.num : '-'}</div>
         </div>
         
         <table style='width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;line-height:1.8;'>
@@ -548,13 +715,14 @@ async function showInvoiceModal(id) {
         ${inv.subType === 'كورسات' && inv.linkedSubTypes && inv.linkedSubTypes.includes('ملازم') ? `<div style='margin:12px 0;padding:12px;background:#fff3e0;border-left:4px solid #ff9800;border-radius:4px;text-align:right;font-size:14px;font-weight:bold;color:#e65100;'>ⓘ كود اشتراك الملازم: <span style='color:#ff6f00;font-size:16px;'>${(typeof inv.num !== 'undefined' && inv.num !== null) ? inv.num + 1 : '-'}</span></div>` : ''}
         
         <div style='margin-top:12px;margin-bottom:12px;padding:10px;background:#e8f5e9;border:2px solid #388e3c;border-radius:6px;'>
-          <div style='font-size:13px;color:#2e7d32;margin-bottom:4px;'><b>طريقة الدفع:</b> ${inv.payment || '-'}</div>
+          <div style='font-size:13px;color:#2e7d32;margin-bottom:4px;font-weight:bold;'>طريقة الدفع: <span id='invoice-payment-method-label'>${inv.payment || 'نقدي'}</span></div>
+          <button id='invoice-payment-method-trigger' type='button' style='padding:7px 14px;border:0;border-radius:6px;background:#388e3c;color:#fff;font-weight:bold;cursor:pointer;'>تغيير طريقة الدفع</button>
         </div>
         
         <div style='margin-bottom:12px;'>
           <div style='font-weight:bold;color:#1976d2;margin-bottom:8px;text-align:right;padding-bottom:6px;border-bottom:2px solid #1565c0;'>📋 العناصر</div>
           <table style='width:100%;border-collapse:collapse;font-size:14px;'>
-            ${(inv.items || []).map((x, idx) => `
+            ${invoiceDisplayItems.map((x, idx) => `
             <tr style='${idx % 2 === 0 ? "background:#f9f9f9;" : ""}'>
               <td style='padding:10px;text-align:right;border-bottom:1px solid #e0e0e0;'>${x.name}</td>
               <td style='padding:10px;text-align:left;border-bottom:1px solid #e0e0e0;color:#388e3c;font-weight:bold;'>${x.price} ج</td>
@@ -564,12 +732,11 @@ async function showInvoiceModal(id) {
         </div>
         ${notesDeliveryBoxes}
         ${indivNotesBoxes}
-        ${cardDeliverySummary}
         ${indivCardsBoxes}
         
         <div style='margin:12px 0;padding:12px;background:#e8f5e9;border:2px solid #388e3c;border-radius:6px;text-align:center;'>
           <div style='font-size:12px;color:#2e7d32;margin-bottom:4px;'>الإجمالي</div>
-          <div style='font-size:18px;font-weight:bold;color:#1b5e20;'>${(inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)} ج</div>
+          <div style='font-size:18px;font-weight:bold;color:#1b5e20;'>${invoiceTotal} ج</div>
         </div>
         
         ${inv.payment === 'تقسيط' && inv.installment ? `
@@ -593,17 +760,16 @@ async function showInvoiceModal(id) {
             <td style='padding:10px;text-align:right;font-weight:bold;color:#1976d2;border-bottom:1px solid #e0e0e0;'>التاريخ:</td>
             <td style='padding:10px;text-align:left;border-bottom:1px solid #e0e0e0;'>${inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-'}</td>
           </tr>
-          <tr>
+          ${!isPortalRegistration ? `<tr>
             <td style='padding:10px;text-align:right;font-weight:bold;color:#1976d2;border-bottom:1px solid #e0e0e0;'>ملاحظات:</td>
             <td style='padding:10px;text-align:left;border-bottom:1px solid #e0e0e0;'>${inv.notes || 'لا توجد'}</td>
-          </tr>
+          </tr>` : ''}
         </table>
         
-        <div style='margin-top:18px;padding-top:12px;border-top:2px solid #e0e0e0;'>
-          <div style='font-weight:bold;color:#1565c0;margin-bottom:8px;text-align:center;'>الفرع الرئيسي</div>
-          <div style='font-size:13px;color:#555;margin-bottom:6px;text-align:center;'>${centerAddress ? centerAddress : '-'}</div>
-          ${phoneHtml ? `<div style='text-align:center;margin:6px 0;font-size:12px;'>${phoneHtml}</div>` : ''}
-          <div style='font-size:1.08rem;color:#1976d2;margin:10px 0;text-align:center;padding:10px;background:#e3f2fd;border-radius:6px;'><b>المستلم:</b> ${inv.recipient && inv.recipient !== '-' ? inv.recipient : '<span style="color:#b3b3b3">غير محدد</span>'}</div>
+        <div style='margin-top:10px;padding-top:8px;border-top:1px solid #d0d0d0;'>
+          <div style='font-weight:bold;color:#1565c0;margin-bottom:4px;text-align:center;'>الفرع الرئيسي</div>
+          <div class='center-address' style='font-size:12px;color:#555;margin-bottom:4px;text-align:center;overflow-wrap:anywhere;white-space:normal;'>${centerAddress ? centerAddress : '-'}</div>
+          ${phoneHtml ? `<div style='text-align:center;margin:3px 0;font-size:11px;'>${phoneHtml}</div>` : ''}
         </div>
       </div>
       <div style='display:flex;gap:10px;justify-content:center;margin-bottom:8px;margin-top:18px;flex-wrap:wrap;'>
@@ -631,84 +797,126 @@ async function showInvoiceModal(id) {
   `;
   modal.appendChild(hiddenEditFields);
 
+  document.getElementById('invoice-payment-method-trigger').onclick = async () => {
+    const payment = await choosePaymentMethod(inv.payment || 'نقدي');
+    if (!payment) return;
+    try {
+      const targetCollection = isPortalRegistration ? 'studentRegistrations' : 'invoices';
+      const paymentData = isPortalRegistration
+        ? { paymentMethod: payment, payment: payment, paymentStatus: 'paid' }
+        : { payment };
+      await updateDoc(doc(db, targetCollection, id), paymentData);
+      inv.payment = payment;
+      document.getElementById('invoice-payment-method-label').textContent = payment;
+      showNotification('تم حفظ طريقة الدفع', 'success');
+    } catch (error) {
+      showNotification('تعذر حفظ طريقة الدفع', 'error');
+    }
+  };
+
   // زر الطباعة
-  document.getElementById('print-invoice-btn').onclick = () => {
-    const printContents = document.getElementById('printable-invoice').innerHTML;
+  document.getElementById('print-invoice-btn').onclick = async () => {
     const win = window.open('', '', 'width=400,height=600');
+    if (!win) {
+      showNotification('اسمح بفتح نافذة الطباعة من إعدادات المتصفح', 'error');
+      return;
+    }
+    const printableInvoice = document.getElementById('printable-invoice').cloneNode(true);
+    const logo = printableInvoice.querySelector('img');
+    if (logo?.src) logo.src = await makePrintableImage(logo.src);
+    const printableNotes = printableInvoice.querySelector('.indiv-notes-list');
+    if (printableNotes) {
+      const receivedNotes = [...printableNotes.querySelectorAll('.indiv-note-box')]
+        .filter(note => note.querySelector('.indiv-note-delivered-checkbox')?.checked);
+      printableNotes.querySelectorAll('.indiv-note-box').forEach(note => {
+        if (!note.querySelector('.indiv-note-delivered-checkbox')?.checked) {
+          note.remove();
+          return;
+        }
+        note.querySelector('.indiv-note-delivered-checkbox')?.remove();
+        const status = note.querySelector('.indiv-note-delivered-status');
+        if (status) status.textContent = 'استلمها الطالب';
+      });
+      if (receivedNotes.length === 0) {
+        const emptyStatus = document.createElement('div');
+        emptyStatus.textContent = 'لم يستلم ملازم بعد';
+        emptyStatus.style.cssText = 'margin:4px 0;font-weight:bold;text-align:right;';
+        printableNotes.appendChild(emptyStatus);
+      }
+    }
+    printableInvoice.querySelectorAll('.card-delivered-checkbox').forEach(checkbox => checkbox.remove());
+    const printContents = printableInvoice.innerHTML;
+
+    async function makePrintableImage(source) {
+      if (!source || source.startsWith('data:')) return source;
+      try {
+        const response = await fetch(source);
+        if (!response.ok) throw new Error(`Image request failed: ${response.status}`);
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.warn('Could not embed invoice logo:', error);
+        return source;
+      }
+    }
     win.document.write(`
       <html dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>فاتورة</title>
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { 
-          margin: 0; 
-          padding: 0; 
-          height: auto;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        body {
-          font-family: "Cairo", "Arabic Typesetting", sans-serif;
-          font-size: 11px;
-          color: #333;
-          background: #f5f5f5;
-          width: 100%;
-          padding: 5mm;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-        }
-        .print-container { 
-          width: 80mm; 
-          margin: 0 auto;
-          background: white;
-          padding: 3mm;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        img { max-width: 45px; height: auto; display: block; margin: 1mm auto; }
-        h1 { font-size: 12px; margin: 1mm 0; color: #1565c0; }
-        hr { border: none; border-top: 0.5px solid #999; margin: 2mm 0; }
-        table { width: 100%; border-collapse: collapse; margin: 2mm 0; font-size: 10px; }
-        td { padding: 1.5mm; border-bottom: 0.5px solid #ddd; }
-        td:first-child { text-align: right; font-weight: bold; width: 40%; }
-        .invoice-num { font-size: 11px; font-weight: bold; color: #1565c0; text-align: center; padding: 1.5mm; border: 1px solid #1565c0; margin: 2mm 0; }
-        .total-box { background: #e8f5e9; border: 1px solid #388e3c; padding: 2mm; margin: 2mm 0; text-align: center; font-weight: bold; font-size: 11px; }
-        .installment-box { background: #fff8e1; border: 1px solid #fbc02d; padding: 2mm; margin: 2mm 0; font-size: 10px; }
-        .footer { margin-top: 2mm; padding-top: 2mm; border-top: 0.5px solid #999; text-align: center; font-size: 9px; line-height: 1.4; }
-        .footer div { margin: 0.5mm 0; }
+        @page { size: 80mm auto; margin: 0; }
+        html, body { margin: 0; padding: 0; height: auto; display: flex; justify-content: center; align-items: center; }
+        body { font-family: Tahoma, Arial, sans-serif; font-size: 10px; font-weight: 900; color: #000; background: #fff; width: 80mm; padding: 0; display: flex; justify-content: center; align-items: flex-start; }
+        .print-container { width: 76mm; margin: 0 auto; background: white; padding: 1.5mm 1.5mm 1mm; box-shadow: none; }
+        img { max-width: 80px; max-height: 80px; height: auto; display: block; margin: 0.8mm auto; opacity: 1; }
+        h1 { font-size: 0; margin: 0; display: none; }
+        hr { border: none; border-top: 1px solid #111; margin: 0.6mm 0; }
+        table { width: 100%; border-collapse: collapse; margin: 0.8mm 0; font-size: 11px; line-height: 1.18; }
+        td { padding: 0.8mm 0.9mm; border-bottom: 1px solid #222; line-height: 1.18; }
+        td:first-child { text-align: right; font-weight: 900; width: 40%; }
+        .invoice-num { font-size: 12.2px; font-weight: 900; color: #000; text-align: center; padding: 1.2mm; border: 1px solid #111; margin: 1mm 0; }
+        .vip-print-badge { display: inline-block; margin: 1mm auto; padding: 1mm 4mm; border: 1px solid #f2c300; border-radius: 4px; background: repeating-linear-gradient(135deg, #fff4a3 0 2mm, #ffe16b 2mm 4mm); color: #d50000; font-size: 12px; font-weight: 900; }
+        .total-box { background: #e8f5e9; border: 1px solid #1b5e20; padding: 1.5mm; margin: 1mm 0; text-align: center; font-weight: 900; font-size: 11.6px; color: #000; }
+        .installment-box { background: #fff8e1; border: 1px solid #8d6e00; padding: 1.5mm; margin: 1mm 0; font-size: 10.8px; }
+        .footer { margin-top: 0.9mm; padding-top: 0.8mm; border-top: 1px solid #222; text-align: center; font-size: 10.2px; line-height: 1.25; }
+        .footer div { margin: 0.25mm 0; }
         @media print {
-          html, body { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            background: white;
-          }
-          body { 
-            padding: 5mm;
-            display: flex;
-            justify-content: center;
-          }
-          .print-container { 
-            width: 80mm; 
-            margin: 0 auto;
-            page-break-after: auto;
-            box-shadow: none;
-          }
+          html, body { margin: 0; padding: 0; width: 80mm; height: auto; display: block; align-items: flex-start; background: white; }
+          body { min-height: 0; background: white; }
+          .print-container { width: 72mm; margin: 0 auto; page-break-after: auto; box-shadow: none; background: white; padding: 1mm 1mm 0.6mm; line-height: 1.08 !important; }
           * { box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-container, .print-container * { font-family: Tahoma, Arial, sans-serif !important; color: #000 !important; font-weight: 900 !important; letter-spacing: 0 !important; }
+          .print-container .vip-print-badge { color: #d50000 !important; background: repeating-linear-gradient(135deg, #fff4a3 0 2mm, #ffe16b 2mm 4mm) !important; border: 1px solid #f2c300 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-container img { display: block !important; max-width: 58px !important; max-height: 58px !important; width: 58px !important; height: 58px !important; object-fit: contain; opacity: 1 !important; background: #fff !important; border: 0 !important; box-shadow: none !important; filter: brightness(1.05) contrast(2.2) saturate(1.4) !important; image-rendering: auto; }
+          .print-container table { margin: 0.8mm 0 !important; font-size: 11px !important; line-height: 1.2 !important; }
+          .print-container td { padding: 0.8mm 0.9mm !important; line-height: 1.2 !important; }
+          .print-container > div { margin-top: 0.5mm !important; margin-bottom: 0.5mm !important; padding-top: 0.5mm !important; padding-bottom: 0.5mm !important; }
+          .print-container button { display: none !important; }
+          .print-container input[type="checkbox"] { display: inline-block !important; appearance: none; -webkit-appearance: none; width: 3.5mm !important; height: 3.5mm !important; min-width: 3.5mm; margin: 0 1mm 0 0; vertical-align: middle; border: 0.4mm solid #000 !important; border-radius: 0 !important; background: #fff !important; position: relative; }
+          .print-container input[type="checkbox"]:checked { background: #000 !important; }
+          .print-container input[type="checkbox"]:checked::after { content: "✓"; position: absolute; inset: -0.7mm 0 0 0; color: #fff !important; font-size: 3mm; line-height: 3.8mm; text-align: center; font-weight: 900; }
+          .print-container .indiv-notes-list, .print-container .indiv-cards-list { display: block !important; margin-top: 0.5mm !important; }
+          .print-container .indiv-note-box, .print-container .indiv-card-box { padding: 0.6mm !important; margin: 0.4mm 0 !important; box-shadow: none !important; }
         }
       </style>
       </head><body><div class="print-container">${printContents}</div></body></html>
     `);
     win.document.close();
-    setTimeout(() => {
+    const printWhenReady = async () => {
+      if (win.document.fonts?.ready) await win.document.fonts.ready;
+      await Promise.all(Array.from(win.document.images).map(image => image.complete
+        ? Promise.resolve()
+        : new Promise(resolve => { image.onload = resolve; image.onerror = resolve; })));
       win.print();
       win.close();
-    }, 300);
+    };
+    printWhenReady();
   };
 
   // --- تفعيل تحديث حالة الاستلام ---
@@ -721,7 +929,7 @@ async function showInvoiceModal(id) {
         await updateDoc(doc(db, 'invoices', id), { items: itemsWithDelivery });
         showNotification(cb.checked ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء الاستلام', 'success');
         // جلب الفاتورة من قاعدة البيانات من جديد لإظهار التغيير فورًا
-        setTimeout(() => showInvoiceModal(id), 200);
+        setTimeout(() => showInvoiceModal(id, isPortalRegistration), 200);
       });
     });
   }
@@ -732,52 +940,73 @@ async function showInvoiceModal(id) {
         const idx = +cb.getAttribute('data-idx');
         const cardInfo = onlineCardsArr[idx];
         const isDelivered = cb.checked;
-
-        // حساب الكمية المراد خصمها أو إضافتها للمخزون
-        let amount = 0;
-        if (cardInfo.type === 'للاشتراكات') {
-          // حساب عدد الاشتراكات في الفاتورة
-          const subCount = (inv.items || []).filter(item =>
-            !item.isOnlineCard && (item.subType === 'كورسات' || item.subType === 'ملازم' || (inv.subType && inv.subType.includes('اشتراك')))
-          ).length;
-          amount = (subCount || 1) * (cardInfo.perSub || 1);
-        } else {
-          amount = 1;
-        }
-
+        const cardId = cardInfo.cardId || cardInfo.id;
+        const invoiceRef = doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id);
+        const cardRef = cardId ? doc(db, 'onlineCards', cardId) : null;
+        const deliveryInvoiceItems = isPortalRegistration
+          ? ([inv.selectedSubscriptions, inv.subscriptions, inv.selectedItems].find(items => Array.isArray(items) && items.length) || [])
+          : (inv.items || []);
+        const matchedCount = deliveryInvoiceItems
+          .filter(item => !cardInfo.linkedSubscriptionIds?.length || cardInfo.linkedSubscriptionIds.includes(item.id))
+          .length;
+        const amount = Math.max(1, Number(cardInfo.quantity) || matchedCount * (Number(cardInfo.perSub) || 1));
+        cb.disabled = true;
         try {
-          // 1. تحديث حالة الفاتورة
-          onlineCardsArr[idx].delivered = isDelivered;
-          await updateDoc(doc(db, 'invoices', id), { onlineCardsDelivery: onlineCardsArr });
+          await runTransaction(db, async transaction => {
+            const invoiceSnapshot = await transaction.get(invoiceRef);
+            if (!invoiceSnapshot.exists()) throw new Error('الفاتورة غير موجودة');
+            const invoiceData = invoiceSnapshot.data();
+            const cards = Array.isArray(invoiceData.onlineCardsDelivery) ? [...invoiceData.onlineCardsDelivery] : [];
+            const currentIndex = cards.findIndex(card => (card.cardId || card.id) === cardId);
+            if (currentIndex < 0) throw new Error('الكارت غير موجود ضمن بيانات الفاتورة');
+            const currentDelivered = cards[currentIndex].delivered === true || cards[currentIndex].isDelivered === true;
+            if (currentDelivered === isDelivered) return;
+            if (!cardRef) throw new Error('معرّف الكارت غير موجود');
+            const cardSnapshot = await transaction.get(cardRef);
+            if (!cardSnapshot.exists()) throw new Error('الكارت غير موجود في المخزون');
 
-          // 2. تحديث المخزون (لو استلم نخصم، لو ألغى نرجع)
-          const stockChange = isDelivered ? -amount : amount;
-          await updateDoc(doc(db, 'onlineCards', cardInfo.id), {
-            stock: increment(stockChange)
+            cards[currentIndex] = { ...cards[currentIndex], delivered: isDelivered };
+            delete cards[currentIndex].isDelivered;
+            transaction.update(invoiceRef, { onlineCardsDelivery: cards });
+            const currentStock = Number(cardSnapshot.data().stock) || 0;
+            transaction.update(cardRef, { stock: currentStock + (isDelivered ? -amount : amount) });
           });
 
           showNotification(isDelivered ? 'تم تسليم الكرت وخصم المخزون' : 'تم إلغاء التسليم وإرجاع المخزون', 'success');
-          setTimeout(() => showInvoiceModal(id), 200);
+          setTimeout(() => showInvoiceModal(id, isPortalRegistration), 200);
         } catch (err) {
           console.error('Error updating card delivery:', err);
+          cb.checked = !isDelivered;
           showNotification('حدث خطأ أثناء تحديث حالة الكرت', 'error');
+        } finally {
+          cb.disabled = false;
         }
       });
     });
   }
 
   // تفعيل تحديث حالة الاستلام لملازم indivNotes (الملازم المرتبطة بالفرقة)
-  if ((inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم') && allNotesList.length > 0) {
+  if (isNotesSubscription && allNotesList.length > 0) {
     modal.querySelectorAll('.indiv-note-delivered-checkbox').forEach(cb => {
       cb.disabled = false;
       cb.addEventListener('change', async function () {
         const idx = +cb.getAttribute('data-idx');
+        const delivered = cb.checked;
         allNotesList[idx].delivered = cb.checked;
-        // احفظ الحالة الجديدة في الفاتورة (indivNotes)
-        await updateDoc(doc(db, 'invoices', id), { indivNotes: allNotesList });
-        showNotification(cb.checked ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء الاستلام', 'success');
-        // جلب الفاتورة من قاعدة البيانات من جديد لإظهار التغيير فورًا
-        setTimeout(() => showInvoiceModal(id), 200);
+        cb.disabled = true;
+        try {
+          await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { indivNotes: allNotesList });
+          showNotification(delivered ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء الاستلام', 'success');
+          setTimeout(() => showInvoiceModal(id, isPortalRegistration), 200);
+        } catch (error) {
+          allNotesList[idx].delivered = !delivered;
+          cb.checked = !delivered;
+          cb.closest('.indiv-note-box')?.querySelector('.indiv-note-delivered-status')?.replaceChildren(document.createTextNode(!delivered ? 'تم الاستلام' : 'لم يستلم'));
+          showNotification('تعذر حفظ حالة استلام الملزمة. تحقق من الاتصال والصلاحيات.', 'error');
+          console.error('Could not update linked note delivery status:', error);
+        } finally {
+          cb.disabled = false;
+        }
       });
     });
   }
@@ -803,7 +1032,7 @@ async function showInvoiceModal(id) {
       const newSubType = document.getElementById('edit-subType').value.trim() || inv.subType;
       const newStudyType = document.getElementById('edit-studyType').value.trim() || inv.studyType;
       const newPayment = document.getElementById('edit-payment').value.trim() || inv.payment;
-      const newNotes = document.getElementById('edit-notes').value.trim() || inv.notes;
+      const newNotes = document.getElementById('edit-notes').value.trim() || '';
 
       // التحقق من وجود تغييرات فعلية
       const hasChanges = newStudent !== inv.student ||
@@ -880,7 +1109,7 @@ async function showInvoiceModal(id) {
         { id: 'edit-subType', label: '🎓 نوع الاشتراك', value: inv.subType || '-', icon: 'fa-book' },
         { id: 'edit-studyType', label: '✏️ الانتظام', value: inv.studyType || '-', icon: 'fa-pencil' },
         { id: 'edit-payment', label: '💳 طريقة الدفع', value: inv.payment || '-', icon: 'fa-credit-card' },
-        { id: 'edit-notes', label: '📝 ملاحظات', value: inv.notes || '-', icon: 'fa-sticky-note' }
+        { id: 'edit-notes', label: '📝 ملاحظات', value: inv.notes || '', icon: 'fa-sticky-note' }
       ];
 
       fields.forEach(field => {
@@ -1083,36 +1312,39 @@ function showNotification(msg, type = 'info') {
 }
 
 // --- تصدير الفواتير إلى Excel ---
-document.getElementById('export-excel-btn').onclick = function () {
-  try {
-    if (!filteredInvoices.length) {
-      showNotification('لا توجد بيانات لتصديرها', 'error');
-      return;
+const exportExcelBtn = document.getElementById('export-excel-btn');
+if (exportExcelBtn) {
+  exportExcelBtn.onclick = function () {
+    try {
+      if (!filteredInvoices.length) {
+        showNotification('لا توجد بيانات لتصديرها', 'error');
+        return;
+      }
+      // تجهيز البيانات
+      const data = filteredInvoices.map(inv => ({
+        'رقم الفاتورة': inv.num,
+        'اسم الطالب': inv.student,
+        'رقم الهاتف': inv.phone,
+        'العناصر': (inv.items || []).map(x => x.name + " (" + x.price + " ج)").join('، '),
+        'نوع الاشتراك': inv.subType,
+        'الفرقة': inv.grade,
+        'المبلغ المدفوع': (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0),
+        'نوع الفاتورة': inv.payment,
+        'انتظام/انتساب': inv.studyType,
+        'التاريخ': inv.date,
+        'الملاحظات': inv.notes || '-'
+      }));
+      // إنشاء ملف Excel
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'الفواتير');
+      XLSX.writeFile(wb, 'invoices.xlsx');
+      showNotification('تم تصدير الفواتير إلى Excel بنجاح', 'success');
+    } catch (e) {
+      showNotification('حدث خطأ أثناء التصدير: ' + e.message, 'error');
     }
-    // تجهيز البيانات
-    const data = filteredInvoices.map(inv => ({
-      'رقم الفاتورة': inv.num,
-      'اسم الطالب': inv.student,
-      'رقم الهاتف': inv.phone,
-      'العناصر': (inv.items || []).map(x => x.name + " (" + x.price + " ج)").join('، '),
-      'نوع الاشتراك': inv.subType,
-      'الفرقة': inv.grade,
-      'المبلغ المدفوع': (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0),
-      'نوع الفاتورة': inv.payment,
-      'انتظام/انتساب': inv.studyType,
-      'التاريخ': inv.date,
-      'الملاحظات': inv.notes || '-'
-    }));
-    // إنشاء ملف Excel
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'الفواتير');
-    XLSX.writeFile(wb, 'invoices.xlsx');
-    showNotification('تم تصدير الفواتير إلى Excel بنجاح', 'success');
-  } catch (e) {
-    showNotification('حدث خطأ أثناء التصدير: ' + e.message, 'error');
-  }
-};
+  };
+}
 
 window.addEventListener("DOMContentLoaded", loadInvoices);
 // تفعيل اختصارات لوحة المفاتيح
@@ -1167,4 +1399,3 @@ window.deleteInvoice = async (id, isPortalRegistration = false) => {
     confirmModal.remove();
   };
 };
-

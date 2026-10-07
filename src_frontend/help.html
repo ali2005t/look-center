@@ -5,75 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>دليل المساعدة</title>
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/help.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/help.css?v=help-v3" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="css/mobile-nav.css" />
   <link rel="stylesheet" href="css/mobile-dropdown-menu.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <style>
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4); }
-      50% { box-shadow: 0 15px 50px rgba(102, 126, 234, 0.7); }
-    }
-    @keyframes glow {
-      0%, 100% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
-      50% { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
-    }
-    .dua-section {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
-      color: #fff;
-      padding: 60px 45px;
-      text-align: center;
-      margin: 70px auto 40px;
-      border-radius: 20px;
-      max-width: 700px;
-      box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
-      animation: slideUp 0.8s ease-out, pulse 3s ease-in-out infinite;
-      font-family: 'Segoe UI', 'Tajawal', Tahoma, Geneva, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .dua-title {
-      font-size: 28px;
-      font-weight: 900;
-      margin-bottom: 35px;
-      letter-spacing: 2px;
-      animation: glow 2s ease-in-out infinite;
-      color: #ffd700;
-    }
-    .dua-icon {
-      font-size: 40px;
-      margin-right: 15px;
-      display: inline-block;
-      animation: slideUp 0.8s ease-out 0.2s backwards;
-    }
-    .dua-line {
-      font-size: 17px;
-      margin: 12px auto;
-      letter-spacing: 0.5px;
-      line-height: 1.8;
-      animation: slideUp 0.8s ease-out backwards;
-      width: 100%;
-      text-align: center;
-      padding: 0 15px;
-      box-sizing: border-box;
-    }
-    .dua-line1 { animation-delay: 0.1s; margin-top: 15px; }
-    .dua-line2 { animation-delay: 0.3s; color: #ffd700; font-weight: 900; margin-top: 12px; }
-    .dua-line3 { animation-delay: 0.5s; margin-top: 12px; }
-    .dua-line4 { animation-delay: 0.7s; margin-top: 20px; }
-  </style>
 </head>
 <body style="text-align:right;direction:rtl;">
   <header class="main-header">
@@ -147,6 +84,39 @@
             <strong style="color:#1976d2;">👋 أهلاً وسهلاً بك!</strong><br/>
             ستجد هنا شرحًا مفصلاً وسهلاً لكل صفحة من صفحات النظام، مع معلومات عملية عن كيفية استخدام كل ميزة. النظام مصمم ليكون سهل الاستخدام، لكن إذا احتجت مساعدة، كل شيء مشروح هنا بوضوح.
           </p>
+        </div>
+        <div class="help-card" style="border-right:5px solid #ff9800;background:linear-gradient(135deg,rgba(255,152,0,0.12) 0%,rgba(255,193,7,0.06) 100%);margin-bottom:30px;">
+          <h3 style="color:#e65100;"><i class="fas fa-keyboard" style="margin-left:10px;"></i>اختصارات لوحة المفاتيح</h3>
+          <p style="color:#444;">اضغط مفتاح الوظيفة وحده، دون Ctrl أو Alt. يتطلب التنقل أن تكون لديك صلاحية الصفحة، وF5 يضيف الفاتورة من صفحة الكاشير فقط.</p>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:right;">
+              <thead>
+                <tr style="background:#fff3e0;">
+                  <th style="padding:10px;border:1px solid #ddd;">الاختصار</th>
+                  <th style="padding:10px;border:1px solid #ddd;">الإجراء</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F5</kbd></td><td style="padding:9px;border:1px solid #ddd;">الضغط على زر «إضافة الفاتورة» في صفحة الكاشير، مع تطبيق التحقق المعتاد. في الصفحات الأخرى يعمل F5 على تحديث الصفحة كالمعتاد.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F1</kbd></td><td style="padding:9px;border:1px solid #ddd;">صفحة الكاشير.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F2</kbd></td><td style="padding:9px;border:1px solid #ddd;">الطلاب المشتركين.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F3</kbd></td><td style="padding:9px;border:1px solid #ddd;">الفواتير الفردية.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F4</kbd></td><td style="padding:9px;border:1px solid #ddd;">صفحة VIP.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F6</kbd></td><td style="padding:9px;border:1px solid #ddd;">لوحة التحكم.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F7</kbd></td><td style="padding:9px;border:1px solid #ddd;">التقفيل اليومي.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F8</kbd></td><td style="padding:9px;border:1px solid #ddd;">الطلاب المتأخرون في الدفع.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F9</kbd></td><td style="padding:9px;border:1px solid #ddd;">الاشتراكات والأسعار.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F10</kbd></td><td style="padding:9px;border:1px solid #ddd;">التقارير.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>F11</kbd></td><td style="padding:9px;border:1px solid #ddd;">المصروفات.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>N</kbd></td><td style="padding:9px;border:1px solid #ddd;">الانتقال إلى الكاشير.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>P</kbd></td><td style="padding:9px;border:1px solid #ddd;">الطباعة.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>F</kbd></td><td style="padding:9px;border:1px solid #ddd;">التركيز على حقل البحث.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>E</kbd></td><td style="padding:9px;border:1px solid #ddd;">تصدير البيانات عند توفر زر التصدير.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>B</kbd></td><td style="padding:9px;border:1px solid #ddd;">إظهار/إخفاء القائمة الجانبية.</td></tr>
+                <tr><td style="padding:9px;border:1px solid #ddd;"><kbd>Ctrl</kbd> + <kbd>Q</kbd></td><td style="padding:9px;border:1px solid #ddd;">تسجيل الخروج.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <!-- القسم الأول: الصفحات الرئيسية -->
         <div style="background:linear-gradient(90deg,#e3f2fd 0%,#f3e5f5 100%);padding:20px;border-radius:12px;margin-bottom:30px;border-right:5px solid #1976d2;">
@@ -279,17 +249,18 @@
           </ul>
         </div>
         
-        <!-- رسالة دعاء جميلة للمطور -->
-        <div class="dua-section">
-          <p class="dua-title">
-            <span class="dua-icon">🙏</span>
-            برجاء الدعاء للمطور
-          </p>
-          <p class="dua-line dua-line1">شكراً لاستخدام نظام LOOK CASHIER</p>
-          <p class="dua-line dua-line2" style="font-size:18px;font-weight:bold;color:#ffd700;">Eng. LoL ✨</p>
-          <p class="dua-line dua-line3" style="color:#e0d5ff;">💡 نتمنى أن يكون النظام مفيداً لك</p>
-          <p class="dua-line dua-line4" style="font-size:14px;color:#c9c3ff;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.2);">جزاك الله خيراً على استخدامك النظام</p>
-        </div>
+        <section class="reminder-section" aria-labelledby="developer-thanks-title">
+          <span class="reminder-kicker"><i class="fas fa-lightbulb" aria-hidden="true"></i> كلمة ليك يا صديقي</span>
+          <h2 id="developer-thanks-title" class="reminder-title">خليك فاكرها</h2>
+          <p class="reminder-thanks">شكرًا لاستخدامك <strong>LOOK CASHIER</strong></p>
+          <blockquote class="reminder-quote">
+            كل فكرة عظيمة بدأت بخطوة صغيرة، والإصرار هو اللي بيكمل الطريق.
+            <span>وخلي كل خطوة بتاخدها تقربك من اللي بتحلم به.</span>
+          </blockquote>
+          <p class="reminder-signature">بالتوفيق دايمًا <span>— Eng. LoL</span></p>
+          <button type="button" id="copy-developer-reminder" class="developer-reminder-button"><i class="fas fa-copy" aria-hidden="true"></i> نسخ الرسالة</button>
+          <span id="developer-reminder-status" class="developer-reminder-status" role="status" aria-live="polite"></span>
+        </section>
       </div>
     </section>
   </main>
@@ -303,11 +274,25 @@
     </div>
   </div>
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/electron-nav.js"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
   <script type="module" src="js/help.js"></script>
   <script>
+  const copyDeveloperReminderButton = document.getElementById('copy-developer-reminder');
+  if (copyDeveloperReminderButton) {
+    copyDeveloperReminderButton.addEventListener('click', async function () {
+      const status = document.getElementById('developer-reminder-status');
+      const reminder = 'افتكر دايمًا: كل فكرة عظيمة بدأت بخطوة صغيرة، والإصرار هو اللي بيكمل الطريق.';
+      try {
+        await navigator.clipboard.writeText(reminder);
+        status.textContent = 'تم نسخ الرسالة.';
+      } catch (error) {
+        console.error('تعذر نسخ الرسالة:', error);
+        status.textContent = 'تعذر النسخ تلقائياً. يمكنك تحديد الرسالة ونسخها يدويًا.';
+      }
+    });
+  }
   function handleMobileTabs() {
     const tabs = document.querySelector('.mobile-tabs');
     if(window.innerWidth <= 900) {
@@ -389,8 +374,3 @@
   <script src="js/zoom-controls.js"></script>
 </body>
 </html>
-
-
-
-
-

@@ -61,7 +61,7 @@ async function loadAgent() {
     return;
   }
 
-  agentBanner.textContent = `التسجيل عن طريق: ${agent.fullname || agent.username || 'المسؤول'}`;
+  agentBanner.textContent = `كود المسؤول: ${agent.studentPortalCode || 'غير محدد'}`;
   const subscriptionsSnapshot = await withTimeout(getDocs(collection(db, 'subscriptions')), 'تحميل الاشتراكات');
   availableSubscriptions = subscriptionsSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   renderSubscriptionOptions();
@@ -100,6 +100,7 @@ form.addEventListener('submit', async (event) => {
       studyType: document.getElementById('study-type').value,
       selectedSubscriptions,
       requestedAmount: selectedSubscriptions.reduce((sum, item) => sum + item.price, 0),
+      notes: document.getElementById('student-notes').value.trim(),
       paymentStatus: 'unpaid',
       source: 'student-portal',
       registeredAt: serverTimestamp(),

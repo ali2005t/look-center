@@ -25,30 +25,18 @@ if (printBtn) {
     }
   });
 }
-// حماية الصفحات من دخول الكاشير لغير صفحة الكاشير
-function blockCashierOnOtherPages() {
-  try {
-    const userType = localStorage.getItem('userType');
-    // إذا كان المستخدم كاشير وليس في صفحة الكاشير
-    const allowedPages = ['cashier.html'];
-    const currentPage = window.location.pathname.split('/').pop();
-    if (userType === 'كاشير' && !allowedPages.includes(currentPage)) {
-      document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;width:100vw;"><div style="background:#fff;padding:48px 32px;border-radius:18px;box-shadow:0 4px 32px #1976d244;text-align:center;max-width:400px;margin:auto;"><div style="font-size:2em;color:#1976d2;font-weight:bold;margin-bottom:18px;">لا تحاول بالتدخل فيما لايعينك</div><div style="font-size:1.3em;color:#43a047;margin-bottom:12px;">تابع عملك يا صديقي <span style='font-size:2em;'>😊</span></div></div></div>`;
-      document.body.style.background = '#e3f2fd';
-    }
-  } catch (e) { }
-}
-window.addEventListener('DOMContentLoaded', blockCashierOnOtherPages);
-
 import { db } from './firebase.js';
-import { collection, getDocs, addDoc, Timestamp, doc, getDoc, setDoc, updateDoc, increment } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { collection, getDocs, addDoc, Timestamp, doc, getDoc, updateDoc, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
+const isVipMode = new URLSearchParams(window.location.search).get('vip') === 'true';
 let selectedGrade = "";
 let selectedSubType = "";
 let selectedItems = [];
 // متغير جديد لتخزين العناصر حسب نوع الاشتراك
 let itemsBySubType = {};
+let vipOriginalPriceCustomized = false;
+let vipFinalPriceCustomized = false;
 
 // تعريف متغير printModal بشكل عام ليكون متاحاً في جميع أنحاء الملف
 let printModal = null;
@@ -97,6 +85,26 @@ if (installmentPaidInput && installmentTotalInput && installmentRemainingInput) 
 // متغير عالمي لاسم المستلم (يتم تحديثه من فايربيس)
 let currentRecipient = '-';
 
+function normalizeRecipientName(value) {
+  const text = String(value || '').trim();
+  if (!text || text.includes('@')) return '';
+  return text.replace(/\s+/g, ' ');
+}
+
+async function loadVipAssignedTeacher() {
+  try {
+    const settingsSnapshot = await getDoc(doc(db, 'settings', 'main'));
+    if (settingsSnapshot.exists()) {
+      const teacher = String(settingsSnapshot.data().vipAssignedTeacher || '').trim();
+      localStorage.setItem('vipAssignedTeacher', teacher);
+      return teacher;
+    }
+  } catch (error) {
+    console.warn('تعذر تحميل الأستاذ المسؤول عن VIP:', error);
+  }
+  return localStorage.getItem('vipAssignedTeacher') || '';
+}
+
 // رقم الفاتورة الحالي
 let nextInvoiceNumber = 1;
 
@@ -135,61 +143,75 @@ function updateUserNameInHeader() {
 
 // جلب اسم المستخدم الحالي من فايربيس (Firestore) بناءً على uid من Auth
 async function fetchCurrentRecipient() {
+  const cachedUsername = normalizeRecipientName(localStorage.getItem('currentUsername')) ||
+    normalizeRecipientName(localStorage.getItem('currentUserName'));
+
   try {
     const auth = getAuth();
     const user = auth.currentUser;
-    if (user && user.uid) {
-      console.log('Firebase Auth UID:', user.uid);
-      const userRef = doc(db, 'users', user.uid);
-      let userDoc = await getDoc(userRef);
-      let username = '';
-      if (!userDoc.exists()) {
-        // إذا لم توجد وثيقة، أنشئها تلقائياً باسم افتراضي
-        username = user.displayName && user.displayName.trim() ? user.displayName.trim() : '';
-        if (!username && user.email) {
-          username = user.email.replace(/@.*/, '').trim();
-        }
-        if (!username) username = 'غير محدد';
-        if (username.includes('@')) username = 'غير محدد';
-        await setDoc(userRef, { username });
-        console.log('Created user doc for:', user.uid, 'with username:', username);
-        userDoc = await getDoc(userRef);
-      } else {
-        // إذا الوثيقة موجودة لكن username غير صالح أو ناقص
-        const data = userDoc.data();
-        username = data.username || data.name || '';
-        if (!username || !username.trim() || username.includes('@')) {
-          // تحديث الوثيقة باسم افتراضي
-          username = user.displayName && user.displayName.trim() ? user.displayName.trim() : '';
-          if (!username && user.email) {
-            username = user.email.replace(/@.*/, '').trim();
-          }
-          if (!username) username = 'غير محدد';
-          if (username.includes('@')) username = 'غير محدد';
-          await setDoc(userRef, { username }, { merge: true });
-          console.log('Updated user doc for:', user.uid, 'with username:', username);
-          userDoc = await getDoc(userRef);
-        }
-      }
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        console.log('Firestore userDoc data:', data);
-        let username = data.username || data.name;
-        // لا تظهر البريد الإلكتروني أو أي نص فيه @ في خانة المستلم
-        if (!username || !username.trim() || username.includes('@')) username = 'غير محدد';
-        currentRecipient = username;
-        console.log('Current recipient:', currentRecipient);
-      } else {
-        currentRecipient = 'غير محدد';
-      }
-    } else {
-      currentRecipient = 'غير محدد';
+    if (!user || !user.uid) {
+      currentRecipient = cachedUsername || 'غير محدد';
+      updateInvoicePreview();
+      return currentRecipient;
     }
-  } catch (e) {
-    console.error('Error fetching recipient:', e);
-    currentRecipient = 'غير محدد';
+
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const profileDoc = usersSnapshot.docs.find(userDoc => {
+      const profile = userDoc.data();
+      return userDoc.id === user.uid ||
+        String(profile.email || '').trim().toLowerCase() === String(user.email || '').trim().toLowerCase();
+    });
+    const data = profileDoc ? profileDoc.data() : {};
+    let username = normalizeRecipientName(data.username || data.fullname || data.name);
+
+    if (!username) {
+      username = normalizeRecipientName(user.displayName);
+    }
+    if (!username) {
+      username = cachedUsername;
+    }
+    if (!username) {
+      username = normalizeRecipientName(user.email?.replace(/@.*$/, ''));
+    }
+    username = username || 'غير محدد';
+
+    localStorage.setItem('currentUserName', username);
+    localStorage.setItem('currentUsername', username);
+    currentRecipient = username;
+    console.log('Current recipient:', currentRecipient);
+  } catch (error) {
+    console.error('Error fetching recipient:', error);
+    currentRecipient = cachedUsername || 'غير محدد';
   }
   updateInvoicePreview();
+  return currentRecipient;
+}
+
+async function fetchCurrentUserAccess() {
+  const user = getAuth().currentUser;
+  if (user) {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const userRecord = usersSnapshot.docs.find(userDoc => {
+      const profile = userDoc.data();
+      return userDoc.id === user.uid ||
+        String(profile.email || '').trim().toLowerCase() === String(user.email || '').trim().toLowerCase();
+    });
+    if (userRecord) {
+      const profile = userRecord.data();
+      const permissions = Array.isArray(profile.permissions) ? profile.permissions : [];
+      localStorage.setItem('userPermissions', JSON.stringify(permissions));
+      localStorage.setItem('userType', profile.type || '');
+      return { permissions, type: profile.type || '' };
+    }
+  }
+
+  let permissions = [];
+  try {
+    permissions = JSON.parse(localStorage.getItem('userPermissions') || '[]');
+  } catch (error) {
+    console.error('Could not read cached user permissions:', error);
+  }
+  return { permissions: Array.isArray(permissions) ? permissions : [], type: localStorage.getItem('userType') || '' };
 }
 
 // مراقبة حالة تسجيل الدخول وتحديث اسم المستلم تلقائياً
@@ -201,6 +223,598 @@ onAuthStateChanged(auth, (user) => {
     currentRecipient = 'غير محدد';
     updateInvoicePreview();
   }
+});
+
+const studentLookupInput = document.getElementById('student-lookup-input');
+const studentLookupResults = document.getElementById('student-lookup-results');
+const studentProfileModal = document.getElementById('student-profile-modal');
+const studentProfileContent = document.getElementById('student-profile-content');
+let studentLookupTimer;
+let studentLookupGroups = new Map();
+let studentProfileDeliveryTargets = new Map();
+let studentLookupRecordsCache = null;
+let studentLookupSearchRequestId = 0;
+let studentProfileInvoiceTargets = new Map();
+
+function normalizeStudentPhone(value) {
+  let digits = String(value || '')
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('20') && digits.length >= 12) digits = `0${digits.slice(-10)}`;
+  return digits;
+}
+
+function normalizeStudentText(value) {
+  return String(value || '').trim().toLocaleLowerCase('ar')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ');
+}
+
+function escapeStudentHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
+function studentRecordDate(record) {
+  const value = record.isPortalRegistration
+    ? (record.data.registeredAt || record.data.createdAt || record.data.date)
+    : (record.data.date || record.data.createdAt);
+  const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function profileDateLabel(date) {
+  return date ? new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(date) : 'التاريخ غير مسجل';
+}
+
+function profileDateTimeLabel(date) {
+  return date
+    ? new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+    : 'الوقت غير مسجل';
+}
+
+function normalizeProfileReference(value) {
+  if (value && typeof value === 'object') value = value.id || value.name || value.value;
+  return normalizeStudentText(value);
+}
+
+function makeStudentRecord(docSnap, isPortalRegistration) {
+  const data = docSnap.data();
+  const items = isPortalRegistration
+    ? (data.selectedSubscriptions || data.subscriptions || data.selectedItems || [])
+    : (data.items || []);
+  const student = isPortalRegistration ? (data.studentName || data.student || '') : (data.student || data.studentName || '');
+  const phone = data.phone || data.studentPhone || '';
+  const itemTypes = new Set(items.map(item => String(item.type || item.subType || '').trim()));
+  const hasBookletSubscription = [...itemTypes].some(type => type.includes('ملازم'));
+  const hasCourseSubscription = [...itemTypes].some(type => type.includes('كورسات'));
+  const portalSubType = hasBookletSubscription && hasCourseSubscription
+    ? 'ملازم وكورسات'
+    : hasBookletSubscription
+      ? 'ملازم'
+      : hasCourseSubscription
+        ? 'كورسات'
+        : 'تسجيل من الموقع';
+  return {
+    id: docSnap.id,
+    collection: isPortalRegistration ? 'studentRegistrations' : 'invoices',
+    isPortalRegistration,
+    data,
+    student: String(student).trim(),
+    phone: String(phone).trim(),
+    grade: String(data.grade || '').trim(),
+    subType: String(data.subType || (isPortalRegistration ? portalSubType : '')).trim(),
+    items: Array.isArray(items) ? items : []
+  };
+}
+
+async function loadStudentLookupRecords() {
+  if (studentLookupRecordsCache) return studentLookupRecordsCache;
+  const [invoicesSnapshot, registrationsSnapshot] = await Promise.all([
+    getDocs(collection(db, 'invoices')),
+    getDocs(collection(db, 'studentRegistrations'))
+  ]);
+  studentLookupRecordsCache = [
+    ...invoicesSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, false)),
+    ...registrationsSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true))
+  ].filter(record => record.student || record.phone);
+  return studentLookupRecordsCache;
+}
+
+function studentGroupKey(record) {
+  const phone = normalizeStudentPhone(record.phone);
+  if (phone) return `phone:${phone}`;
+  return `student:${normalizeStudentText(record.student)}:${normalizeStudentText(record.grade)}`;
+}
+
+function renderStudentLookupResults(queryText) {
+  if (!studentLookupResults) return;
+  const textQuery = normalizeStudentText(queryText);
+  const phoneQuery = normalizeStudentPhone(queryText);
+  if (!textQuery) {
+    studentLookupResults.replaceChildren();
+    return;
+  }
+
+  const groups = [...studentLookupGroups.entries()].map(([key, records]) => {
+    const newest = [...records].sort((first, second) =>
+      (studentRecordDate(second)?.getTime() || 0) - (studentRecordDate(first)?.getTime() || 0)
+    )[0];
+    return { key, records, newest };
+  }).filter(group => {
+    const nameMatches = normalizeStudentText(group.newest.student).includes(textQuery);
+    const phoneMatches = phoneQuery.length >= 2 && normalizeStudentPhone(group.newest.phone).includes(phoneQuery);
+    return nameMatches || phoneMatches;
+  }).sort((first, second) => first.newest.student.localeCompare(second.newest.student, 'ar'))
+    .slice(0, 8);
+
+  studentLookupResults.replaceChildren();
+  if (!groups.length) {
+    const empty = document.createElement('div');
+    empty.className = 'student-lookup-empty';
+    empty.textContent = 'لم يتم العثور على طالب بهذا الاسم أو الرقم.';
+    studentLookupResults.appendChild(empty);
+    return;
+  }
+  groups.forEach(group => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'student-lookup-result';
+    button.setAttribute('role', 'option');
+    button.dataset.studentKey = group.key;
+    const name = document.createElement('strong');
+    name.textContent = group.newest.student || 'طالب بدون اسم';
+    const details = document.createElement('small');
+    const grades = [...new Set(group.records.map(record => record.grade).filter(Boolean))];
+    details.textContent = `${group.newest.phone || 'بدون هاتف'} · ${grades.join('، ') || 'الفرقة غير مسجلة'} · ${group.records.length} سجل`;
+    button.append(name, details);
+    studentLookupResults.appendChild(button);
+  });
+}
+
+function getStudentLinkedBooklets(invoiceRecord, subscriptionDocs) {
+  const invoice = invoiceRecord.data;
+  const parentItems = invoiceRecord.isPortalRegistration
+    ? invoiceRecord.items
+    : (invoiceRecord.items.length ? invoiceRecord.items : (invoice.indivNotes || []));
+  const parentReferences = new Set(parentItems.flatMap(item => [item.id, item.name])
+    .map(normalizeProfileReference).filter(Boolean));
+  const invoiceGrade = normalizeStudentText(invoiceRecord.grade);
+  const previousDelivery = new Map((invoice.indivNotes || []).map(note => [
+    note.noteId || note.name,
+    note.delivered === true
+  ]));
+
+  return subscriptionDocs.filter(subscriptionDoc => {
+    const note = subscriptionDoc.data();
+    const noteGrade = normalizeStudentText(note.grade);
+    return String(note.type || '').trim() === 'ملازم فردية'
+      && (!invoiceGrade || !noteGrade || noteGrade === invoiceGrade)
+      && parentReferences.has(normalizeProfileReference(note.linkedSubscription));
+  }).map(subscriptionDoc => {
+    const note = subscriptionDoc.data();
+    return {
+      id: subscriptionDoc.id,
+      name: note.name || 'ملزمة',
+      delivered: previousDelivery.get(subscriptionDoc.id) === true || previousDelivery.get(note.name) === true,
+      sortOrder: Number(note.sortOrder) || Number.MAX_SAFE_INTEGER
+    };
+  }).sort((first, second) => first.sortOrder - second.sortOrder
+    || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' }));
+}
+
+async function openStudentProfile(studentKey) {
+  const baseRecords = studentLookupGroups.get(studentKey);
+  if (!baseRecords?.length || !studentProfileModal || !studentProfileContent) return;
+  studentProfileModal.hidden = false;
+  studentProfileContent.innerHTML = '<div class="student-profile-loading">جاري تحميل ملف الطالب...</div>';
+  studentProfileDeliveryTargets = new Map();
+  studentProfileInvoiceTargets = new Map();
+
+  try {
+    const [invoiceSnapshot, registrationSnapshot, subscriptionSnapshot, onlineCardsSnapshot, usersSnapshot] = await Promise.all([
+      getDocs(collection(db, 'invoices')),
+      getDocs(collection(db, 'studentRegistrations')),
+      getDocs(collection(db, 'subscriptions')),
+      getDocs(collection(db, 'onlineCards')),
+      getDocs(collection(db, 'users'))
+    ]);
+    const userNamesById = new Map(usersSnapshot.docs.map(userDoc => {
+      const user = userDoc.data();
+      return [userDoc.id, user.username || user.fullname || user.name || user.email || userDoc.id];
+    }));
+    const records = [
+      ...invoiceSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, false)),
+      ...registrationSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true))
+    ].filter(record => studentGroupKey(record) === studentKey)
+      .sort((first, second) => (studentRecordDate(second)?.getTime() || 0) - (studentRecordDate(first)?.getTime() || 0));
+    if (!records.length) throw new Error('لم تعد هناك سجلات لهذا الطالب');
+
+    const newest = records[0];
+    studentProfileModal.dataset.studentName = newest.student || '';
+    studentProfileModal.dataset.studentPhone = newest.phone || '';
+    const subscriptionDatedRecords = records.filter(record => record.isPortalRegistration
+      ? record.items.length > 0
+      : !['ملازم فردية', 'محاضرات فردية'].includes(record.subType));
+    const datedRecords = subscriptionDatedRecords.map(record => studentRecordDate(record)).filter(Boolean);
+    const firstDate = datedRecords.length
+      ? new Date(Math.min(...datedRecords.map(date => date.getTime())))
+      : null;
+    const grades = [...new Set(records.map(record => record.grade).filter(Boolean))];
+    const subscriptionNames = [...new Set(records.flatMap(record => record.items
+      .filter(item => item.type || item.subType || record.isPortalRegistration)
+      .map(item => item.name || item.title || ''))
+      .concat(records.filter(record => !record.isPortalRegistration).map(record => record.subType))
+      .filter(name => name && name !== 'تسجيل من الموقع'))];
+    const outstanding = records.reduce((total, record) => {
+      const remaining = Number(record.data.installment?.remaining);
+      return total + (Number.isFinite(remaining) && remaining > 0 ? remaining : 0);
+    }, 0);
+    const subscriptionDocs = subscriptionSnapshot.docs;
+    const onlineCardRecords = onlineCardsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+    const deliveryControlsByRecord = records.map(() => []);
+    const bookletDeliveryCards = [];
+
+    const invoicesHtml = records.map((record, recordIndex) => {
+      const date = studentRecordDate(record);
+      const creator = [
+        record.data.recipient,
+        record.data.createdBy,
+        record.data.createdByName,
+        userNamesById.get(record.data.agentId),
+        record.data.agentId
+      ].map(value => String(value || '').trim()).find(value => value && value !== '-') || 'غير مسجل';
+      const itemNames = record.items.map(item => item.name || item.title).filter(Boolean).join('، ');
+      const isPaid = record.isPortalRegistration
+        ? record.data.paymentStatus === 'paid'
+        : record.data.payment !== 'تقسيط' || Number(record.data.installment?.remaining || 0) <= 0;
+      const payment = record.isPortalRegistration
+        ? (isPaid ? 'مدفوع' : 'غير مدفوع')
+        : (record.data.payment || 'غير محدد');
+      const itemsAmount = record.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+      const amount = record.isPortalRegistration
+        ? Number(record.data.requestedAmount ?? record.data.paidAmount ?? itemsAmount) || 0
+        : record.data.isVip
+          ? Number(record.data.vipFinalPrice ?? itemsAmount) || 0
+          : itemsAmount;
+      const invoiceKey = `${record.collection}:${record.id}`;
+      studentProfileInvoiceTargets.set(invoiceKey, {
+        ...record.data,
+        student: record.student || '-',
+        phone: record.phone || '',
+        subType: record.subType,
+        items: record.items,
+        date: record.isPortalRegistration
+          ? (record.data.registeredAt || record.data.createdAt || record.data.date)
+          : record.data.date,
+        num: record.data.num || record.data.invoiceNumber || '-',
+        payment: record.isPortalRegistration
+          ? (record.data.paymentMethod || record.data.payment || 'نقدي')
+          : record.data.payment,
+        isVip: record.data.isVip === true,
+        isIndividualInvoice: ['ملازم فردية', 'محاضرات فردية'].includes(record.subType)
+      });
+      return `<article class="student-profile-invoice">
+        <div class="student-profile-invoice-head">
+          <div class="student-profile-invoice-title">
+            <span class="student-invoice-number">#${escapeStudentHtml(record.data.num || record.data.invoiceNumber || records.length - recordIndex)}</span>
+            <div><strong>${escapeStudentHtml(record.subType || 'فاتورة')}</strong></div>
+          </div>
+        </div>
+        <div class="student-profile-invoice-details">
+          <div class="student-profile-invoice-meta"><i class="fas fa-calendar-clock" aria-hidden="true"></i><span>${escapeStudentHtml(profileDateTimeLabel(date))}</span></div>
+          <div class="student-profile-invoice-meta"><i class="fas fa-user-check" aria-hidden="true"></i><span>سجّل الاشتراك: <strong>${escapeStudentHtml(creator)}</strong></span></div>
+          <span class="student-payment-badge ${isPaid ? 'is-paid' : 'is-unpaid'}">${escapeStudentHtml(payment)}</span>
+        </div>
+        <p class="student-profile-invoice-items"><i class="fas fa-book-open" aria-hidden="true"></i> ${escapeStudentHtml(itemNames || record.data.subscriptionFallback || 'لا توجد تفاصيل عناصر')}</p>
+        <div class="student-profile-invoice-footer">
+          <strong>${amount.toFixed(2)} ج</strong>
+          <button type="button" class="student-profile-print-invoice" data-print-invoice="${escapeStudentHtml(invoiceKey)}">
+            <i class="fas fa-print" aria-hidden="true"></i> طباعة الفاتورة
+          </button>
+          <!--STUDENT_DELIVERY_${recordIndex}-->
+        </div>
+      </article>`;
+    }).join('');
+
+    let deliveredBookletsCount = 0;
+    let onlineCardsCount = 0;
+    records.forEach((record, recordIndex) => {
+      const sourceRef = `${record.collection}:${record.id}`;
+      const isNotesSubscription = ['ملازم', 'اشتراك ملازم', 'ملازم وكورسات'].includes(record.subType);
+      if (isNotesSubscription) {
+        getStudentLinkedBooklets(record, subscriptionDocs).forEach(note => {
+          if (note.delivered) deliveredBookletsCount += 1;
+          const targetKey = `${sourceRef}:linked:${note.id}`;
+          studentProfileDeliveryTargets.set(targetKey, { record, kind: 'linked', noteId: note.id, noteName: note.name });
+          bookletDeliveryCards.push(`<div class="student-booklet-delivery-card">
+            <label><input type="checkbox" data-delivery-key="${escapeStudentHtml(targetKey)}" ${note.delivered ? 'checked' : ''}>
+              <span>${escapeStudentHtml(note.name)}</span></label>
+            <small>${note.delivered ? 'تم الاستلام' : 'لم يستلم'} · فاتورة ${escapeStudentHtml(record.data.num || record.data.invoiceNumber || '—')}</small>
+          </div>`);
+        });
+      }
+      if (record.subType === 'ملازم فردية') {
+        record.items.forEach((item, itemIndex) => {
+          if (item.delivered === true) deliveredBookletsCount += 1;
+          const targetKey = `${sourceRef}:item:${itemIndex}`;
+          studentProfileDeliveryTargets.set(targetKey, { record, kind: 'item', itemIndex, noteName: item.name || 'ملزمة' });
+          bookletDeliveryCards.push(`<div class="student-booklet-delivery-card">
+            <label><input type="checkbox" data-delivery-key="${escapeStudentHtml(targetKey)}" ${item.delivered === true ? 'checked' : ''}>
+              <span>${escapeStudentHtml(item.name || 'ملزمة')}</span></label>
+            <small>${item.delivered === true ? 'تم الاستلام' : 'لم يستلم'} · فاتورة ${escapeStudentHtml(record.data.num || record.data.invoiceNumber || '—')}</small>
+          </div>`);
+        });
+      }
+      const isSubscriptionInvoice = ['ملازم', 'اشتراك ملازم', 'ملازم وكورسات', 'كورسات', 'اشتراك كورسات']
+        .includes(record.subType);
+      const savedCardDeliveries = isSubscriptionInvoice && Array.isArray(record.data.onlineCardsDelivery)
+        ? record.data.onlineCardsDelivery.filter(card => !card.type || card.type === 'للاشتراكات')
+        : [];
+      const invoiceSubscriptionIds = new Set(record.items.map(item => item.id).filter(Boolean));
+      const cardDeliveries = !isSubscriptionInvoice
+        ? []
+        : savedCardDeliveries.length
+        ? savedCardDeliveries
+        : onlineCardRecords.flatMap(card => {
+          if (card.type !== 'للاشتراكات') return [];
+          const linkedIds = Array.isArray(card.linkedSubscriptionIds) ? card.linkedSubscriptionIds : [];
+          const matchedItems = record.items.filter(item =>
+            item.id && (!linkedIds.length || linkedIds.includes(item.id))
+          );
+          if (!matchedItems.length || (linkedIds.length && !linkedIds.some(id => invoiceSubscriptionIds.has(id)))) return [];
+          const linkedSubscriptionIds = matchedItems.map(item => item.id);
+          return [{
+            id: card.id,
+            cardId: card.id,
+            name: card.name || 'كارت أونلاين',
+            type: card.type,
+            perSub: Math.max(1, Number(card.perSub) || 1),
+            quantity: matchedItems.length * Math.max(1, Number(card.perSub) || 1),
+            linkedSubscriptionIds,
+            delivered: false
+          }];
+        });
+      cardDeliveries.forEach(card => {
+        const cardId = card.cardId || card.id;
+        if (!cardId) return;
+        const delivered = card.delivered === true || card.isDelivered === true;
+        if (delivered) onlineCardsCount += Number(card.quantity) || 1;
+        const targetKey = `${sourceRef}:card:${cardId}`;
+        const cardInfo = {
+          ...card,
+          id: cardId,
+          cardId,
+          name: card.name || 'كارت أونلاين',
+          perSub: Math.max(1, Number(card.perSub) || 1),
+          quantity: Math.max(1, Number(card.quantity) || 1),
+          linkedSubscriptionIds: Array.isArray(card.linkedSubscriptionIds) ? card.linkedSubscriptionIds : []
+        };
+        studentProfileDeliveryTargets.set(targetKey, { record, kind: 'card', cardInfo });
+        deliveryControlsByRecord[recordIndex].push(`<label class="student-profile-delivery-toggle student-profile-card-toggle ${delivered ? 'is-delivered' : ''}" title="${escapeStudentHtml(cardInfo.name)} · ${delivered ? 'استلم الكارت' : 'لم يستلم الكارت'}">
+          <input type="checkbox" data-delivery-key="${escapeStudentHtml(targetKey)}" ${delivered ? 'checked' : ''} aria-label="${delivered ? 'إلغاء استلام' : 'تسجيل استلام'} ${escapeStudentHtml(cardInfo.name)}">
+          <i class="fas fa-id-card" aria-hidden="true"></i><span>${escapeStudentHtml(cardInfo.name)} · ${delivered ? 'استلم' : 'لم يستلم'}</span>
+        </label>`);
+      });
+    });
+    const invoicesWithDeliveryControls = invoicesHtml.replace(/<!--STUDENT_DELIVERY_(\d+)-->/g, (_placeholder, index) =>
+      deliveryControlsByRecord[Number(index)].join('')
+    );
+
+    const gradeOptions = grades.map(grade =>
+      `<option value="${escapeStudentHtml(grade)}" ${grade === (newest.grade || grades[0]) ? 'selected' : ''}>${escapeStudentHtml(grade)}</option>`
+    ).join('');
+    const initials = (newest.student || 'ط').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('');
+    const normalizedPhone = normalizeStudentPhone(newest.phone);
+    studentProfileContent.innerHTML = `
+      <header class="student-profile-header">
+        <div class="student-profile-identity">
+          <span class="student-profile-avatar" aria-hidden="true">${escapeStudentHtml(initials)}</span>
+          <div class="student-profile-identity-main">
+            <span class="student-profile-kicker">ملف الطالب</span>
+            <h2 id="student-profile-name">${escapeStudentHtml(newest.student || 'ملف الطالب')}</h2>
+            <div class="student-profile-meta">
+              ${newest.phone
+                ? `<a href="tel:${escapeStudentHtml(normalizedPhone)}"><i class="fas fa-phone" aria-hidden="true"></i> ${escapeStudentHtml(newest.phone)}</a>`
+                : '<span>الهاتف غير مسجل</span>'}
+              <span><i class="fas fa-graduation-cap" aria-hidden="true"></i> ${escapeStudentHtml(grades.join('، ') || 'الفرقة غير مسجلة')}</span>
+            </div>
+          </div>
+        </div>
+        <div class="student-profile-subscriptions">
+          <strong><i class="fas fa-book-open" aria-hidden="true"></i> الاشتراكات:</strong>
+          ${subscriptionNames.map(name => `<span>${escapeStudentHtml(name)}</span>`).join('') || '<span>لا توجد اشتراكات مسجلة</span>'}
+        </div>
+      </header>
+      <div class="student-profile-summary">
+        <div class="student-profile-stat"><span class="student-stat-icon"><i class="fas fa-calendar-check" aria-hidden="true"></i></span><div><small>أول اشتراك مسجل</small><strong>${escapeStudentHtml(profileDateLabel(firstDate))}</strong></div></div>
+        <div class="student-profile-stat"><span class="student-stat-icon"><i class="fas fa-file-invoice" aria-hidden="true"></i></span><div><small>الفواتير والسجلات</small><strong>${records.length}</strong></div></div>
+        <div class="student-profile-stat"><span class="student-stat-icon"><i class="fas fa-money-bill-wave" aria-hidden="true"></i></span><div><small>المتبقي في الأقساط المسجلة</small><strong>${outstanding.toFixed(2)} ج</strong></div></div>
+        <div class="student-profile-stat"><span class="student-stat-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span><div><small>الملازم / كروت الأونلاين المستلمة</small><strong>${deliveredBookletsCount} ملزمة · ${onlineCardsCount} كارت</strong></div></div>
+      </div>
+      <div class="student-profile-actions">
+        <select id="student-profile-grade" aria-label="اختر الفرقة للفاتورة الجديدة">
+          <option value="">اختر الفرقة للفاتورة الجديدة</option>${gradeOptions}
+        </select>
+        <button type="button" id="student-profile-new-invoice"><i class="fas fa-file-invoice" aria-hidden="true"></i> فاتورة جديدة</button>
+      </div>
+      <section class="student-profile-section">
+        <div class="student-profile-section-heading"><div><span class="student-profile-kicker">BOOKLET DELIVERY</span><h3>استلام الملازم</h3></div><span class="student-section-count">${bookletDeliveryCards.length} ملزمة</span></div>
+        ${bookletDeliveryCards.length ? `<div class="student-booklet-delivery-list">${bookletDeliveryCards.join('')}</div>` : '<div class="student-profile-empty"><i class="fas fa-box-open" aria-hidden="true"></i><span>لا توجد ملازم مرتبطة باشتراكات هذا الطالب لعرض حالة استلامها.</span></div>'}
+      </section>
+      <section class="student-profile-section">
+        <div class="student-profile-section-heading"><div><span class="student-profile-kicker">STUDENT HISTORY</span><h3>سجل الاشتراكات والفواتير</h3></div><span class="student-section-count">${records.length} سجل</span></div>
+        <div class="student-profile-invoices-list">${invoicesWithDeliveryControls || '<div class="student-profile-empty">لا توجد فواتير مسجلة.</div>'}</div>
+      </section>`;
+  } catch (error) {
+    console.error('تعذر تحميل ملف الطالب:', error);
+    studentProfileContent.innerHTML = '<div class="student-profile-loading">تعذر تحميل ملف الطالب. تحقق من الاتصال والصلاحيات ثم حاول مرة أخرى.</div>';
+  }
+}
+
+async function updateStudentBookletDelivery(checkbox) {
+  const target = studentProfileDeliveryTargets.get(checkbox.dataset.deliveryKey);
+  if (!target) return;
+  checkbox.disabled = true;
+  try {
+    const invoiceRef = doc(db, target.record.collection, target.record.id);
+    await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(invoiceRef);
+      if (!snapshot.exists()) throw new Error('سجل الفاتورة غير موجود');
+      const data = snapshot.data();
+      if (target.kind === 'linked') {
+        const notes = Array.isArray(data.indivNotes) ? [...data.indivNotes] : [];
+        const noteIndex = notes.findIndex(note => (note.noteId || note.name) === target.noteId
+          || note.name === target.noteName);
+        if (noteIndex < 0) {
+          notes.push({ noteId: target.noteId, name: target.noteName, delivered: checkbox.checked });
+        } else {
+          notes[noteIndex] = { ...notes[noteIndex], delivered: checkbox.checked };
+        }
+        transaction.update(invoiceRef, { indivNotes: notes });
+      } else if (target.kind === 'card') {
+        const cardRef = doc(db, 'onlineCards', target.cardInfo.cardId);
+        const cardSnapshot = await transaction.get(cardRef);
+        if (!cardSnapshot.exists()) throw new Error('كارت الأونلاين غير موجود في المخزون');
+        const cards = Array.isArray(data.onlineCardsDelivery) ? [...data.onlineCardsDelivery] : [];
+        const cardIndex = cards.findIndex(card => (card.cardId || card.id) === target.cardInfo.cardId);
+        const currentCard = cardIndex >= 0 ? cards[cardIndex] : target.cardInfo;
+        const wasDelivered = currentCard.delivered === true || currentCard.isDelivered === true;
+        if (wasDelivered === checkbox.checked) return;
+        const updatedCard = { ...currentCard, delivered: checkbox.checked };
+        delete updatedCard.isDelivered;
+        if (cardIndex >= 0) cards[cardIndex] = updatedCard;
+        else cards.push(updatedCard);
+        transaction.update(invoiceRef, { onlineCardsDelivery: cards });
+        const currentStock = Number(cardSnapshot.data().stock) || 0;
+        const quantity = Math.max(1, Number(updatedCard.quantity) || 1);
+        transaction.update(cardRef, { stock: currentStock + (checkbox.checked ? -quantity : quantity) });
+      } else {
+        const items = Array.isArray(data.items) ? [...data.items] : [];
+        if (!items[target.itemIndex]) throw new Error('الملزمة غير موجودة ضمن الفاتورة');
+        items[target.itemIndex] = { ...items[target.itemIndex], delivered: checkbox.checked };
+        transaction.update(invoiceRef, { items });
+      }
+    });
+    studentLookupRecordsCache = null;
+    showNotification(
+      target.kind === 'card'
+        ? (checkbox.checked ? 'تم تسجيل استلام كارت الأونلاين وخصم المخزون' : 'تم إلغاء استلام الكارت وإرجاع المخزون')
+        : (checkbox.checked ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء تسجيل الاستلام'),
+      'success'
+    );
+    await openStudentProfile(studentGroupKey(target.record));
+  } catch (error) {
+    console.error(target.kind === 'card' ? 'تعذر تحديث استلام كارت الأونلاين:' : 'تعذر تحديث استلام الملزمة:', error);
+    checkbox.checked = !checkbox.checked;
+    checkbox.disabled = false;
+    showNotification(
+      target.kind === 'card'
+        ? 'تعذر تحديث حالة كارت الأونلاين أو مخزونه. حاول مرة أخرى.'
+        : 'تعذر حفظ حالة استلام الملزمة. حاول مرة أخرى.',
+      'error'
+    );
+  }
+}
+
+studentLookupInput?.addEventListener('input', () => {
+  clearTimeout(studentLookupTimer);
+  const queryText = studentLookupInput.value.trim();
+  const requestId = ++studentLookupSearchRequestId;
+  if (queryText.length < 2) {
+    studentLookupResults?.replaceChildren();
+    return;
+  }
+  studentLookupResults.innerHTML = '<div class="student-lookup-empty">جاري البحث...</div>';
+  studentLookupTimer = setTimeout(async () => {
+    try {
+      const records = await loadStudentLookupRecords();
+      if (requestId !== studentLookupSearchRequestId || studentLookupInput.value.trim() !== queryText) return;
+      studentLookupGroups = new Map();
+      records.forEach(record => {
+        const key = studentGroupKey(record);
+        const group = studentLookupGroups.get(key) || [];
+        group.push(record);
+        studentLookupGroups.set(key, group);
+      });
+      renderStudentLookupResults(queryText);
+    } catch (error) {
+      if (requestId !== studentLookupSearchRequestId) return;
+      console.error('تعذر البحث عن الطالب:', error);
+      studentLookupResults.innerHTML = '<div class="student-lookup-empty">تعذر البحث الآن. تحقق من الاتصال والصلاحيات.</div>';
+    }
+  }, 250);
+});
+
+studentLookupResults?.addEventListener('click', event => {
+  const button = event.target.closest('.student-lookup-result');
+  if (button) openStudentProfile(button.dataset.studentKey);
+});
+
+studentProfileModal?.addEventListener('click', event => {
+  if (event.target === studentProfileModal) studentProfileModal.hidden = true;
+});
+
+studentProfileModal?.addEventListener('change', event => {
+  const checkbox = event.target.closest('input[data-delivery-key]');
+  if (checkbox) updateStudentBookletDelivery(checkbox);
+});
+
+document.getElementById('close-student-profile')?.addEventListener('click', () => {
+  studentProfileModal.hidden = true;
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && studentProfileModal && !studentProfileModal.hidden) {
+    studentProfileModal.hidden = true;
+  }
+});
+
+studentProfileContent?.addEventListener('click', event => {
+  const printButton = event.target.closest('[data-print-invoice]');
+  if (printButton) {
+    const invoice = studentProfileInvoiceTargets.get(printButton.dataset.printInvoice);
+    if (!invoice) {
+      showNotification('تعذر فتح بيانات الفاتورة للطباعة.', 'error');
+      return;
+    }
+    window.lastSavedInvoice = invoice;
+    printInvoice();
+    return;
+  }
+
+  if (!event.target.closest('#student-profile-new-invoice')) return;
+  const grade = document.getElementById('student-profile-grade')?.value || '';
+  if (!grade) {
+    showNotification('اختر الفرقة أولاً لتجهيز الفاتورة', 'warning');
+    return;
+  }
+  const gradeButton = [...document.querySelectorAll('.grade-btn')].find(button => button.dataset.grade === grade);
+  if (!gradeButton) {
+    showNotification('تعذر تحديد الفرقة المختارة في نموذج الكاشير', 'error');
+    return;
+  }
+  const studentName = studentProfileModal.dataset.studentName;
+  const studentPhone = studentProfileModal.dataset.studentPhone;
+  if (!studentName && !studentPhone) {
+    showNotification('تعذر استعادة بيانات الطالب. أعد البحث عنه.', 'error');
+    return;
+  }
+  itemsBySubType = {};
+  selectedItems = [];
+  window.selectedItems = [];
+  gradeButton.click();
+  document.getElementById('student-name').value = studentName || '';
+  document.getElementById('phone').value = studentPhone || '';
+  updateInvoicePreview();
+  studentProfileModal.hidden = true;
+  document.getElementById('invoice-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('student-name')?.focus({ preventScroll: true });
+  showNotification('بيانات الطالب جاهزة. اختر العناصر وأكمل الفاتورة كالمعتاد.', 'info');
 });
 
 document.querySelectorAll('.grade-btn').forEach(btn => {
@@ -229,9 +843,10 @@ document.querySelectorAll('.sub-btn').forEach(btn => {
 
 // تحويل اسم زر الاشتراك إلى اسم النوع في قاعدة البيانات
 function mapSubTypeToDbType(subType) {
-  if (subType === "اشتراك كورسات") return "كورسات";
-  if (subType === "اشتراك ملازم") return "ملازم";
-  return subType; // "محاضرات فردية" أو "ملازم فردية"
+  if (!subType) return '';
+  const normalized = String(subType).trim();
+  if (normalized.startsWith('اشتراك ')) return normalized.replace(/^اشتراك\s+/, '');
+  return normalized;
 }
 
 // جلب العناصر من فايربيس حسب النوع والفرقة (يدعم اختيار ملازم فردية أو محاضرات فردية من كل الاشتراكات)
@@ -256,24 +871,73 @@ async function getItemsForSubType(subType, grade) {
   if (subType === "ملازم فردية") {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.type === "ملازم فردية" && data.grade === grade && (data.published === undefined || data.published)) {
-        items.push({ id: docSnap.id, name: data.name, price: data.price, stock: data.stock || 0 });
+      if (data.type === "ملازم فردية" && data.grade === grade && data.published === true) {
+        items.push({
+          id: docSnap.id,
+          name: data.name,
+          price: data.price,
+          stock: data.stock || 0,
+          linkedSubscription: data.linkedSubscription || '',
+          sortOrder: Number(data.sortOrder) || null
+        });
       }
     });
+    const cardsSnapshot = await getDocs(collection(db, 'onlineCards'));
+    cardsSnapshot.forEach(docSnap => {
+      const card = docSnap.data();
+      if (card.type !== 'فردي') return;
+      const targetTypes = Array.isArray(card.individualSubTypes) ? card.individualSubTypes : ['محاضرات فردية', 'ملازم فردية'];
+      if (targetTypes.includes(subType)) {
+        items.push({
+          id: docSnap.id,
+          name: card.name,
+          price: Number(card.price) || 0,
+          stock: Number(card.stock) || 0,
+          isOnlineCard: true
+        });
+      }
+    });
+    items.sort((first, second) =>
+      Number(Boolean(first.isOnlineCard)) - Number(Boolean(second.isOnlineCard))
+      || String(first.linkedSubscription || '').localeCompare(String(second.linkedSubscription || ''), 'ar', { numeric: true, sensitivity: 'base' })
+      || (first.sortOrder || Number.MAX_SAFE_INTEGER) - (second.sortOrder || Number.MAX_SAFE_INTEGER)
+      || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' })
+    );
   } else if (subType === "محاضرات فردية") {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.type === "محاضرات فردية" && data.grade === grade && (data.published === undefined || data.published)) {
-        items.push({ id: docSnap.id, name: data.name, price: data.price, stock: data.stock || 0 });
+      if (data.type === "محاضرات فردية" && data.grade === grade && data.published === true) {
+        items.push({ id: docSnap.id, name: data.name, price: data.price });
+      }
+    });
+    const cardsSnapshot = await getDocs(collection(db, 'onlineCards'));
+    cardsSnapshot.forEach(docSnap => {
+      const card = docSnap.data();
+      if (card.type !== 'فردي') return;
+      const targetTypes = Array.isArray(card.individualSubTypes) ? card.individualSubTypes : ['محاضرات فردية', 'ملازم فردية'];
+      if (targetTypes.includes(subType)) {
+        items.push({
+          id: docSnap.id,
+          name: card.name,
+          price: Number(card.price) || 0,
+          stock: Number(card.stock) || 0,
+          isOnlineCard: true
+        });
       }
     });
   } else {
-    // منطق الاشتراكات العادي
     const dbType = mapSubTypeToDbType(subType);
+    const allowedTypes = new Set([dbType, subType]);
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.type === dbType && data.grade === grade && (data.published === undefined || data.published)) {
-        items.push({ id: docSnap.id, name: data.name, price: data.price, stock: data.stock || 0 });
+      const type = String(data.type || '').trim();
+      if (allowedTypes.has(type) && data.grade === grade && data.published === true) {
+        items.push({
+          id: docSnap.id,
+          name: data.name,
+          price: data.price,
+          ...(['ملازم', 'ملازم فردية'].includes(type) ? { stock: data.stock || 0 } : {})
+        });
       }
     });
   }
@@ -286,6 +950,7 @@ function updateInvoicePreview() {
   if (!preview) return;
   const grade = selectedGrade;
   const studyType = document.getElementById('study-type')?.value || '';
+  const vipBadge = isVipMode ? '<div style="margin:8px 0;display:inline-block;background:#ffb300;color:#1f2d3d;padding:6px 12px;border-radius:999px;font-weight:bold;">VIP</div>' : '';
   const subType = selectedSubType;
   const payment = document.getElementById('payment-method')?.value || '';
   const notes = document.getElementById('notes')?.value || '';
@@ -296,6 +961,8 @@ function updateInvoicePreview() {
 
   // حساب مجموع العناصر
   const totalAmount = items.reduce((sum, x) => sum + (+x.price || 0), 0);
+  const vipSaleAmount = Number(document.getElementById('vip-final-price')?.value ?? totalAmount);
+  const displayedAmount = isVipMode ? vipSaleAmount : totalAmount;
 
   // تحديث حقل الإجمالي في التقسيط تلقائياً
   if (payment === 'تقسيط') {
@@ -310,6 +977,7 @@ function updateInvoicePreview() {
   // معاينة الفاتورة حسب النوع
   let html = `<div class="invoice-preview-modern">
     <h3 class='invoice-preview-title'>معاينة الفاتورة</h3>
+    ${vipBadge}
     <div style='font-size:1.1em;color:#1976d2;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px;'>
       رقم الفاتورة: <span id='invoice-num-preview'>${nextInvoiceNumber}</span>
       <button id='copy-invoice-num' style='background:#1976d2;color:#fff;border:none;border-radius:6px;padding:2px 10px;font-size:0.95em;cursor:pointer;'>نسخ</button>
@@ -325,7 +993,7 @@ function updateInvoicePreview() {
       </div>
       <div class='invoice-preview-items-box'>
           ${items.length ? `<ul class='invoice-preview-items-list'>${items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span> <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span></li>`).join('')}</ul>` : '<div>لا يوجد عناصر</div>'}
-        <div class='invoice-preview-total'><b>المجموع:</b> <span>${items.reduce((sum, x) => sum + (+x.price || 0), 0)} ج</span></div>
+        <div class='invoice-preview-total'><b>${isVipMode ? 'سعر البيع VIP:' : 'المجموع:'}</b> <span>${displayedAmount} ج</span></div>
       </div>
       <div class='invoice-preview-grid'>
         <span>طريقة الدفع:</span><span>${payment || '-'}</span>
@@ -356,7 +1024,7 @@ function updateInvoicePreview() {
         <ul class='invoice-preview-items-list'>
           ${items.length ? items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span> <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span></li>`).join('') : '<li>لا يوجد عناصر</li>'}
         </ul>
-        <div class='invoice-preview-total'><b>المبلغ المدفوع:</b> <span>${items.reduce((sum, x) => sum + (+x.price || 0), 0)} ج</span></div>
+        <div class='invoice-preview-total'><b>${isVipMode ? 'سعر البيع VIP:' : 'المبلغ المدفوع:'}</b> <span>${displayedAmount} ج</span></div>
       </div>
       <div class='invoice-preview-grid'>
         <span>طريقة الدفع:</span><span>${payment || '-'}</span>
@@ -406,6 +1074,37 @@ if (demoBtn) {
 // تعريف invoiceForm مرة واحدة فقط في الأعلى
 const invoiceForm = document.getElementById('invoice-form');
 if (invoiceForm) {
+  if (isVipMode) {
+    const vipFields = document.getElementById('vip-discount-fields');
+    if (vipFields) vipFields.style.display = 'block';
+    const priceInput = document.getElementById('vip-original-price');
+    const discountInput = document.getElementById('vip-discount-amount');
+    const finalPriceInput = document.getElementById('vip-final-price');
+    if (priceInput && discountInput && finalPriceInput) {
+      const syncVipPrices = () => {
+        const original = Number(priceInput.value || 0);
+        const discount = Number(discountInput.value || 0);
+        finalPriceInput.value = Math.max(0, original - discount);
+        updateInvoicePreview();
+      };
+      priceInput.addEventListener('input', () => {
+        vipOriginalPriceCustomized = true;
+        vipFinalPriceCustomized = false;
+        syncVipPrices();
+      });
+      discountInput.addEventListener('input', () => {
+        vipFinalPriceCustomized = false;
+        syncVipPrices();
+      });
+      finalPriceInput.addEventListener('input', () => {
+        vipFinalPriceCustomized = true;
+        discountInput.value = Math.max(0, Number(priceInput.value || 0) - Number(finalPriceInput.value || 0));
+        updateInvoicePreview();
+      });
+      syncVipPriceFromItems(selectedItems);
+    }
+  }
+
   invoiceForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     if (!validateForm()) return;
@@ -429,13 +1128,21 @@ if (invoiceForm) {
       return;
     }
 
-    const userType = localStorage.getItem('userType');
-    const userPermissions = JSON.parse(localStorage.getItem('userPermissions') || '[]');
     const isSubscriberInvoice = subTypesSelected.some(st => st !== 'محاضرات فردية' && st !== 'ملازم فردية');
 
-    if (isSubscriberInvoice && userType !== 'مدير' && !userPermissions.includes('create_subscriber_invoice')) {
-      showNotification('❌ ليس لديك صلاحية لإنشاء فواتير الطلاب المشتركين. يرجى التواصل مع المدير.', 'error', 4000);
-      return;
+    if (isSubscriberInvoice) {
+      let access;
+      try {
+        access = await fetchCurrentUserAccess();
+      } catch (error) {
+        console.error('Could not verify invoice creation permission:', error);
+        showNotification('تعذر التحقق من الصلاحيات. تحقق من الاتصال ثم حاول مرة أخرى.', 'error', 4000);
+        return;
+      }
+      if (access.type !== 'مدير' && !access.permissions.includes('create_subscriber_invoice')) {
+        showNotification('❌ ليس لديك صلاحية لإنشاء فواتير الطلاب المشتركين. يرجى التواصل مع المدير.', 'error', 4000);
+        return;
+      }
     }
 
     let student = '', phone = '';
@@ -443,6 +1150,12 @@ if (invoiceForm) {
     const studyType = document.getElementById('study-type').value;
     const payment = document.getElementById('payment-method').value;
     const notes = document.getElementById('notes').value;
+    const vipOriginalPrice = Number(document.getElementById('vip-original-price')?.value || 0);
+    const vipDiscountAmount = Number(document.getElementById('vip-discount-amount')?.value || 0);
+    const vipFinalPrice = Number(document.getElementById('vip-final-price')?.value || 0);
+    const vipReason = document.getElementById('vip-reason')?.value?.trim() || 'VIP';
+    const vipOwner = isVipMode ? await loadVipAssignedTeacher() : '';
+    await fetchCurrentRecipient();
     const recipient = currentRecipient || '-';
     const installment = {
       total: document.getElementById('installment-total')?.value || '',
@@ -451,9 +1164,13 @@ if (invoiceForm) {
     };
 
     const isIndividual = subTypesSelected.some(st => st === 'محاضرات فردية' || st === 'ملازم فردية');
-    if (!isIndividual) {
-      student = document.getElementById('student-name').value;
-      phone = document.getElementById('phone').value;
+    student = document.getElementById('student-name')?.value?.trim() || '';
+    phone = document.getElementById('phone')?.value?.trim() || '';
+
+    if (isIndividual) {
+      // للفواتير الفردية لا نلتزم بإضافة اسم الطالب أو رقم الهاتف
+      student = '';
+      phone = '';
     }
 
     let invoiceIds = {};
@@ -465,13 +1182,49 @@ if (invoiceForm) {
     const logoSrc = localStorage.getItem('logoSrc') || '';
 
     try {
-      // 1. إنشاء الفواتير
-      for (let subType of subTypesSelected) {
+      const deliverySelections = [...document.querySelectorAll('#online-card-delivery-list input[type="checkbox"]')].map(checkbox => ({
+        cardId: checkbox.dataset.cardId,
+        cardName: checkbox.dataset.cardName,
+        cardType: checkbox.dataset.cardType,
+        perSub: Math.max(1, parseInt(checkbox.dataset.perSub) || 1),
+        linkedSubscriptionIds: JSON.parse(checkbox.dataset.linkedSubs || '[]'),
+        delivered: checkbox.checked
+      }));
+
+      const invoicesToCreate = subTypesSelected.map((subType, index) => {
         const itemsForSubType = itemsBySubType[subType] || [];
+        const dbSubType = mapSubTypeToDbType(subType);
+        const onlineCardsDelivery = deliverySelections.flatMap(card => {
+          if (card.cardType !== 'للاشتراكات') return [];
+          const matchedItems = itemsForSubType.filter(item =>
+            item && !item.isOnlineCard
+            && (!card.linkedSubscriptionIds.length || card.linkedSubscriptionIds.includes(item.id))
+          );
+          if (!matchedItems.length) return [];
+          return [{
+            id: card.cardId,
+            cardId: card.cardId,
+            name: card.cardName,
+            type: card.cardType,
+            perSub: card.perSub,
+            quantity: matchedItems.length * card.perSub,
+            delivered: card.delivered,
+            linkedSubscriptionIds: matchedItems.map(item => item.id)
+          }];
+        });
+        const selectedSharedNotes = itemsForSubType
+          .filter(item => item && item.name)
+          .map(item => ({
+            name: item.name,
+            delivered: false,
+            price: item.price || 0,
+            noteId: item.id || null
+          }));
+
         const invoice = {
           grade: grade,
           studyType: studyType,
-          subType: mapSubTypeToDbType(subType),
+          subType: dbSubType,
           items: itemsForSubType.map(({ subType, ...rest }) => rest),
           payment: payment,
           notes: notes,
@@ -480,18 +1233,84 @@ if (invoiceForm) {
           installment: installment,
           num: nextInvoiceNumber + (subTypesSelected.indexOf(subType)),
           centerInfo: { name: centerName, address: centerAddress, phone1: centerPhone1, phone2: centerPhone2, phone3: centerPhone3, logo: logoSrc },
-          isVodafone: payment === 'فودافون كاش'
+          isVodafone: payment === 'فودافون كاش',
+          indivNotes: (dbSubType === 'ملازم' || dbSubType === 'اشتراك ملازم') ? selectedSharedNotes : [],
+          linkedSubTypes: subTypesSelected.filter(type => type !== subType && (type === 'اشتراك كورسات' || type === 'كورسات' || type === 'اشتراك ملازم' || type === 'ملازم')).map(type => mapSubTypeToDbType(type)),
+          isVip: isVipMode,
+          vipOriginalPrice: vipOriginalPrice,
+          vipDiscountAmount: vipDiscountAmount,
+          vipFinalPrice: vipFinalPrice,
+          vipReason: vipReason,
+          vipPayer: document.getElementById('vip-reason')?.value?.trim() || 'VIP',
+          vipCreatedBy: localStorage.getItem('currentUsername') || localStorage.getItem('currentUserName') || currentRecipient || 'مدير',
+          vipAssignedTeacher: vipOwner,
+          onlineCardsDelivery
         };
 
         if (subType !== 'محاضرات فردية' && subType !== 'ملازم فردية') {
           invoice.student = student;
           invoice.phone = phone;
+        } else {
+          invoice.student = '';
+          invoice.phone = '';
         }
 
-        const savedInvoiceRef = await addDoc(collection(db, 'invoices'), invoice);
-        invoiceIds[mapSubTypeToDbType(subType)] = savedInvoiceRef.id;
-        localStorage.setItem('invoice_saved', Date.now());
-      }
+        const invoiceRef = doc(collection(db, 'invoices'));
+        invoiceIds[dbSubType] = invoiceRef.id;
+        return { ref: invoiceRef, data: invoice };
+      });
+
+      const subscriptionCounts = new Map();
+      const cardStockCounts = new Map();
+      allSelectedItems.forEach(item => {
+        if (!item.id) return;
+        if (item.isOnlineCard) {
+          cardStockCounts.set(item.id, (cardStockCounts.get(item.id) || 0) + 1);
+        } else {
+          subscriptionCounts.set(item.id, (subscriptionCounts.get(item.id) || 0) + 1);
+        }
+      });
+      invoicesToCreate.forEach(({ data }) => {
+        (data.onlineCardsDelivery || []).forEach(card => {
+          if (card.delivered && card.cardId) {
+            cardStockCounts.set(card.cardId, (cardStockCounts.get(card.cardId) || 0) + card.quantity);
+          }
+        });
+      });
+      const subscriptionRefs = [...subscriptionCounts.keys()].map(id => doc(db, 'subscriptions', id));
+      const onlineCardRefs = [...cardStockCounts.keys()].map(id => doc(db, 'onlineCards', id));
+
+      // Only booklet stock is tracked; courses remain open inventory-wise.
+      await runTransaction(db, async transaction => {
+        const subscriptionSnapshots = [];
+        for (const subscriptionRef of subscriptionRefs) {
+          subscriptionSnapshots.push(await transaction.get(subscriptionRef));
+        }
+        const onlineCardSnapshots = [];
+        for (const cardRef of onlineCardRefs) {
+          onlineCardSnapshots.push(await transaction.get(cardRef));
+        }
+
+        subscriptionSnapshots.forEach(snapshot => {
+          if (!snapshot.exists()) throw new Error('A selected subscription no longer exists');
+          if (!['ملازم', 'ملازم فردية'].includes(snapshot.data().type)) return;
+          const currentStock = Number(snapshot.data().stock) || 0;
+          transaction.update(doc(db, 'subscriptions', snapshot.id), {
+            stock: currentStock - (subscriptionCounts.get(snapshot.id) || 0)
+          });
+        });
+        onlineCardSnapshots.forEach(snapshot => {
+          if (!snapshot.exists()) throw new Error('A selected online card no longer exists');
+          const currentStock = Number(snapshot.data().stock) || 0;
+          transaction.update(doc(db, 'onlineCards', snapshot.id), {
+            stock: currentStock - (cardStockCounts.get(snapshot.id) || 0)
+          });
+        });
+
+        invoicesToCreate.forEach(({ ref, data }) => transaction.set(ref, data));
+      });
+      localStorage.setItem('invoice_saved', Date.now());
+      studentLookupRecordsCache = null;
 
       showNotification('تم حفظ الفواتير بنجاح (' + subTypesSelected.length + ' فاتورة)', 'success', 2500);
 
@@ -502,67 +1321,10 @@ if (invoiceForm) {
         if (snap.exists()) refreshInvoices.push({ ...snap.data(), id: snap.id });
       }
 
-      // 3. خصم المخزون للعناصر العادية
-      const allSubsForStock = await getDocs(collection(db, 'subscriptions'));
-      for (const item of allSelectedItems) {
-        if (item.id) {
-          try {
-            const itemDoc = allSubsForStock.docs.find(d => d.id === item.id);
-            const itemData = itemDoc ? itemDoc.data() : null;
-            if (itemData) {
-              for (const d of allSubsForStock.docs) {
-                const data = d.data();
-                if (data.name === itemData.name && data.type === itemData.type) {
-                  await updateDoc(doc(db, 'subscriptions', d.id), { stock: increment(-1) });
-                }
-              }
-            } else if (item.isOnlineCard) {
-              // خصم لو كرت فردي تم بيعه مباشرة
-              await updateDoc(doc(db, 'onlineCards', item.id), { stock: increment(-1) });
-            }
-          } catch (e) { console.error('Stock error:', e); }
-        }
-      }
-
-      // 4. معالجة تسليم كروت الأونلاين (الـ Checkboxes)
-      const deliveryCheckboxes = document.querySelectorAll('#online-card-delivery-list input[type="checkbox"]');
-      let onlineCardsDeliveryInfo = [];
-
-      for (const cb of deliveryCheckboxes) {
-        const cardId = cb.dataset.cardId;
-        const cardName = cb.dataset.cardName;
-        const perSub = parseInt(cb.dataset.perSub) || 1;
-        const cardType = cb.dataset.cardType;
-        const isDelivered = cb.checked;
-
-        onlineCardsDeliveryInfo.push({ cardId, cardName, isDelivered });
-
-        if (isDelivered) {
-          try {
-            const cardRef = doc(db, 'onlineCards', cardId);
-            if (cardType === 'للاشتراكات') {
-              const subCount = allSelectedItems.filter(i => i.subType !== 'محاضرات فردية' && i.subType !== 'ملازم فردية' && !i.isOnlineCard).length;
-              if (subCount > 0) await updateDoc(cardRef, { stock: increment(-subCount * perSub) });
-            } else {
-              await updateDoc(cardRef, { stock: increment(-1) });
-            }
-          } catch (e) { console.error('Online card stock error:', e); }
-        }
-      }
-
-      // تحديث الفواتير المسجلة بمعلومات التسليم في قاعدة البيانات
-      for (let dbType of Object.values(invoiceIds)) {
-        await updateDoc(doc(db, 'invoices', dbType), {
-          onlineCardsDelivery: onlineCardsDeliveryInfo
-        });
-      }
-
-      refreshInvoices.forEach(inv => {
-        inv.onlineCardsDelivery = onlineCardsDeliveryInfo;
-      });
-
       // 5. إعادة تعيين وإنهاء
       document.getElementById('invoice-form').reset();
+      vipOriginalPriceCustomized = false;
+      vipFinalPriceCustomized = false;
       selectedItems = []; window.selectedItems = []; itemsBySubType = {};
       document.getElementById('items-container').innerHTML = '';
       updateInvoicePreview();
@@ -613,7 +1375,10 @@ function updateFormFields() {
     if (studyTypeField) studyTypeField.style.display = '';
   }
 }
-document.getElementById('sub-type').addEventListener('input', updateFormFields);
+const subTypeField = document.getElementById('sub-type');
+if (subTypeField) {
+  subTypeField.addEventListener('input', updateFormFields);
+}
 
 // تحديث العناصر المختارة في نموذج الفاتورة
 function updateSelectedItemsBox() {
@@ -635,9 +1400,27 @@ function updateSelectedItemsBox() {
   }
   // تحديث العناصر المختارة في نموذج المحاكاة
   window.selectedItems = allSelectedItems;
+  syncVipPriceFromItems(allSelectedItems);
   updateInvoicePreview();
   // تحديث مربعات تسليم كروت الأونلاين - ندهها مباشرة
   updateOnlineCardDelivery();
+}
+
+function syncVipPriceFromItems(items) {
+  if (!isVipMode) return;
+  const priceInput = document.getElementById('vip-original-price');
+  const discountInput = document.getElementById('vip-discount-amount');
+  const finalPriceInput = document.getElementById('vip-final-price');
+  if (!priceInput || !discountInput || !finalPriceInput) return;
+  const original = items.reduce((sum, item) => sum + Number(item.price || 0), 0);
+  if (!vipOriginalPriceCustomized) priceInput.value = original;
+  const effectiveOriginal = Number(priceInput.value || 0);
+  if (vipFinalPriceCustomized) {
+    discountInput.value = Math.max(0, effectiveOriginal - Number(finalPriceInput.value || 0));
+    return;
+  }
+  const discount = Number(discountInput.value || 0);
+  finalPriceInput.value = Math.max(0, effectiveOriginal - discount);
 }
 
 // تحديث المعاينة عند اختيار العناصر
@@ -680,25 +1463,19 @@ function showSelectableItems(items, subType = selectedSubType) {
     // تحقق من العنصر في itemsBySubType للنوع الحالي
     const itemsForThisType = itemsBySubType[subType] || [];
     const isSelected = itemsForThisType.find(i => i.name === item.name);
-    const isOutOfStock = item.stock <= 0 && (subType === 'ملازم فردية' || subType === 'محاضرات فردية' || subType === 'ملازم');
+    const isOutOfStock = item.stock !== undefined && item.stock <= 0
+      && (subType === 'ملازم فردية' || subType === 'ملازم');
 
     tr.innerHTML = `
-      <td style="${isOutOfStock ? 'color:#888;text-decoration:line-through;' : ''}">${item.name} ${item.stock !== undefined ? `<small style="color:#666;display:block;">(المتوفر: ${item.stock})</small>` : ''}</td>
+      <td style="${isOutOfStock ? 'color:#777;' : ''}">${item.name} ${item.stock !== undefined ? `<small style="color:${item.stock < 0 ? '#c62828' : '#666'};display:block;">(${item.stock < 0 ? 'عجز' : 'المتوفر'}: ${item.stock})</small>` : ''}</td>
       <td style="${isOutOfStock ? 'color:#888;' : ''}">${item.price} ج</td>
       <td>
-        <button class="${isSelected ? 'remove' : ''}" ${isOutOfStock && !isSelected ? 'disabled style="background:#ccc;cursor:not-allowed;"' : ''}>
-          ${isOutOfStock && !isSelected ? 'نفذ' : (isSelected ? 'إزالة' : 'إضافة')}
-        </button>
+        <button class="${isSelected ? 'remove' : ''}">${isSelected ? 'إزالة' : 'إضافة'}</button>
       </td>
     `;
     const btn = tr.querySelector('button');
     btn.onclick = (e) => {
       e.stopPropagation();
-      if (isOutOfStock && !isSelected) {
-        showNotification(`⚠️ "${item.name}" نفذ من المخزون!`, 'warning', 2500);
-        return;
-      }
-
       // إذا لم تكن الخريطة موجودة للنوع، أنشئها
       if (!itemsBySubType[subType]) {
         itemsBySubType[subType] = [];
@@ -774,28 +1551,26 @@ function validateForm() {
     return false;
   }
 
-  // التحقق من بيانات الطالب إذا لم تكن محاضرات أو ملازم فردية فقط
   const isOnlyIndividual = subTypesSelected.every(st => st === 'محاضرات فردية' || st === 'ملازم فردية');
-  if (!isOnlyIndividual) {
-    const student = document.getElementById('student-name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-    const studyType = document.getElementById('study-type').value;
+  const student = document.getElementById('student-name')?.value.trim() || '';
+  const phone = document.getElementById('phone')?.value.trim() || '';
+  const studyType = document.getElementById('study-type').value;
 
-    // اسم الطالب ثلاثي
+  if (!isOnlyIndividual) {
     if (student.split(' ').filter(Boolean).length < 3) {
       showNotification('يرجى إدخال اسم الطالب ثلاثي على الأقل', 'error', 3500);
       return false;
     }
-    // رقم الهاتف 11 رقم
+
     if (!/^01[0-9]{9}$/.test(phone)) {
       showNotification('يرجى إدخال رقم هاتف صحيح مكون من 11 رقم يبدأ بـ 01', 'error', 3500);
       return false;
     }
-    // انتظام/انتساب
-    if (!studyType || (studyType !== 'انتظام' && studyType !== 'انتساب')) {
-      showNotification('يرجى اختيار انتظام أو انتساب', 'error', 3500);
-      return false;
-    }
+  }
+
+  if (!studyType || (studyType !== 'انتظام' && studyType !== 'انتساب')) {
+    showNotification('يرجى اختيار انتظام أو انتساب', 'error', 3500);
+    return false;
   }
 
   return true;
@@ -874,16 +1649,13 @@ function showConfirmDialog(message, onConfirm, onCancel) {
 // جلب رقم الفاتورة التالي حسب النوع والفرقة
 async function fetchNextInvoiceNumber() {
   const subType = document.getElementById('sub-type')?.value || selectedSubType;
-  let dbType = '';
-  if (subType === 'اشتراك كورسات') dbType = 'كورسات';
-  else if (subType === 'اشتراك ملازم') dbType = 'ملازم';
-  else dbType = subType;
+  const dbType = mapSubTypeToDbType(subType);
   const snapshot = await getDocs(collection(db, 'invoices'));
   let count = 0;
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
-    // فقط الفواتير من نفس النوع
-    if (inv && inv.subType === dbType) {
+    const invType = String(inv?.subType || '').trim();
+    if (inv && (invType === dbType || invType === subType || invType === `اشتراك ${dbType}`)) {
       count++;
     }
   });
@@ -896,11 +1668,13 @@ async function fetchLinkedSubscription(phone, currentType) {
   if (!phone || !/^01[0-9]{9}$/.test(phone)) return null;
   const snapshot = await getDocs(collection(db, 'invoices'));
   let found = null;
+  const currentDbType = mapSubTypeToDbType(currentType);
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
+    const invType = String(inv?.subType || '').trim();
     if (inv && inv.phone === phone) {
-      if (currentType === 'كورسات' && inv.subType === 'ملازم') found = 'لديه اشتراك ملازم';
-      if (currentType === 'ملازم' && inv.subType === 'كورسات') found = 'لديه اشتراك كورسات';
+      if (currentDbType === 'كورسات' && (invType === 'ملازم' || invType === 'اشتراك ملازم')) found = 'لديه اشتراك ملازم';
+      if (currentDbType === 'ملازم' && (invType === 'كورسات' || invType === 'اشتراك كورسات')) found = 'لديه اشتراك كورسات';
     }
   });
   return found;
@@ -939,11 +1713,14 @@ function resetSelectedItemsBox() {
 });
 
 // دالة الطباعة (تُستدعى فقط عند الضغط على زر الطباعة)
-function printInvoice() {
+async function printInvoice() {
   const inv = window.lastSavedInvoice || {};
   let logoSrc = localStorage.getItem('centerLogo');
   if (!logoSrc || logoSrc === 'null' || logoSrc === 'undefined') {
     logoSrc = 'img/placeholder-logo.png';
+  }
+  if (!/^(data:|https?:|file:)/i.test(logoSrc)) {
+    logoSrc = new URL(logoSrc, window.location.href).href;
   }
   const centerName = localStorage.getItem('centerName') || 'اسم السنتر';
   const centerAddress = localStorage.getItem('centerAddress') || '';
@@ -957,27 +1734,63 @@ function printInvoice() {
   if (centerPhone2) phones.push(centerPhone2);
   if (centerPhone3) phones.push(centerPhone3);
   const phonesText = phones.length > 0 ? phones.join(' - ') : '';
+  const primaryCenterPhone = phones[0] || '';
+  function normalizeWhatsAppNumber(rawPhone) {
+    if (!rawPhone) return '';
+    let digits = String(rawPhone).replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.startsWith('+')) digits = digits.slice(1);
+    if (digits.startsWith('20') && digits.length >= 12) return digits;
+    if (digits.startsWith('0') && digits.length === 11) return `20${digits.slice(1)}`;
+    if (digits.length === 10 && !digits.startsWith('0')) return `20${digits}`;
+    return digits;
+  }
+  const normalizedCenterPhone = normalizeWhatsAppNumber(primaryCenterPhone);
+  const centerWhatsAppUrl = normalizedCenterPhone ? `https://wa.me/${normalizedCenterPhone}` : '';
+  const centerWhatsAppQr = centerWhatsAppUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(centerWhatsAppUrl)}` : '';
 
   // حساب الإجمالي
-  const total = (inv.items || []).reduce((sum, x) => sum + (parseFloat(x.price) || 0), 0);
+  const itemsTotal = (inv.items || []).reduce((sum, x) => sum + (parseFloat(x.price) || 0), 0);
+  const total = inv.isVip ? Number(inv.vipFinalPrice ?? itemsTotal) : itemsTotal;
+
+  const isIndividualInvoice = ['محاضرات فردية', 'ملازم فردية'].includes(String(inv.subType || '').trim());
+  const isNotesSubscription = ['ملازم', 'اشتراك ملازم', 'ملازم وكورسات'].includes(String(inv.subType || '').trim());
+  const bookletDeliveryItems = isNotesSubscription
+    ? (Array.isArray(inv.indivNotes) && inv.indivNotes.length ? inv.indivNotes : (inv.items || []))
+    : [];
+  const deliveredBooklets = bookletDeliveryItems.filter(item => item.delivered === true);
+  const bookletDeliveryHtml = isNotesSubscription ? `
+      <section class='booklet-delivery-print'>
+        <strong>الملازم المستلمة</strong>
+        ${deliveredBooklets.length ? `<table>
+          ${deliveredBooklets.map((item, idx) => `
+          <tr ${idx % 2 === 0 ? "style='background:#f9f9f9;'" : ''}>
+            <td>${escapeStudentHtml(item.name || item.title || 'ملزمة')}</td>
+            <td class='booklet-delivery-status'>استلمها الطالب</td>
+          </tr>
+          `).join('')}
+        </table>` : `<div>لم يستلم ملازم بعد</div>`}
+      </section>
+      ` : '';
 
   // بناء محتوى الفاتورة بتصميم محسّن
   let html = `
     <div style='text-align:center;font-family:"Cairo", "Arabic Typesetting", sans-serif;direction:rtl;'>
       <img src='${logoSrc}' alt='شعار السنتر' />
-      <h1>${centerName}</h1>
-      <hr>
+      ${inv.isVip ? `<div class='vip-print-badge'>VIP</div>` : ''}
       <div class='invoice-num'>فاتورة رقم: ${inv.num || '-'}</div>
-      
       <table>
+        ${!isIndividualInvoice ? `
         <tr>
-          <td>الاسم:</td>
+          <td>اسم الطالب:</td>
           <td>${inv.student || '-'}</td>
         </tr>
         <tr>
           <td>الهاتف:</td>
-          <td>${inv.phone || '-'}</td>
+          <td>${(inv.phone || '').trim() || '-'}</td>
         </tr>
+        ` : ''}
         <tr>
           <td>الفرقة:</td>
           <td>${inv.grade || '-'}</td>
@@ -990,12 +1803,12 @@ function printInvoice() {
       </table>
       
       ${inv.subType === 'كورسات' && inv.linkedSubTypes && inv.linkedSubTypes.includes('ملازم') ? `
-      <div style='margin:3mm 0;padding:2mm;background:#fff3e0;border-left:2px solid #ff9800;border-radius:3px;text-align:right;font-size:10px;color:#e65100;'>
+      <div style='margin:1mm 0;padding:1mm 1.5mm;background:#fff3e0;border-left:2px solid #ff9800;border-radius:3px;text-align:right;font-size:9.5px;color:#e65100;line-height:1.2;'>
         كود الملازم: <span style='color:#ff6f00;font-weight:bold;'>${inv.num ? inv.num + 1 : '-'}</span>
       </div>
       ` : ''}
       
-      <table style='margin:3mm 0;'>
+      <table style='margin:1mm 0;'>
         ${(inv.items || []).map((item, idx) => `
         <tr ${idx % 2 === 0 ? "style='background:#f9f9f9;'" : ''}>
           <td>${item.name}</td>
@@ -1003,12 +1816,20 @@ function printInvoice() {
         </tr>
         `).join('')}
       </table>
+      ${bookletDeliveryHtml}
+      ${(inv.onlineCardsDelivery || []).length ? `
+      <div class='online-card-delivery-print'>
+        ${(inv.onlineCardsDelivery || []).map(card => `
+          <div><b>${escapeStudentHtml(card.name || 'كارت أونلاين')}</b>: ${card.delivered === true || card.isDelivered === true ? 'استلم كارت أونلاين' : 'لم يستلم الكارت الأونلاين'}</div>
+        `).join('')}
+      </div>
+      ` : ''}
       
-      <div class='total-box'>
+      <div class='total-box' style='margin:1mm 0;padding:1.3mm;'>
         الإجمالي: ${total.toFixed(2)} ج
       </div>
       
-      <table>
+      <table style='margin:1mm 0;'>
         ${inv.payment ? `<tr><td>الدفع:</td><td>${inv.payment}</td></tr>` : ''}
         ${inv.payment === 'تقسيط' && inv.installment ? `
         <tr style='background:#fff9c4;'><td>المدفوع:</td><td>${inv.installment.paid || 0} ج</td></tr>
@@ -1019,18 +1840,20 @@ function printInvoice() {
       
       <div class='footer'>
         <div style='font-weight:bold;color:#1565c0;margin-bottom:1mm;'>الفرع الرئيسي</div>
-        <div>${centerAddress || '-'}</div>
-        <div style='margin:0.5mm 0;font-size:10px;'>
-          ${[centerPhone1, centerPhone2, centerPhone3].filter(p => p).map(p => `${p}`).join(' - ')}
+        <div class='center-address'>${centerAddress || '-'}</div>
+        <div style='margin:1mm 0 0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#000;'>
+          ${centerWhatsAppQr ? `<a href='${centerWhatsAppUrl}' target='_blank' rel='noopener' style='position:relative;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;'><img src='${centerWhatsAppQr}' alt='WhatsApp QR' style='display:block;width:18px;height:18px;border:2px solid #000;border-radius:6px;background:#fff;padding:1px;box-shadow:none;' /><span style='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;width:7px;height:7px;border-radius:50%;background:#fff;border:1px solid #000;box-shadow:0 1px 3px rgba(0,0,0,.15);'><svg viewBox='0 0 24 24' width='5' height='5' style='fill:#25d366;'><path d='M19.05 4.95A9.89 9.89 0 0 0 12.02 2a9.9 9.9 0 0 0-8.81 14.96L2 22l5.2-1.35A9.9 9.9 0 0 0 12.02 22a9.9 9.9 0 0 0 6.96-2.99A9.9 9.9 0 0 0 19.05 4.95ZM12.02 20.2a8.2 8.2 0 0 1-4.18-1.13l-.3-.18-3.08.8.82-3L5.1 16.8a8.2 8.2 0 1 1 13.46-6.8 8.17 8.17 0 0 1-6.54 10.2Zm4.54-6.2c-.25-.12-1.46-.72-1.69-.8-.23-.08-.4-.12-.57.12-.17.25-.65.8-.8 1-.15.17-.3.2-.55.07-.25-.12-1.05-.38-2-1.23-.74-.66-1.23-1.48-1.38-1.73-.15-.25-.02-.38.11-.5.11-.11.25-.3.38-.45.12-.15.17-.25.25-.42.08-.17.04-.32-.02-.45-.07-.12-.57-1.38-.79-1.89-.2-.48-.42-.42-.57-.42h-.49c-.17 0-.45.07-.68.32-.23.25-.88.86-.88 2.1 0 1.23.9 2.44.1 2.56.18.3.39.46.66.7.27.18.94.54 1.76 1.3.78.7 1.33 1.08 1.81 1.4.26.17.47.15.64.09.2-.06.65-.27.93-.52.28-.25.36-.46.46-.76.08-.3.08-.56-.03-.68-.1-.12-.23-.2-.45-.32Z'/></svg></span></a>` : '<span>-</span>'}
         </div>
-        <div style='margin-top:1.5mm;border-top:0.5px solid #ddd;padding-top:1mm;'>التاريخ: ${inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-'}</div>
-        <div style='margin-top:1mm;'>المستلم: ${currentRecipient && currentRecipient !== '-' ? currentRecipient : 'غير محدد'}</div>
+        <div style='margin-top:1mm;border-top:0.5px solid #ddd;padding-top:1mm;'>التاريخ: ${inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-'}</div>
       </div>
     </div>
   `;
 
   // نافذة الطباعة
   const win = window.open('', '', 'width=400,height=600');
+  if (!win) return;
+  logoSrc = await makePrintableImage(logoSrc);
+  html = html.replace(/src='[^']*'/, `src='${logoSrc}'`);
   win.document.write(`
     <!DOCTYPE html>
     <html dir="rtl">
@@ -1041,6 +1864,7 @@ function printInvoice() {
       <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: 80mm auto; margin: 0; }
         html, body { 
           margin: 0; 
           padding: 0; 
@@ -1050,50 +1874,56 @@ function printInvoice() {
           align-items: center;
         }
         body {
-          font-family: "Cairo", "Arabic Typesetting", sans-serif;
+          font-family: Tahoma, Arial, sans-serif;
           font-size: 11px;
-          color: #333;
-          background: #f5f5f5;
-          width: 100%;
-          padding: 5mm;
+          font-weight: 900;
+          color: #000;
+          background: #fff;
+          width: 80mm;
+          padding: 0;
           display: flex;
           justify-content: center;
           align-items: flex-start;
           line-height: 1.3;
         }
-        .print-container { 
-          width: 80mm; 
+        .print-container {
+          width: 76mm;
           margin: 0 auto;
           background: white;
-          padding: 3mm;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          padding: 1.5mm 1.5mm 0.8mm;
+          box-shadow: none;
         }
-        img { max-width: 45px; height: auto; display: block; margin: 1mm auto; }
-        h1 { font-size: 12px; margin: 1mm 0; color: #1565c0; }
-        hr { border: none; border-top: 0.5px solid #999; margin: 2mm 0; }
-        table { width: 100%; border-collapse: collapse; margin: 2mm 0; font-size: 10px; }
-        td { padding: 1.5mm; border-bottom: 0.5px solid #ddd; }
-        td:first-child { text-align: right; font-weight: bold; width: 40%; }
-        .invoice-num { font-size: 11px; font-weight: bold; color: #1565c0; text-align: center; padding: 1.5mm; border: 1px solid #1565c0; margin: 2mm 0; }
-        .total-box { background: #e8f5e9; border: 1px solid #388e3c; padding: 2mm; margin: 2mm 0; text-align: center; font-weight: bold; font-size: 11px; }
-        .installment-box { background: #fff8e1; border: 1px solid #fbc02d; padding: 2mm; margin: 2mm 0; font-size: 10px; }
-        .footer { margin-top: 2mm; padding-top: 2mm; border-top: 0.5px solid #999; text-align: center; font-size: 9px; line-height: 1.4; }
-        .footer div { margin: 0.5mm 0; }
+        img { max-width: 82px; max-height: 82px; height: auto; display: block; margin: 0.8mm auto; opacity: 1; }
+        h1 { font-size: 0; margin: 0; color: #000; font-weight: 900; display: none; }
+        hr { border: none; border-top: 1px solid #111; margin: 0.6mm 0; }
+        table { width: 100%; border-collapse: collapse; margin: 0.6mm 0; font-size: 9.8px; line-height: 1.15; }
+        td { padding: 0.5mm 0.7mm; border-bottom: 1px solid #222; line-height: 1.15; }
+        td:first-child { text-align: right; font-weight: 900; width: 40%; }
+        .invoice-num { font-size: 12.8px; font-weight: 900; color: #000; text-align: center; padding: 0.9mm; border: 1px solid #111; margin: 0.7mm 0; }
+        .vip-print-badge { display: inline-block; margin: 0.8mm auto; padding: 1mm 4mm; border: 1px solid #f2c300; border-radius: 4px; background: repeating-linear-gradient(135deg, #fff4a3 0 2mm, #ffe16b 2mm 4mm); color: #d50000; font-size: 12px; font-weight: 900; }
+        .total-box { background: #e8f5e9; border: 1px solid #1b5e20; padding: 2mm; margin: 2mm 0; text-align: center; font-weight: 900; font-size: 12px; color: #000; }
+        .installment-box { background: #fff8e1; border: 1px solid #8d6e00; padding: 2mm; margin: 2mm 0; font-size: 11px; }
+        .footer { margin-top: 1mm; padding-top: 1mm; border-top: 1px solid #222; text-align: center; font-size: 9.2px; line-height: 1.2; }
+        .footer div { margin: 0.3mm 0; }
+        .center-address { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+        .online-card-delivery-print { margin: 1mm 0; padding: 1mm; border: 0.5px solid #7897ad; border-radius: 2mm; text-align: right; font-size: 9px; line-height: 1.2; }
+        .booklet-delivery-print { margin: 1mm 0; padding: 1mm; border: 0.5px solid #7897ad; border-radius: 2mm; text-align: right; font-size: 9px; line-height: 1.2; }
+        .booklet-delivery-print > strong { display: block; margin-bottom: 0.5mm; }
+        .booklet-delivery-print table { margin: 0; }
+        .booklet-delivery-print td { padding: 0.5mm 0.7mm; }
+        .booklet-delivery-status { text-align: left; white-space: nowrap; }
         @media print {
           html, body { 
             margin: 0; 
             padding: 0; 
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
+            width: 80mm;
+            height: auto;
+            display: block;
             align-items: flex-start;
             background: white;
           }
           body { 
-            padding: 5mm;
-            display: flex;
-            justify-content: center;
+            min-height: 0;
             background: white;
           }
           .print-container { 
@@ -1101,8 +1931,28 @@ function printInvoice() {
             margin: 0 auto;
             page-break-after: auto;
             box-shadow: none;
+            background: white;
           }
           * { box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-container,
+          .print-container * {
+            font-family: Tahoma, Arial, sans-serif !important;
+            color: #000 !important;
+            font-weight: 900 !important;
+            letter-spacing: 0 !important;
+          }
+          .print-container .vip-print-badge { color: #d50000 !important; background: repeating-linear-gradient(135deg, #fff4a3 0 2mm, #ffe16b 2mm 4mm) !important; border: 1px solid #f2c300 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-container {
+            width: 72mm;
+            padding: 1mm 1mm 0.6mm;
+            overflow: visible;
+            line-height: 1.08 !important;
+          }
+          .print-container img { display: block !important; max-width: 84px !important; max-height: 84px !important; width: auto !important; height: auto !important; object-fit: contain; opacity: 1 !important; background: #fff !important; border: 0 !important; box-shadow: none !important; filter: brightness(1.05) contrast(2.2) saturate(1.4) !important; image-rendering: auto; }
+          .print-container table { margin: 0.5mm 0 !important; font-size: 9.1px !important; line-height: 1.08 !important; }
+          .print-container td { padding: 0.5mm 0.7mm !important; line-height: 1.08 !important; }
+          .print-container > div { margin-top: 0.6mm !important; margin-bottom: 0.6mm !important; padding-top: 0.6mm !important; padding-bottom: 0.6mm !important; }
         }
       </style>
     </head>
@@ -1111,9 +1961,32 @@ function printInvoice() {
   `);
 
   win.document.close();
-  setTimeout(() => {
+  const printWhenReady = async () => {
+    if (win.document.fonts?.ready) await win.document.fonts.ready;
+    await Promise.all(Array.from(win.document.images).map(image => image.complete
+      ? Promise.resolve()
+      : new Promise(resolve => { image.onload = resolve; image.onerror = resolve; })));
     win.print();
-  }, 300);
+  };
+  printWhenReady();
+}
+
+async function makePrintableImage(source) {
+  if (!source || source.startsWith('data:')) return source;
+  try {
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`Image request failed: ${response.status}`);
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn('Could not embed invoice logo:', error);
+    return source;
+  }
 }
 
 // ===== مربع تسليم كروت الأونلاين في الكاشير =====
@@ -1134,34 +2007,26 @@ async function updateOnlineCardDelivery() {
     return;
   }
 
-  // تحديد أي أنواع كروت محتاجين نعرضها
-  let hasSubscriptions = false;
-  let hasIndividualItems = false;
-
-  Object.keys(itemsBySubType || {}).forEach(subType => {
-    const items = itemsBySubType[subType];
-    if (Array.isArray(items) && items.length > 0) {
-      if (subType === 'محاضرات فردية' || subType === 'ملازم فردية') {
-        hasIndividualItems = true;
-      } else if (subType.includes('اشتراك')) {
-        hasSubscriptions = true;
-      } else {
-        // أي صنف أخر يندرج تحت الاشتراكات في الغالب
-        hasSubscriptions = true;
-      }
-    }
-  });
+  const subscriptionItems = allSelectedItems.filter(item =>
+    item && !item.isOnlineCard
+    && !['محاضرات فردية', 'ملازم فردية'].includes(item.subType)
+    && item.id
+  );
+  if (!subscriptionItems.length) {
+    box.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
 
   try {
     const snap = await getDocs(collection(db, 'onlineCards'));
     const relevantCards = [];
     snap.forEach(d => {
       const data = d.data();
-      if (data.type === 'للاشتراكات' && hasSubscriptions) {
-        relevantCards.push({ id: d.id, ...data });
-      } else if (data.type === 'فردي' && hasIndividualItems) {
-        relevantCards.push({ id: d.id, ...data });
-      }
+      if (data.type !== 'للاشتراكات') return;
+      const linkedIds = Array.isArray(data.linkedSubscriptionIds) ? data.linkedSubscriptionIds : [];
+      const matches = linkedIds.length === 0 || subscriptionItems.some(item => linkedIds.includes(item.id));
+      if (matches) relevantCards.push({ id: d.id, ...data, linkedSubscriptionIds: linkedIds });
     });
 
     if (relevantCards.length === 0) {
@@ -1177,23 +2042,42 @@ async function updateOnlineCardDelivery() {
       prevChecked[cb.dataset.cardId] = cb.checked;
     });
 
-    list.innerHTML = relevantCards.map(card => `
-      <label style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;background:#fff;padding:8px;border-radius:8px;border:1px solid #e0f0ff;">
-        <input type="checkbox" data-card-id="${card.id}" data-card-name="${card.name}" data-per-sub="${card.perSub || 1}" data-card-type="${card.type}"
-          ${prevChecked[card.id] ? 'checked' : ''}
-          style="width:20px;height:20px;accent-color:#1976d2;">
-        <span style="font-size:0.95em;">
-          <b style="color:#1565c0;">${card.name}</b>
-          <br>
-          <small style="color:#666;">
-            ${card.type === 'للاشتراكات' ? `(${card.perSub || 1} كرت/اشتراك)` : '(كود فردي)'} 
-            | مخزون: <span style="color:${(card.stock || 0) < 10 ? 'red' : '#388e3c'}">${card.stock || 0}</span>
-          </small>
-        </span>
-      </label>
-    `).join('');
+    list.replaceChildren();
+    relevantCards.forEach(card => {
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;background:#fff;padding:8px;border-radius:8px;border:1px solid #e0f0ff;';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.cardId = card.id;
+      checkbox.dataset.cardName = card.name || '';
+      checkbox.dataset.perSub = String(card.perSub || 1);
+      checkbox.dataset.cardType = card.type;
+      checkbox.dataset.linkedSubs = JSON.stringify(card.linkedSubscriptionIds);
+      checkbox.checked = Boolean(prevChecked[card.id]);
+      checkbox.style.cssText = 'width:20px;height:20px;accent-color:#1976d2;';
+      const description = document.createElement('span');
+      description.style.fontSize = '0.95em';
+      const title = document.createElement('b');
+      title.style.color = '#1565c0';
+      title.textContent = card.name || 'كارت أونلاين';
+      const details = document.createElement('small');
+      details.style.color = '#666';
+      details.textContent = `(${card.perSub || 1} كرت/اشتراك) | مخزون: ${Number(card.stock) || 0}`;
+      const deliveryStatus = document.createElement('small');
+      deliveryStatus.style.cssText = `display:block;font-weight:bold;color:${checkbox.checked ? '#2e7d32' : '#d32f2f'};`;
+      deliveryStatus.textContent = checkbox.checked ? 'استلم الكارت' : 'لم يستلم الكارت';
+      checkbox.addEventListener('change', () => {
+        deliveryStatus.textContent = checkbox.checked ? 'استلم الكارت' : 'لم يستلم الكارت';
+        deliveryStatus.style.color = checkbox.checked ? '#2e7d32' : '#d32f2f';
+      });
+      description.append(title, document.createElement('br'), details, deliveryStatus);
+      label.append(checkbox, description);
+      list.appendChild(label);
+    });
   } catch (e) {
     console.error('Error loading online cards for delivery:', e);
+    box.style.display = 'none';
+    showNotification('تعذر تحميل كروت التسليم. حاول تحديث الاختيارات.', 'error');
   }
 }
 

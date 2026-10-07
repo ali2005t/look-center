@@ -6,11 +6,12 @@ import 'https://cdn.jsdelivr.net/npm/chart.js';
 // --- تعريف متغير allInvoices كمتغير عام في أعلى الملف ---
 let allInvoices = [];
 
-function filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal) {
+function filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal) {
   if (!inv.date) return false;
   let d = inv.date;
   if (typeof d === "object" && d.toDate) d = d.toDate();
   else d = new Date(d);
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return false;
   if (period === "day" && dateVal) {
     const sel = new Date(dateVal);
     return d.getFullYear() === sel.getFullYear() && d.getMonth() === sel.getMonth() && d.getDate() === sel.getDate();
@@ -21,6 +22,13 @@ function filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal) {
   }
   if (period === "year" && yearVal) {
     return d.getFullYear() === +yearVal;
+  }
+  if (period === "custom") {
+    const start = startDateVal ? new Date(`${startDateVal}T00:00:00`) : null;
+    const end = endDateVal ? new Date(`${endDateVal}T23:59:59.999`) : null;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
   }
   return true;
 }
@@ -71,6 +79,29 @@ async function loadReports() {
   const dateVal = document.getElementById('filter-date')?.value;
   const monthVal = document.getElementById('filter-month')?.value;
   const yearVal = document.getElementById('filter-year')?.value;
+  const startDateVal = document.getElementById('filter-start-date')?.value;
+  const endDateVal = document.getElementById('filter-end-date')?.value;
+  const rangeError = document.getElementById('filter-range-error');
+  if (period === 'custom') {
+    if (!startDateVal || !endDateVal) {
+      if (rangeError) {
+        rangeError.textContent = 'حدد تاريخ البداية وتاريخ النهاية لعرض التقرير.';
+        rangeError.hidden = false;
+      }
+      return;
+    }
+    if (startDateVal > endDateVal) {
+      if (rangeError) {
+        rangeError.textContent = 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية أو مساويًا له.';
+        rangeError.hidden = false;
+      }
+      return;
+    }
+  }
+  if (rangeError) {
+    rangeError.textContent = '';
+    rangeError.hidden = true;
+  }
   // جلب الفواتير العادية ومدفوعات بوابة الطلاب معًا.
   const [snapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, usersSnapshot] = await Promise.all([
     getDocs(collection(db, "invoices")),
@@ -105,7 +136,7 @@ async function loadReports() {
   };
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
-    if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal)) return;
+    if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) return;
     // تطبيع اسم الفرقة
     const grade = normalizeGrade(inv.grade);
     // أرباح حسب النوع (يشمل فقط الأنواع الأربعة المعتمدة)
@@ -138,7 +169,7 @@ async function loadReports() {
   });
 
   const addPortalMetrics = (payment, registration, date) => {
-    if (!filterInvoiceByDate({ date }, period, dateVal, monthVal, yearVal)) return;
+    if (!filterInvoiceByDate({ date }, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) return;
     const subscriptions = Array.isArray(registration?.selectedSubscriptions) ? registration.selectedSubscriptions : [];
     const validSubscriptions = subscriptions.filter(item => reportTypes.includes(item.type));
     const grade = normalizeGrade(registration?.grade);
@@ -169,7 +200,7 @@ async function loadReports() {
     const registration = portalRegistrations.get(payment.registrationId);
     if (payment.registrationId) recordedPortalRegistrations.add(payment.registrationId);
     addPortalMetrics(payment, registration, paymentDate);
-    if (filterInvoiceByDate({ date: paymentDate }, period, dateVal, monthVal, yearVal)) addPortalReportInvoice(payment, registration, paymentDate);
+    if (filterInvoiceByDate({ date: paymentDate }, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) addPortalReportInvoice(payment, registration, paymentDate);
   });
 
   portalRegistrationsSnapshot.forEach(docSnap => {
@@ -181,7 +212,7 @@ async function loadReports() {
     if (!paidDate || Number.isNaN(paidDate.getTime())) return;
     const payment = { id: registration.id, agentId: registration.agentId, studentName: registration.studentName, amount: registration.paidAmount };
     addPortalMetrics(payment, registration, paidDate);
-    if (filterInvoiceByDate({ date: paidDate }, period, dateVal, monthVal, yearVal)) addPortalReportInvoice(payment, registration, paidDate);
+    if (filterInvoiceByDate({ date: paidDate }, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) addPortalReportInvoice(payment, registration, paidDate);
   });
   // تحديث مربعات الأرباح
   document.getElementById('profit-courses').textContent = (byType['كورسات']||0) + ' ج';
@@ -299,34 +330,39 @@ async function loadReports() {
   const lineCtx = document.getElementById('reports-line-canvas');
   if (lineCtx) {
     if (window.reportsLineChart) window.reportsLineChart.destroy();
-    // تجميع الأرباح لكل شهر
-    const months = Array.from({length: 12}, (_, i) => i+1);
-    const now = new Date();
-    const year = now.getFullYear();
-    const monthlyTotals = Array(12).fill(0);
-    snapshot.forEach(docSnap => {
-      const inv = docSnap.data();
+    const monthlyTotals = new Map();
+    const currentYear = new Date().getFullYear();
+    const trendInvoices = [
+      ...snapshot.docs
+        .map(docSnap => docSnap.data())
+        .filter(inv => filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)),
+      ...portalReportInvoices
+    ];
+    trendInvoices.forEach(inv => {
       let d = inv.date;
-      if (d && d.toDate) d = d.toDate();
+      if (d?.toDate) d = d.toDate();
       else d = new Date(d);
-      if (d.getFullYear() === year) {
-        const m = d.getMonth();
-        monthlyTotals[m] += (inv.items||[]).reduce((sum,x)=>sum+(x.price||0),0);
-      }
+      if (!(d instanceof Date) || Number.isNaN(d.getTime())) return;
+      if (period === 'all' && d.getFullYear() !== currentYear) return;
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) || 0) +
+        (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0));
     });
-    portalReportInvoices.forEach(inv => {
-      const d = inv.date instanceof Date ? inv.date : new Date(inv.date);
-      if (d.getFullYear() === year) {
-        monthlyTotals[d.getMonth()] += (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-      }
+    const monthKeys = [...monthlyTotals.keys()].sort();
+    const monthLabels = monthKeys.map(monthKey => {
+      const [year, month] = monthKey.split('-').map(Number);
+      return new Date(year, month - 1, 1).toLocaleDateString('ar-EG', { month: 'short', year: 'numeric' });
     });
+    const chartTitle = period === 'all'
+      ? `تطور الأرباح خلال ${currentYear}`
+      : 'تطور الأرباح شهريًا للفترة المحددة';
     window.reportsLineChart = new Chart(lineCtx, {
       type: 'line',
       data: {
-        labels: ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
+        labels: monthLabels,
         datasets: [{
           label: 'إجمالي الأرباح (جنيه)',
-          data: monthlyTotals,
+          data: monthKeys.map(monthKey => monthlyTotals.get(monthKey)),
           borderColor: '#1976d2',
           backgroundColor: 'rgba(25, 118, 210, 0.10)',
           tension: 0.4,
@@ -346,7 +382,7 @@ async function loadReports() {
         responsive: true,
         plugins: {
           legend: { display: false },
-          title: { display: true, text: 'تطور الأرباح عبر شهور السنة الحالية', font: { size: 22, weight: 'bold' } },
+          title: { display: true, text: chartTitle, font: { size: 22, weight: 'bold' } },
           tooltip: { enabled: true, backgroundColor: '#fff', titleColor: '#1976d2', bodyColor: '#333', borderColor: '#1976d2', borderWidth: 1 }
         },
         scales: {
@@ -393,7 +429,7 @@ async function loadReports() {
   allInvoices = [];
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
-    if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal)) return;
+    if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) return;
     allInvoices.push(inv);
     invoiceCount++;
     if (inv.items && Array.isArray(inv.items)) {
@@ -638,11 +674,26 @@ window.addEventListener("DOMContentLoaded", () => {
   const dateInput = document.getElementById('filter-date');
   const monthInput = document.getElementById('filter-month');
   const yearInput = document.getElementById('filter-year');
+  const customDateRange = document.getElementById('custom-date-range');
+  const startDateInput = document.getElementById('filter-start-date');
+  const endDateInput = document.getElementById('filter-end-date');
+  const toLocalDateInputValue = date => {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 10);
+  };
   function updateDateInputs() {
     if (!periodSel) return;
     dateInput.style.display = periodSel.value === 'day' ? '' : 'none';
     monthInput.style.display = periodSel.value === 'month' ? '' : 'none';
     yearInput.style.display = periodSel.value === 'year' ? '' : 'none';
+    if (customDateRange) customDateRange.style.display = periodSel.value === 'custom' ? 'flex' : 'none';
+    if (periodSel.value === 'custom') {
+      const today = new Date();
+      if (startDateInput && !startDateInput.value) {
+        startDateInput.value = toLocalDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
+      }
+      if (endDateInput && !endDateInput.value) endDateInput.value = toLocalDateInputValue(today);
+    }
   }
   if (periodSel) {
     periodSel.addEventListener('change', () => {
@@ -653,6 +704,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (dateInput) dateInput.addEventListener('change', loadReports);
   if (monthInput) monthInput.addEventListener('change', loadReports);
   if (yearInput) yearInput.addEventListener('input', loadReports);
+  if (startDateInput) startDateInput.addEventListener('change', loadReports);
+  if (endDateInput) endDateInput.addEventListener('change', loadReports);
   updateDateInputs();
   loadReports();
 
@@ -780,4 +833,3 @@ function renderLateStudentsTable() {
     </tr>
   `).join('');
 }
-

@@ -158,6 +158,7 @@ function renderTable() {
       <td>${inv.studyType || '-'}</td>
       <td><button class="edit-btn" data-idx="${idx}" style="background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;">تعديل</button></td>
       <td>${canDeleteInvoice ? `<button class=\"delete-btn\" data-idx=\"${idx}\" style=\"background:#f44336;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;\">حذف</button>` : ''}</td>
+      <td><button class="print-btn" data-idx="${idx}" style="background:#388e3c;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;">طباعة</button></td>
       <td><button class="view-btn" data-idx="${idx}" style="background:#009688;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;">قراءة</button></td>
       <td>
         <span style="display:inline-block;padding:4px 10px;border-radius:6px;background:#e3f2fd;color:#1565c0;font-size:0.9em;font-weight:bold;border:1px solid #90caf9;">
@@ -177,6 +178,9 @@ function renderTable() {
   tbody.querySelectorAll('.view-btn').forEach(btn => {
     btn.onclick = () => showInvoiceModal(filteredInvoices[btn.dataset.idx]);
   });
+  tbody.querySelectorAll('.print-btn').forEach(btn => {
+    btn.onclick = () => printIndividualInvoice(filteredInvoices[btn.dataset.idx]);
+  });
   tbody.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -186,6 +190,78 @@ function renderTable() {
   tbody.querySelectorAll('.delete-btn').forEach(btn => {
     btn.onclick = () => confirmDeleteInvoice(filteredInvoices[btn.dataset.idx]);
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function printIndividualInvoice(inv) {
+  if (!inv) return;
+  const centerName = localStorage.getItem('centerName') || 'اسم السنتر';
+  const centerAddress = localStorage.getItem('centerAddress') || 'عنوان السنتر';
+  const centerPhone = localStorage.getItem('centerPhone1') || localStorage.getItem('centerPhone') || '';
+  const centerLogo = localStorage.getItem('centerLogo') || '';
+  const invoiceNum = inv.individualInvoiceNumber ? String(inv.individualInvoiceNumber).padStart(4, '0') : (inv.num ? String(inv.num).padStart(4, '0') : '-');
+  const total = Number(inv.total || (inv.items || []).reduce((sum, x) => sum + (Number(x.price) || 0), 0));
+  const notesText = (inv.notes && String(inv.notes).trim()) ? String(inv.notes).trim() : 'لا توجد ملاحظات';
+  const printWindow = window.open('', '_blank', 'width=420,height=800');
+  if (!printWindow) {
+    alert('اسمح بفتح نافذة الطباعة من إعدادات المتصفح');
+    return;
+  }
+
+  const rowsHtml = (inv.items || []).map(item => `
+    <tr>
+      <td>${escapeHtml(item.name || '-')}</td>
+      <td>${escapeHtml((Number(item.price) || 0))} ج</td>
+    </tr>
+  `).join('');
+
+  printWindow.document.write(`<!doctype html>
+  <html lang="ar" dir="rtl">
+    <head>
+      <meta charset="UTF-8" />
+      <title>طباعة فاتورة فردية</title>
+      <style>
+        body { font-family: Arial, sans-serif; background: #fff; color: #111; margin: 0; padding: 20px; }
+        .receipt { max-width: 360px; margin: 0 auto; border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
+        .logo { display: block; max-width: 80px; max-height: 80px; margin: 0 auto 8px; }
+        h2 { margin: 6px 0; text-align: center; color: #1565c0; font-size: 22px; }
+        .meta { text-align: center; font-size: 12px; color: #555; margin-bottom: 12px; }
+        .header-row { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; }
+        .box { border-top: 1px dashed #bbb; margin-top: 12px; padding-top: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 7px 5px; border-bottom: 1px solid #eee; text-align: right; }
+        .total { font-weight: bold; font-size: 18px; margin-top: 12px; text-align: center; color: #1b5e20; }
+        .notes { margin-top: 12px; font-size: 12px; background: #fff8e1; padding: 8px; border-radius: 6px; }
+        @media print { body { padding: 0; } .receipt { border: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="receipt">
+        ${centerLogo ? `<img class="logo" src="${centerLogo}" alt="logo" />` : ''}
+        <h2>${escapeHtml(centerName)}</h2>
+        <div class="meta">${escapeHtml(centerAddress)}${centerPhone ? ` | ${escapeHtml(centerPhone)}` : ''}</div>
+        <div class="header-row"><span>رقم الفاتورة</span><strong>#${escapeHtml(invoiceNum)}</strong></div>
+        <div class="header-row"><span>نوع الفاتورة</span><strong>${escapeHtml(inv.type || inv.subType || '-')}</strong></div>
+        <div class="header-row"><span>التاريخ</span><strong>${escapeHtml(inv.date || '-')}</strong></div>
+        <div class="box">
+          <table>
+            <thead>
+              <tr><th>العنصر</th><th>السعر</th></tr>
+            </thead>
+            <tbody>${rowsHtml || '<tr><td colspan="2">لا توجد عناصر</td></tr>'}</tbody>
+          </table>
+        </div>
+        <div class="total">الإجمالي: ${escapeHtml(total)} ج</div>
+        <div class="notes"><strong>ملاحظات:</strong> ${escapeHtml(notesText)}</div>
+      </div>
+    </body>
+  </html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 300);
 }
 
 // Modal logic
@@ -305,15 +381,42 @@ async function renderInvoiceModalContent(id) {
   });
 }
 
+function normalizeDateInputValue(value) {
+  if (!value || value === '-') return '';
+  if (value && typeof value.toDate === 'function') {
+    const d = value.toDate();
+    if (d && !isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const match = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (match) {
+      const [, d, m, y] = match;
+      const year = y.length === 2 ? `20${y}` : y;
+      const date = new Date(Number(year), Number(m) - 1, Number(d));
+      if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+    }
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
+  return '';
+}
+
 async function showEditModal(inv) {
   const modal = document.getElementById('unsubscribed-invoice-modal');
+  if (!modal) return;
+  const initialDateValue = normalizeDateInputValue(inv.date);
   modal.innerHTML = `
     <div class="modal-bg" style="position:fixed;top:0;right:0;left:0;bottom:0;background:rgba(0,0,0,0.18);z-index:1000;display:flex;align-items:center;justify-content:center;">
       <div class="modal-box" style="background:#fff;border-radius:16px;box-shadow:0 6px 32px #90caf988;padding:32px 18px 18px 18px;min-width:320px;max-width:420px;position:relative;">
         <button id="close-modal-btn" style="position:absolute;left:18px;top:18px;background:transparent;border:none;font-size:22px;color:#1976d2;cursor:pointer;">&#10006;</button>
         <h2 style="color:#1976d2;text-align:center;font-weight:bold;margin-bottom:18px;">تعديل الفاتورة</h2>
         <div style="margin-bottom:12px;"><b>ملاحظات:</b><br><textarea id="edit-notes" style="width:100%;border-radius:8px;border:1px solid #b3c6e0;padding:8px;">${inv.notes}</textarea></div>
-        <div style="margin-bottom:12px;"><b>التاريخ:</b><br><input id="edit-date" type="date" value="${inv.date && inv.date !== '-' ? (new Date(inv.date.split('/').reverse().join('-')).toISOString().slice(0, 10)) : ''}" style="width:100%;border-radius:8px;border:1px solid #b3c6e0;padding:8px;"></div>
+        <div style="margin-bottom:12px;"><b>التاريخ:</b><br><input id="edit-date" type="date" value="${initialDateValue}" style="width:100%;border-radius:8px;border:1px solid #b3c6e0;padding:8px;"></div>
         <button id="save-edit-btn" style="background:#1976d2;color:#fff;padding:8px 24px;border:none;border-radius:8px;cursor:pointer;">حفظ</button>
       </div>
     </div>

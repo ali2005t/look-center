@@ -5,9 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الاشتراكات والأسعار</title>
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/subscriptions.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v4" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/subscriptions.css?v=inventory-v1" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
 </head>
 
@@ -93,10 +93,11 @@
   </aside>
 
   <!-- المحتوى -->
-  <main class="subscriptions-content" style="margin-right:220px;">
+  <main class="subscriptions-content">
     <section class="form-section">
-      <h2>إضافة اشتراك جديد</h2>
-      <form id="add-subscription-form">
+      <details class="add-subscription-details">
+        <summary><i class="fas fa-plus" aria-hidden="true"></i> إضافة اشتراك جديد</summary>
+        <form id="add-subscription-form">
         <div id="linked-subscription-group" style="display:none;margin-bottom:8px;">
           <label for="linked-subscription" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">اختر
             الاشتراك المرتبط</label>
@@ -104,8 +105,12 @@
             <option value="">-- بدون اشتراك مرتبط --</option>
           </select>
         </div>
-        <label id="name-label" for="name" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">📝 اسم
-          الاشتراك</label>
+          <div id="booklet-order-field" hidden>
+            <label for="booklet-order" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">ترتيب الملزمة داخل الاشتراك</label>
+            <input id="booklet-order" type="number" min="1" step="1" placeholder="مثال: 1" />
+          </div>
+          <label id="name-label" for="name" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">📝 اسم
+            الاشتراك</label>
         <input type="text" placeholder="مثال: مقيد، اشتراك نصف سنة..." id="name" required />
 
         <label for="type" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📂 نوع
@@ -132,26 +137,42 @@
           السعر (بالجنيه)</label>
         <input type="number" id="price" placeholder="مثال: 250" required />
 
-        <label for="stock" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📦
-          المخزون المتوفر <small style="color:#888;font-weight:normal;">(عدد النسخ)</small></label>
-        <input type="number" id="stock" placeholder="مثال: 50" />
+        <div id="booklet-stock-field" hidden>
+          <label for="stock" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📦
+            المخزون المتوفر <small style="color:#888;font-weight:normal;">(للملازم فقط)</small></label>
+          <input type="number" id="stock" placeholder="مثال: 50" min="0" step="1" value="0" />
+        </div>
 
         <button type="submit">إضافة</button>
-      </form>
+        </form>
+      </details>
     </section>
 
     <section class="table-section">
-      <h2>كل الاشتراكات</h2>
-      <table>
+      <div class="subscriptions-table-toolbar">
+        <h2>كل الاشتراكات</h2>
+        <label for="subscription-type-filter">تصفية النوع</label>
+        <select id="subscription-type-filter">
+          <option value="">كل الأنواع</option>
+          <option value="كورسات">كورسات</option>
+          <option value="ملازم">ملازم</option>
+          <option value="ملازم فردية">ملازم فردية</option>
+          <option value="محاضرات فردية">محاضرات فردية</option>
+        </select>
+      </div>
+      <table id="subscriptions-table">
         <thead>
           <tr>
             <th></th>
-            <th>الاسم</th>
+            <th>الاسم (أ–ي)</th>
             <th>النوع</th>
+            <th>مرتبط بـ</th>
             <th>الفرقة</th>
             <th>السعر</th>
             <th>المخزون</th>
+            <th>كروت أونلاين</th>
             <th>الحالة / نشر</th>
+            <th>المحتويات</th>
             <th>تعديل</th>
             <th>حذف</th>
           </tr>
@@ -160,45 +181,117 @@
           <!-- الاشتراكات هتتحط هنا -->
         </tbody>
       </table>
+      <section class="inventory-report" aria-labelledby="inventory-report-title">
+        <div class="inventory-report-heading">
+          <div>
+            <span class="inventory-report-kicker">INVENTORY OVERVIEW</span>
+            <h2 id="inventory-report-title">ملخص الاشتراكات والملازم والمخزون</h2>
+          </div>
+          <button type="button" id="refresh-inventory-report" class="inventory-refresh-btn">
+            <i class="fas fa-rotate" aria-hidden="true"></i> تحديث
+          </button>
+        </div>
+        <div id="inventory-summary-cards" class="inventory-summary-cards" aria-live="polite"></div>
+        <div class="inventory-table-wrap">
+          <table class="inventory-grade-table">
+            <thead>
+              <tr>
+                <th>الفرقة</th>
+                <th>اشتراكات كورسات</th>
+                <th>اشتراكات ملازم</th>
+                <th>ملازم فردية</th>
+                <th>إجمالي الاشتراكات</th>
+                <th>نسخ المخزون</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-grade-report"></tbody>
+          </table>
+        </div>
+        <h3 class="inventory-history-title">سجل حركات مخزون الملازم</h3>
+        <div class="inventory-table-wrap">
+          <table class="inventory-history-table">
+            <thead>
+              <tr>
+                <th>التاريخ والوقت</th>
+                <th>الفرقة</th>
+                <th>الملزمة</th>
+                <th>نوع الحركة</th>
+                <th>تغيير الكمية</th>
+                <th>الرصيد بعد الحركة</th>
+                <th>المستخدم</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-movements-report"></tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
     <!-- ===== قسم كروت الأونلاين المستقل ===== -->
-    <section class="form-section" style="margin-top:32px;">
-      <h2 style="color:#1976d2;">🃏 كروت الأونلاين</h2>
+    <section class="form-section online-cards-form-section">
+      <div class="online-cards-section-heading">
+        <span class="online-cards-section-icon"><i class="fas fa-id-card" aria-hidden="true"></i></span>
+        <div>
+          <span class="online-cards-kicker">ONLINE CARDS</span>
+          <h2>إدارة كروت الأونلاين</h2>
+          <p>اربط الكارت باشتراك واحد أو أكثر، وتابع الرصيد وحالة التسليم على الفاتورة.</p>
+        </div>
+      </div>
       <form id="add-online-card-form">
-        <label style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">📝 اسم الكرت</label>
-        <input type="text" id="card-name" placeholder="مثال: كود نصف سنة أونلاين" required />
-
-        <label style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📂 نوع
-          الكرت</label>
-        <select id="card-type">
-          <option value="للاشتراكات">للاشتراكات (بيتسلم تلقائياً مع أي اشتراك)</option>
-          <option value="فردي">فردي (للبيع بمفرده)</option>
-        </select>
-
-        <label style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">🔢 عدد الكروت /
-          اشتراك <small style="color:#888;font-weight:normal;">(كام كرت بيتسلم مع كل اشتراك)</small></label>
-        <input type="number" id="card-per-sub" placeholder="مثال: 1" min="1" value="1" />
-
-        <label style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">💰 السعر (للفردي)
-          <small style="color:#888;font-weight:normal;">(اتركه 0 لو مرتبط باشتراك)</small></label>
-        <input type="number" id="card-price" placeholder="مثال: 50" min="0" value="0" />
-
-        <label style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📦 الكمية
-          المتوفرة <small style="color:#888;font-weight:normal;">(إجمالي عدد الكروت في المخزون)</small></label>
-        <input type="number" id="card-stock" placeholder="مثال: 100" min="0" />
-
-        <button type="submit" style="margin-top:14px;">إضافة كرت</button>
+        <div class="online-card-form-grid">
+          <label class="online-card-field">
+            اسم الكارت
+            <input type="text" id="card-name" placeholder="مثال: كود منصة الترم" required />
+          </label>
+          <label class="online-card-field">
+            نوع الكارت
+            <select id="card-type">
+              <option value="للاشتراكات">مرتبط باشتراك</option>
+              <option value="فردي">كارت فردي</option>
+            </select>
+          </label>
+          <label class="online-card-field" id="card-per-sub-field">
+            عدد الكروت لكل اشتراك
+            <input type="number" id="card-per-sub" placeholder="1" min="1" step="1" value="1" />
+          </label>
+          <label class="online-card-field" id="card-price-field">
+            سعر الكارت الفردي (يظهر في الفاتورة)
+            <input type="number" id="card-price" placeholder="مثال: 50" min="0.01" step="0.01" value="0" />
+          </label>
+          <label class="online-card-field">
+            عدد الكروت المتوفرة
+            <input type="number" id="card-stock" placeholder="مثال: 100" min="0" step="1" required />
+          </label>
+        </div>
+        <fieldset id="card-linked-subscriptions-group" class="card-linked-subscriptions-group">
+          <legend>الاشتراكات المرتبطة بالكارت <small>يمكن اختيار أكثر من اشتراك</small></legend>
+          <div id="card-linked-subscriptions" class="card-linked-subscriptions" aria-live="polite"></div>
+        </fieldset>
+        <fieldset id="card-individual-types-group" class="card-linked-subscriptions-group" hidden>
+          <legend>يظهر الكارت مع <small>اختر نوعًا واحدًا أو أكثر</small></legend>
+          <div class="card-individual-types">
+            <label class="card-subscription-option"><input type="checkbox" name="card-individual-type" value="محاضرات فردية" /> محاضرات فردية</label>
+            <label class="card-subscription-option"><input type="checkbox" name="card-individual-type" value="ملازم فردية" /> ملازم فردية</label>
+          </div>
+        </fieldset>
+        <button type="submit" class="online-card-submit"><i class="fas fa-plus" aria-hidden="true"></i> إضافة الكارت</button>
       </form>
     </section>
 
-    <section class="table-section" style="margin-top:16px;">
-      <h2>كل كروت الأونلاين</h2>
-      <table>
+    <section class="table-section online-cards-table-section">
+      <div class="online-cards-table-heading">
+        <div>
+          <span class="online-cards-kicker">CARD STOCK</span>
+          <h2>كروت الأونلاين والمخزون</h2>
+        </div>
+        <div id="online-card-stock-summary" class="online-card-stock-summary" aria-live="polite">إجمالي الرصيد: —</div>
+      </div>
+      <table class="online-cards-table">
         <thead>
           <tr>
             <th>اسم الكرت</th>
             <th>النوع</th>
+            <th>الاشتراكات المرتبطة</th>
             <th>كروت / اشتراك</th>
             <th>💰 السعر</th>
             <th>📦 المخزون</th>
@@ -235,36 +328,10 @@
   <script src="js/notifications.js"></script>
   <script src="js/electron-nav.js"></script>
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script type="module" src="js/subscriptions.js"></script>
-  <script>
-    // إظهار حقل الاشتراك المرتبط عند اختيار ملزمة فردية
-    document.getElementById('type').addEventListener('change', function () {
-      var val = this.value;
-      var group = document.getElementById('linked-subscription-group');
-      if (val === 'ملازم فردية') {
-        group.style.display = '';
-        // جلب قائمة الاشتراكات من الجدول (فقط ملازم)
-        var subs = Array.from(document.querySelectorAll('#subscriptions-table-body tr'));
-        var select = document.getElementById('linked-subscription');
-        select.innerHTML = '<option value="">-- اختر الاشتراك --</option>';
-        subs.forEach(function (tr) {
-          var type = tr.querySelector('td:nth-child(3)');
-          var name = tr.querySelector('td:nth-child(2)');
-          if (type && name && type.textContent.trim() === 'ملازم') {
-            var opt = document.createElement('option');
-            opt.value = name.textContent.trim();
-            opt.textContent = name.textContent.trim();
-            select.appendChild(opt);
-          }
-        });
-      } else {
-        group.style.display = 'none';
-      }
-    });
-  </script>
+  <script type="module" src="js/subscriptions.js?v=inventory-v1"></script>
   <script>
     // تغيير اسم الحقل حسب النوع المختار
     document.getElementById('type').addEventListener('change', function () {

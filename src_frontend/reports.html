@@ -5,9 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>التقارير</title>
-  <link rel="stylesheet" href="css/main.css" />
-  <link rel="stylesheet" href="css/reports.css" />
-  <link rel="stylesheet" href="css/look-theme.css?v=look-v2" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/reports.css?v=reports-v2" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
 
 </head>
@@ -45,6 +45,7 @@
     <ul class="mobile-menu-list">
       <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
       <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="vip.html"><i class="fas fa-crown"></i><span>VIP</span></a></li>
       <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
       <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
       <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
@@ -61,6 +62,7 @@
     <ul>
   <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
   <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register" style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+  <li data-link="vip.html"><a href="vip.html"><span class="sidebar-icon"><i class="fas fa-crown" style="color:#ffb300;"></i></span><span>VIP</span></a></li>
      <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
 
   <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice" style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
@@ -101,6 +103,13 @@
       <input type="date" id="filter-date" style="display:none;" />
       <input type="month" id="filter-month" style="display:none;" />
       <input type="number" id="filter-year" min="2000" max="2100" placeholder="السنة" style="display:none;width:100px;" />
+      <div id="custom-date-range" class="custom-date-range" style="display:none;">
+        <label for="filter-start-date">من تاريخ</label>
+        <input type="date" id="filter-start-date" />
+        <label for="filter-end-date">إلى تاريخ</label>
+        <input type="date" id="filter-end-date" />
+      </div>
+      <p id="filter-range-error" class="filter-range-error" role="alert" hidden></p>
       <button id="export-excel-btn" style="background:#43a047;color:#fff;padding:8px 18px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #43a04722;">تصدير Excel</button>
     </div>
     <div id="reports-summary">
@@ -267,12 +276,16 @@
           </tbody>
         </table>
       </div>
+    <section class="reports-visualizations" aria-labelledby="reports-visualizations-title">
+      <h3 id="reports-visualizations-title">الرسوم البيانية للفترة المحددة</h3>
     <div id="reports-charts">
       <!-- الرسوم البيانية -->
+      <canvas id="reports-chart-canvas" height="220" aria-label="الأرباح حسب نوع الاشتراك"></canvas>
       <canvas id="reports-pie-canvas" height="220" style="background:#f9f9f9; border-radius:10px; margin-top:30px;"></canvas>
       <canvas id="reports-line-canvas" height="220" style="background:#f9f9f9; border-radius:10px; margin-top:30px;"></canvas>
       <canvas id="reports-bar-canvas" height="220" style="background:#f9f9f9; border-radius:10px; margin-top:30px;"></canvas>
     </div>
+    </section>
   </main>
 <div id="logout-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
     <div style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
@@ -284,7 +297,7 @@
     </div>
   </div>
   <script type="module" src="js/firebase.js"></script>
-  <script type="module" src="js/header.js?v=sidebar-v2"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/electron-nav.js"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
   <script type="module" src="js/reports.js"></script>
@@ -354,6 +367,3 @@
 </body>
 
 </html>
-
-
-

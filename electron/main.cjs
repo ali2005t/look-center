@@ -32,7 +32,7 @@ function createMainWindow() {
     fullscreen: true,
     show: false, // Hidden until splash finishes
     title: 'ASAS look cashier POS',
-    icon: path.join(__dirname, 'logo.png'),
+    icon: path.join(__dirname, '../ico/ico.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

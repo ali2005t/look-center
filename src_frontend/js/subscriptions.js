@@ -13,21 +13,75 @@ import {
 
 let subscriptionRecords = [];
 
+function normalizeName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function getNoteLinkedSubscriptions(note) {
+  if (!note) return [];
+  if (Array.isArray(note.linkedSubscriptions) && note.linkedSubscriptions.length > 0) {
+    return note.linkedSubscriptions.map(s => String(s).trim()).filter(Boolean);
+  }
+  if (typeof note.linkedSubscription === 'string' && note.linkedSubscription.trim()) {
+    return note.linkedSubscription.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function isNoteLinkedToParent(note, parentName) {
+  if (!note || !parentName) return false;
+  const target = normalizeName(parentName);
+  const linkedSubs = getNoteLinkedSubscriptions(note);
+  return linkedSubs.some(s => normalizeName(s) === target);
+}
+
+function getNoteSortOrder(note, parentName) {
+  if (!note) return null;
+  if (parentName && note.sortOrders && typeof note.sortOrders === 'object') {
+    const directOrder = note.sortOrders[parentName];
+    if (Number.isInteger(Number(directOrder)) && Number(directOrder) > 0) {
+      return Number(directOrder);
+    }
+    const target = normalizeName(parentName);
+    for (const [key, val] of Object.entries(note.sortOrders)) {
+      if (normalizeName(key) === target && Number.isInteger(Number(val)) && Number(val) > 0) {
+        return Number(val);
+      }
+    }
+  }
+  return Number.isInteger(Number(note.sortOrder)) && Number(note.sortOrder) > 0 ? Number(note.sortOrder) : null;
+}
+
 function updateLinkedParentOptions(select, grade, selectedName = '', excludedId = '') {
-  if (!select) return;
   const parentSubscriptions = subscriptionRecords.filter(subscription =>
     subscription.type === 'ملازم'
     && (!grade || subscription.grade === grade)
     && subscription.id !== excludedId
   );
-  select.innerHTML = '<option value="">-- اختر الاشتراك الأب --</option>';
-  parentSubscriptions.forEach(subscription => {
-    const option = document.createElement('option');
-    option.value = subscription.name;
-    option.textContent = subscription.name;
-    select.appendChild(option);
-  });
-  select.value = selectedName || '';
+  if (select) {
+    select.innerHTML = '<option value="">-- اختر الاشتراك الأب --</option>';
+    parentSubscriptions.forEach(subscription => {
+      const option = document.createElement('option');
+      option.value = subscription.name;
+      option.textContent = subscription.name;
+      select.appendChild(option);
+    });
+    select.value = selectedName || '';
+  }
+
+  const checklist = document.getElementById('linked-subscriptions-checklist');
+  if (checklist) {
+    if (!parentSubscriptions.length) {
+      checklist.innerHTML = `<p style="margin:0;color:#888;font-size:12px;">لا توجد باقات ملازم مسجلة في هذه الفرقة (${grade || 'المحددة'}).</p>`;
+    } else {
+      checklist.innerHTML = parentSubscriptions.map(sub => `
+        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px;color:#1a237e;">
+          <input type="checkbox" class="add-linked-sub-cb" value="${sub.name}" style="width:16px;height:16px;cursor:pointer;">
+          <span><strong>${sub.name}</strong> <small style="color:#666;">(${sub.price} ج)</small></span>
+        </label>
+      `).join('');
+    }
+  }
 }
 
 function updateAddLinkedParentField() {
@@ -41,10 +95,7 @@ function updateAddLinkedParentField() {
   if (group) group.style.display = isIndividualNote ? '' : 'none';
   if (orderGroup) orderGroup.hidden = !isIndividualNote;
   if (orderInput) orderInput.required = isIndividualNote;
-  if (select) {
-    select.required = isIndividualNote;
-    updateLinkedParentOptions(select, grade?.value || '', select.value);
-  }
+  updateLinkedParentOptions(select, grade?.value || '', select ? select.value : '');
 }
 
 // Notify html/daily_closing.html about updates
@@ -245,17 +296,24 @@ document.getElementById("add-subscription-form").addEventListener("submit", asyn
     ...(onlineCardsCount > 0 ? { onlineCardsCount } : {})
   };
   // إذا كان نوع الاشتراك "ملزمة فردية" وبه اشتراك مرتبط، أضفه
-  if (type === "ملازم فردية" && !linkedSub) {
-    window.showNotification('اختر الاشتراك الأب المرتبط بهذه الملزمة', 'error');
-    return;
-  }
   if (type === "ملازم فردية") {
+    const checkedSubs = Array.from(document.querySelectorAll('#linked-subscriptions-checklist .add-linked-sub-cb:checked')).map(cb => cb.value);
+    const fallbackSub = document.getElementById("linked-subscription")?.value || "";
+    const linkedSubs = checkedSubs.length ? checkedSubs : (fallbackSub ? [fallbackSub] : []);
+
+    if (!linkedSubs.length) {
+      window.showNotification('اختر على الأقل باقة اشتراك واحدة مرتبطة بهذه الملزمة', 'error');
+      return;
+    }
     if (!Number.isInteger(sortOrder) || sortOrder < 1) {
       window.showNotification('أدخل ترتيبًا صحيحًا للملزمة يبدأ من 1', 'error');
       return;
     }
-    subData.linkedSubscription = linkedSub;
+    subData.linkedSubscriptions = linkedSubs;
+    subData.linkedSubscription = linkedSubs.join(', ');
     subData.sortOrder = sortOrder;
+    subData.sortOrders = {};
+    linkedSubs.forEach(p => { subData.sortOrders[p] = sortOrder; });
   }
   if (['ملازم', 'ملازم فردية'].includes(type) && stock < 0) {
     window.showNotification('مخزون الملزمة الجديدة لا يمكن أن يكون سالبًا.', 'error');
@@ -273,7 +331,7 @@ document.getElementById("add-subscription-form").addEventListener("submit", asyn
       currentUser?.email ||
       'مستخدم'
     );
-    await runTransaction(db, transaction => {
+    await runTransaction(db, async transaction => {
       transaction.set(subscriptionRef, subData);
       if (movementRef) {
         transaction.set(movementRef, {
@@ -321,10 +379,10 @@ async function loadSubscriptions() {
   const parentNotes = subscriptionRecords.filter(subscription => subscription.type === 'ملازم');
   const linkedNotesForParent = parent => subscriptionRecords.filter(subscription =>
     subscription.type === 'ملازم فردية'
-    && normalizeName(subscription.linkedSubscription) === normalizeName(parent.name)
+    && isNoteLinkedToParent(subscription, parent.name)
     && subscription.grade === parent.grade
   ).sort((first, second) =>
-    (Number(first.sortOrder) || Number.MAX_SAFE_INTEGER) - (Number(second.sortOrder) || Number.MAX_SAFE_INTEGER)
+    (getNoteSortOrder(first, parent.name) || Number.MAX_SAFE_INTEGER) - (getNoteSortOrder(second, parent.name) || Number.MAX_SAFE_INTEGER)
     || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' })
   );
   const individualNoteGroups = new Map();
@@ -336,7 +394,7 @@ async function loadSubscriptions() {
       individualNoteGroups.set(note.grade, group);
     });
     individualNoteGroups.forEach(notes => notes.sort((first, second) =>
-    String(first.linkedSubscription || '').localeCompare(String(second.linkedSubscription || ''), 'ar', { numeric: true, sensitivity: 'base' })
+    String(getNoteLinkedSubscriptions(first).join('، ') || first.linkedSubscription || '').localeCompare(String(getNoteLinkedSubscriptions(second).join('، ') || second.linkedSubscription || ''), 'ar', { numeric: true, sensitivity: 'base' })
     || (Number(first.sortOrder) || Number.MAX_SAFE_INTEGER) - (Number(second.sortOrder) || Number.MAX_SAFE_INTEGER)
     || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' })
     ));
@@ -356,13 +414,13 @@ async function loadSubscriptions() {
     tr.setAttribute('data-id', sub.id);
     const linkedNotes = sub.type === 'ملازم' ? linkedNotesForParent(sub) : [];
     const contentsCell = linkedNotes.length
-        ? `<details class="subscription-contents"><summary>ملازم تابعة (${linkedNotes.length})</summary><ul>${linkedNotes.map(note => `<li><strong>${Number(note.sortOrder) || '—'}.</strong> ${note.name} <small>${note.price} ج · متبقي ${note.stock || 0}</small></li>`).join('')}</ul></details>`
+        ? `<details class="subscription-contents"><summary>ملازم تابعة (${linkedNotes.length})</summary><ul style="padding:4px 0;margin:0;list-style:none;">${linkedNotes.map(note => `<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #e0e0e0;"><span><strong>${Number(getNoteSortOrder(note, sub.name)) || '—'}.</strong> ${note.name} <small style="color:#666;">${note.price} ج · متبقي ${note.stock || 0}</small></span><button type="button" onclick="event.stopPropagation(); editSubscription('${note.id}')" style="background:#1976d2;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:bold;cursor:pointer;" title="تعديل هذه الملزمة">✏️ تعديل</button></li>`).join('')}</ul></details>`
       : '-';
     tr.innerHTML = `
       <td class="drag-handle" title="اسحب لترتيب الصف">☰</td>
       <td>${sub.name}</td>
       <td>${sub.type}</td>
-      <td>${sub.linkedSubscription || '-'}</td>
+      <td style="max-width:220px;font-size:13px;">${getNoteLinkedSubscriptions(sub).join('، ') || sub.linkedSubscription || '-'}</td>
       <td>${sub.grade}</td>
       <td>${sub.price} ج</td>
       <td>${['ملازم', 'ملازم فردية'].includes(sub.type) ? (sub.stock || 0) : '—'}</td>
@@ -388,7 +446,7 @@ async function loadSubscriptions() {
       const groupRow = document.createElement('tr');
       groupRow.className = 'lecture-group-row';
       groupRow.innerHTML = `<td colspan="12"><div class="grade-content-groups">
-        ${notes.length ? `<details class="subscription-contents"><summary>ملازم فردية · ${grade} (${notes.length})</summary><ul>${notes.map(note => `<li><strong>${Number(note.sortOrder) || '—'}.</strong> ${note.name} <small>${note.linkedSubscription ? `تابعة لـ ${note.linkedSubscription} · ` : ''}${note.price} ج · متبقي ${note.stock || 0}</small></li>`).join('')}</ul></details>` : ''}
+        ${notes.length ? `<details class="subscription-contents"><summary>ملازم فردية · ${grade} (${notes.length})</summary><ul style="padding:4px 0;margin:0;list-style:none;">${notes.map(note => `<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #e0e0e0;"><span><strong>${Number(note.sortOrder) || '—'}.</strong> ${note.name} <small style="color:#666;">${note.linkedSubscription ? `تابعة لـ ${note.linkedSubscription} · ` : ''}${note.price} ج · متبقي ${note.stock || 0}</small></span><button type="button" onclick="event.stopPropagation(); editSubscription('${note.id}')" style="background:#1976d2;color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:bold;cursor:pointer;" title="تعديل هذه الملزمة">✏️ تعديل</button></li>`).join('')}</ul></details>` : ''}
         ${lectures.length ? `<details class="subscription-contents"><summary>محاضرات فردية · ${grade} (${lectures.length})</summary><ul>${lectures.map(lecture => `<li>${lecture.name} <small>${lecture.price} ج</small></li>`).join('')}</ul></details>` : ''}
       </div></td>`;
       rows.push(groupRow);
@@ -459,89 +517,321 @@ window.editSubscription = async (id) => {
   });
   if (!subDoc) return alert("لم يتم العثور على الاشتراك!");
   const sub = subDoc.data();
+  const normalizeName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
   const linkedParentOptions = subscriptionRecords
     .filter(subscription => subscription.type === 'ملازم' && subscription.grade === sub.grade && subscription.id !== id)
     .map(subscription => `<option value="${subscription.name}" ${sub.linkedSubscription === subscription.name ? 'selected' : ''}>${subscription.name}</option>`)
     .join('');
-  // نافذة منبثقة بسيطة
+
   const modal = document.createElement('div');
-  modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0002;z-index:3000;display:flex;align-items:center;justify-content:center;';
+  modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0004;z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
   modal.innerHTML = `
-    <div style="background:#fff;padding:28px 22px;border-radius:12px;min-width:340px;max-width:90vw;box-shadow:0 4px 32px #90caf988;">
-      <h3 style='margin-bottom:18px;color:#1976d2;'>✏️ تعديل الاشتراك</h3>
+    <div style="background:#fff;padding:26px 22px;border-radius:14px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 36px rgba(25,118,210,0.25);box-sizing:border-box;">
+      <h3 style='margin:0 0 16px 0;color:#1976d2;display:flex;align-items:center;gap:8px;'>✏️ تعديل الاشتراك</h3>
 
       <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>📝 اسم الاشتراك</label>
-      <input id='edit-name' value='${sub.name}' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
+      <input id='edit-name' value='${sub.name}' style='width:100%;margin-bottom:12px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
 
       <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>📂 نوع الاشتراك</label>
-      <input id='edit-type' value='${sub.type}' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
+      <select id='edit-type' style='width:100%;margin-bottom:12px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
+        ${['كورسات', 'ملازم', 'محاضرات فردية', 'ملازم فردية'].map(t => `<option value="${t}" ${sub.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+      </select>
 
       <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>🎓 الفرقة الدراسية</label>
-      <input id='edit-grade' value='${sub.grade}' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
-
-      ${sub.type === 'ملازم فردية' ? `<label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>الاشتراك الأب المرتبطة به</label>
-      <select id='edit-linked-subscription' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
-        <option value="">-- اختر الاشتراك الأب --</option>
-        ${linkedParentOptions}
+      <select id='edit-grade' style='width:100%;margin-bottom:12px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
+        ${['أولى', 'ثانية', 'ثالثة', 'رابعة'].map(g => `<option value="${g}" ${sub.grade === g ? 'selected' : ''}>${g}</option>`).join('')}
+        ${!['أولى', 'ثانية', 'ثالثة', 'رابعة'].includes(sub.grade) && sub.grade ? `<option value="${sub.grade}" selected>${sub.grade}</option>` : ''}
       </select>
-      <label for='edit-sort-order' style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>ترتيب الملزمة داخل الاشتراك</label>
-      <input id='edit-sort-order' type='number' min='1' step='1' value='${Number.isInteger(Number(sub.sortOrder)) && Number(sub.sortOrder) > 0 ? Number(sub.sortOrder) : ''}' placeholder='مثال: 1' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>` : ''}
+
+      ${sub.type === 'ملازم' ? `
+      <div id="parent-linked-booklets-section" style="margin-top:8px;margin-bottom:14px;padding:12px;background:#f0f7ff;border:1px solid #bbdefb;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label style="font-weight:bold;color:#1976d2;margin:0;font-size:14px;">
+            📚 الملازم التابعة لهذا الاشتراك (<span id="grade-label-in-modal">${sub.grade}</span>)
+          </label>
+          <span id="linked-booklets-count-badge" style="background:#1976d2;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:bold;">0 ملزمة</span>
+        </div>
+        <p style="font-size:11px;color:#555;margin:0 0 8px 0;">
+          حدد الملازم التابعة لهذا الاشتراك واضبط رقم ترتيب تسليم كل ملزمة (1، 2، 3...). عند تغيير الفرقة أعلاه سيتم تحديث الملازم تلقائيًا.
+        </p>
+        <div id="parent-linked-booklets-list" style="max-height:190px;overflow-y:auto;border:1px solid #e3f2fd;border-radius:7px;background:#fafdff;padding:6px;">
+        </div>
+      </div>
+      ` : ''}
+
+      ${sub.type === 'ملازم فردية' ? `
+      <div id="individual-booklet-link-group">
+        <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>
+          📚 باقات الاشتراكات المرتبطة بهذه الملزمة <small style="color:#666;font-weight:normal;">(يمكنك اختيار أكثر من باقة)</small>
+        </label>
+        <div id="edit-linked-parents-checklist" style="max-height:140px;overflow-y:auto;border:1px solid #cde4ff;border-radius:7px;padding:8px;background:#fafdff;margin-bottom:12px;">
+        </div>
+        <label for='edit-sort-order' style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>الترتيب الافتراضي داخل الاشتراكات</label>
+        <input id='edit-sort-order' type='number' min='1' step='1' value='${Number.isInteger(Number(sub.sortOrder)) && Number(sub.sortOrder) > 0 ? Number(sub.sortOrder) : ''}' placeholder='مثال: 1' style='width:100%;margin-bottom:12px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
+      </div>` : ''}
 
       <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>💰 السعر (بالجنيه)</label>
-      <input id='edit-price' type='number' value='${sub.price}' style='width:100%;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
+      <input id='edit-price' type='number' value='${sub.price}' style='width:100%;margin-bottom:12px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
 
       ${['ملازم', 'ملازم فردية'].includes(sub.type) ? `<div id="edit-booklet-stock-group">
         <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>📦 مخزون الملزمة <small style="color:#888;font-weight:normal;">(يمكن تصفيره)</small></label>
-        <input id='edit-stock' type='number' min='0' step='1' value='${sub.stock || 0}' style='width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
-        <button id="zero-booklet-stock" type="button" style="margin-bottom:12px;background:#fff3e0;color:#a84b00;border:1px solid #f2c078;border-radius:7px;padding:7px 12px;font-weight:bold;cursor:pointer;">تصفير مخزون الملزمة</button>
+        <input id='edit-stock' type='number' min='0' step='1' value='${sub.stock || 0}' style='width:100%;margin-bottom:8px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
+        <button id="zero-booklet-stock" type="button" style="margin-bottom:12px;background:#fff3e0;color:#a84b00;border:1px solid #f2c078;border-radius:7px;padding:7px 12px;font-weight:bold;cursor:pointer;font-size:13px;">تصفير مخزون الملزمة</button>
       </div>` : ''}
 
       <label style='display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;'>🃏 عدد كروت الأونلاين المرتبطة <small style="color:#888;font-weight:normal;">(0 = لا يوجد)</small></label>
-      <input id='edit-online-cards' type='number' value='${sub.onlineCardsCount || 0}' min='0' style='width:100%;margin-bottom:16px;padding:8px;border-radius:6px;border:1px solid #cde4ff;box-sizing:border-box;'>
+      <input id='edit-online-cards' type='number' value='${sub.onlineCardsCount || 0}' min='0' style='width:100%;margin-bottom:18px;padding:9px;border-radius:7px;border:1px solid #cde4ff;box-sizing:border-box;font-size:14px;'>
 
       <div style='display:flex;gap:10px;justify-content:flex-end;'>
-        <button id='save-edit-sub' style='background:#1976d2;color:#fff;padding:8px 22px;border:none;border-radius:7px;cursor:pointer;'>حفظ</button>
-        <button id='cancel-edit-sub' style='background:#eee;color:#333;padding:8px 22px;border:none;border-radius:7px;cursor:pointer;'>إلغاء</button>
+        <button id='save-edit-sub' style='background:#1976d2;color:#fff;padding:9px 24px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px;'>حفظ التعديلات</button>
+        <button id='cancel-edit-sub' style='background:#eee;color:#333;padding:9px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;'>إلغاء</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
+
   const editGradeField = document.getElementById('edit-grade');
-  const editParentSelect = document.getElementById('edit-linked-subscription');
+  const editTypeField = document.getElementById('edit-type');
+
+  // دالة عرض باقات الاشتراكات عند تعديل ملزمة فردية
+  const renderEditLinkedParents = (selectedGrade) => {
+    const checklist = document.getElementById('edit-linked-parents-checklist');
+    if (!checklist) return;
+    const parentSubs = subscriptionRecords.filter(s =>
+      s.type === 'ملازم' && (!selectedGrade || s.grade === selectedGrade) && s.id !== id
+    );
+    if (!parentSubs.length) {
+      checklist.innerHTML = `<p style="margin:0;color:#888;font-size:12px;">لا توجد باقات ملازم مسجلة في فرقة (${selectedGrade}).</p>`;
+      return;
+    }
+    checklist.innerHTML = parentSubs.map(p => `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;color:#1a237e;">
+        <input type="checkbox" class="parent-link-cb" value="${p.name}" ${isNoteLinkedToParent(sub, p.name) ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;">
+        <span><strong>${p.name}</strong> <small style="color:#666;">(${p.price} ج)</small></span>
+      </label>
+    `).join('');
+  };
+
+  if (sub.type === 'ملازم فردية') {
+    renderEditLinkedParents(sub.grade);
+  }
+
+  // دالة عرض وتحديث الملازم التابعة للاشتراك الأب حسب الفرقة
+  const renderParentLinkedBooklets = (selectedGrade) => {
+    const container = document.getElementById('parent-linked-booklets-list');
+    const countBadge = document.getElementById('linked-booklets-count-badge');
+    const gradeLabel = document.getElementById('grade-label-in-modal');
+    if (!container) return;
+    if (gradeLabel) gradeLabel.textContent = selectedGrade;
+
+    const gradeBooklets = subscriptionRecords.filter(s =>
+      s.type === 'ملازم فردية' && s.grade === selectedGrade && s.id !== id
+    );
+
+    if (gradeBooklets.length === 0) {
+      container.innerHTML = `<div style="text-align:center;color:#888;padding:12px;font-size:12px;background:#fff;border-radius:6px;">لا توجد ملازم فردية مسجلة في فرقة (${selectedGrade}).</div>`;
+      if (countBadge) countBadge.textContent = '0 ملزمة';
+      return;
+    }
+
+    gradeBooklets.sort((a, b) => {
+      const aLinked = isNoteLinkedToParent(a, sub.name);
+      const bLinked = isNoteLinkedToParent(b, sub.name);
+      if (aLinked && !bLinked) return -1;
+      if (!aLinked && bLinked) return 1;
+      if (aLinked && bLinked) {
+        return (getNoteSortOrder(a, sub.name) || 9999) - (getNoteSortOrder(b, sub.name) || 9999);
+      }
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ar', { numeric: true, sensitivity: 'base' });
+    });
+
+    let linkedCount = 0;
+    container.innerHTML = gradeBooklets.map(b => {
+      const isLinked = isNoteLinkedToParent(b, sub.name);
+      if (isLinked) linkedCount++;
+      const sortVal = getNoteSortOrder(b, sub.name) || '';
+      const otherSubs = getNoteLinkedSubscriptions(b).filter(s => normalizeName(s) !== normalizeName(sub.name));
+      const otherNote = otherSubs.length ? `(مرتبطة أيضاً بـ: ${otherSubs.join('، ')})` : '';
+
+      return `
+        <div class="booklet-item-row" data-id="${b.id}" style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;margin-bottom:6px;background:${isLinked ? '#f0f9ff' : '#fff'};border:1px solid ${isLinked ? '#64b5f6' : '#e0e0e0'};border-radius:6px;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;flex:1;font-size:13px;color:#1a237e;">
+            <input type="checkbox" class="booklet-check" data-id="${b.id}" ${isLinked ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;">
+            <span>
+              <strong>${b.name}</strong>
+              <small style="display:block;color:#666;font-size:11px;">${b.price} ج · متبقي ${b.stock || 0} ${otherNote ? `<span style="color:#0288d1;font-weight:bold;">${otherNote}</span>` : ''}</small>
+            </span>
+          </label>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <label style="font-size:11px;color:#555;white-space:nowrap;">ترتيب:</label>
+            <input type="number" min="1" step="1" class="booklet-order-input" data-id="${b.id}" value="${sortVal}" placeholder="1" style="width:48px;padding:3px;border:1px solid #cde4ff;border-radius:4px;text-align:center;font-size:12px;" ${isLinked ? '' : 'disabled'}>
+            <button type="button" class="quick-edit-inner-btn" data-id="${b.id}" style="background:#e3f2fd;color:#1976d2;border:none;border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;font-weight:bold;" title="تعديل تفاصيل الملزمة">✏️</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (countBadge) countBadge.textContent = `${linkedCount} ملزمة مرتبطة`;
+
+    container.querySelectorAll('.booklet-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const row = cb.closest('.booklet-item-row');
+        const orderInput = row.querySelector('.booklet-order-input');
+        if (cb.checked) {
+          orderInput.disabled = false;
+          if (!orderInput.value) {
+            const currentOrders = Array.from(container.querySelectorAll('.booklet-order-input:not([disabled])'))
+              .map(inp => parseInt(inp.value) || 0);
+            const maxOrder = currentOrders.length ? Math.max(...currentOrders) : 0;
+            orderInput.value = maxOrder + 1;
+          }
+          row.style.borderColor = '#64b5f6';
+          row.style.background = '#f0f9ff';
+        } else {
+          orderInput.disabled = true;
+          row.style.borderColor = '#e0e0e0';
+          row.style.background = '#fff';
+        }
+        const activeCount = container.querySelectorAll('.booklet-check:checked').length;
+        if (countBadge) countBadge.textContent = `${activeCount} ملزمة مرتبطة`;
+      });
+    });
+
+    container.querySelectorAll('.quick-edit-inner-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const bId = btn.getAttribute('data-id');
+        modal.remove();
+        editSubscription(bId);
+      });
+    });
+  };
+
+  if (sub.type === 'ملازم') {
+    renderParentLinkedBooklets(sub.grade);
+  }
+
   editGradeField?.addEventListener('change', () => {
-    updateLinkedParentOptions(editParentSelect, editGradeField.value, '', id);
+    const selectedGrade = editGradeField.value;
+    if (sub.type === 'ملازم') {
+      renderParentLinkedBooklets(selectedGrade);
+    }
+    if (sub.type === 'ملازم فردية') {
+      renderEditLinkedParents(selectedGrade);
+    }
   });
+
   document.getElementById('cancel-edit-sub').onclick = () => modal.remove();
+
   document.getElementById('zero-booklet-stock')?.addEventListener('click', () => {
     if (!window.confirm('هل تريد تصفير مخزون هذه الملزمة؟ سيتم تسجيل الحركة في سجل المخزون.')) return;
     const stockInput = document.getElementById('edit-stock');
-    stockInput.value = '0';
+    if (stockInput) stockInput.value = '0';
     document.getElementById('save-edit-sub').click();
   });
+
   document.getElementById('save-edit-sub').onclick = async () => {
-    const newName = document.getElementById('edit-name').value;
+    const newName = document.getElementById('edit-name').value.trim();
     const newType = document.getElementById('edit-type').value;
     const newGrade = document.getElementById('edit-grade').value;
     const newPrice = parseFloat(document.getElementById('edit-price').value);
     const newStock = parseInt(document.getElementById('edit-stock')?.value ?? sub.stock ?? 0) || 0;
     const newOnlineCards = parseInt(document.getElementById('edit-online-cards').value) || 0;
-    const newLinkedSubscription = document.getElementById('edit-linked-subscription')?.value || '';
     const newSortOrder = Number(document.getElementById('edit-sort-order')?.value);
-    if (!newName || !newType || !newGrade || !newPrice) {
-      window.showNotification('يرجى ملء كل الحقول', 'error');
+
+    if (!newName || !newType || !newGrade || isNaN(newPrice)) {
+      window.showNotification('يرجى ملء كل الحقول الأساسية', 'error');
       return;
     }
-    if (newType === 'ملازم فردية' && !newLinkedSubscription) {
-      window.showNotification('اختر الاشتراك الأب المرتبط بالملزمة', 'error');
-      return;
+
+    let selectedParentsForIndividualNote = [];
+    if (newType === 'ملازم فردية') {
+      selectedParentsForIndividualNote = Array.from(document.querySelectorAll('#edit-linked-parents-checklist .parent-link-cb:checked')).map(cb => cb.value);
+      if (!selectedParentsForIndividualNote.length) {
+        window.showNotification('اختر على الأقل باقة اشتراك واحدة مرتبطة بهذه الملزمة', 'error');
+        return;
+      }
+      if (!Number.isInteger(newSortOrder) || newSortOrder < 1) {
+        window.showNotification('أدخل ترتيبًا صحيحًا للملزمة يبدأ من 1', 'error');
+        return;
+      }
     }
-    if (newType === 'ملازم فردية' && (!Number.isInteger(newSortOrder) || newSortOrder < 1)) {
-      window.showNotification('أدخل ترتيبًا صحيحًا للملزمة يبدأ من 1', 'error');
-      return;
+
+    const bookletUpdates = [];
+    if (newType === 'ملازم') {
+      const container = document.getElementById('parent-linked-booklets-list');
+      const bookletRows = container?.querySelectorAll('.booklet-item-row') || [];
+      bookletRows.forEach(row => {
+        const bId = row.getAttribute('data-id');
+        const isChecked = row.querySelector('.booklet-check')?.checked;
+        const orderVal = parseInt(row.querySelector('.booklet-order-input')?.value) || 1;
+        const originalBooklet = subscriptionRecords.find(s => s.id === bId);
+        if (!originalBooklet) return;
+
+        let currentSubs = getNoteLinkedSubscriptions(originalBooklet);
+        let currentOrders = (originalBooklet.sortOrders && typeof originalBooklet.sortOrders === 'object')
+          ? { ...originalBooklet.sortOrders }
+          : {};
+
+        // في حال تم تغيير اسم باقة الاشتراك
+        if (newName !== sub.name) {
+          currentSubs = currentSubs.filter(s => normalizeName(s) !== normalizeName(sub.name));
+          if (currentOrders[sub.name]) {
+            currentOrders[newName] = currentOrders[sub.name];
+            delete currentOrders[sub.name];
+          }
+        }
+
+        if (isChecked) {
+          if (!currentSubs.some(s => normalizeName(s) === normalizeName(newName))) {
+            currentSubs.push(newName);
+          }
+          currentOrders[newName] = orderVal;
+        } else {
+          currentSubs = currentSubs.filter(s =>
+            normalizeName(s) !== normalizeName(newName) && normalizeName(s) !== normalizeName(sub.name)
+          );
+          delete currentOrders[newName];
+          delete currentOrders[sub.name];
+        }
+
+        bookletUpdates.push({
+          id: bId,
+          linkedSubscriptions: currentSubs,
+          linkedSubscription: currentSubs.join(', '),
+          sortOrders: currentOrders,
+          sortOrder: currentOrders[newName] || originalBooklet.sortOrder || null
+        });
+      });
+
+      // في حال تم تغيير اسم الاشتراك الأب، نضمن تحديث أي ملزمة أخرى كانت مرتبطة به
+      if (newName !== sub.name) {
+        subscriptionRecords.forEach(s => {
+          if (s.type === 'ملازم فردية' && isNoteLinkedToParent(s, sub.name)) {
+            if (!bookletUpdates.some(u => u.id === s.id)) {
+              let updatedSubs = getNoteLinkedSubscriptions(s)
+                .map(item => normalizeName(item) === normalizeName(sub.name) ? newName : item);
+              let updatedOrders = (s.sortOrders && typeof s.sortOrders === 'object') ? { ...s.sortOrders } : {};
+              if (updatedOrders[sub.name]) {
+                updatedOrders[newName] = updatedOrders[sub.name];
+                delete updatedOrders[sub.name];
+              }
+              bookletUpdates.push({
+                id: s.id,
+                linkedSubscriptions: updatedSubs,
+                linkedSubscription: updatedSubs.join(', '),
+                sortOrders: updatedOrders,
+                sortOrder: s.sortOrder || null
+              });
+            }
+          }
+        });
+      }
     }
+
     try {
       const subscriptionRef = doc(db, 'subscriptions', id);
-      const movementRef = doc(collection(db, 'stockMovements'));
+      const movementRef = ['ملازم', 'ملازم فردية'].includes(newType) ? doc(collection(db, 'stockMovements')) : null;
       const currentUser = auth.currentUser;
       const recordedBy = String(
         localStorage.getItem('currentUsername') ||
@@ -550,23 +840,50 @@ window.editSubscription = async (id) => {
         'مستخدم'
       );
       const recordedAt = Timestamp.now();
+
       await runTransaction(db, async transaction => {
         const currentSnapshot = await transaction.get(subscriptionRef);
         if (!currentSnapshot.exists()) throw new Error('الاشتراك غير موجود');
         const currentStock = Number(currentSnapshot.data().stock) || 0;
+
+        let updatedSortOrders = (sub.sortOrders && typeof sub.sortOrders === 'object') ? { ...sub.sortOrders } : {};
+        if (newType === 'ملازم فردية') {
+          selectedParentsForIndividualNote.forEach(p => {
+            if (!updatedSortOrders[p]) updatedSortOrders[p] = newSortOrder || 1;
+          });
+          Object.keys(updatedSortOrders).forEach(k => {
+            if (!selectedParentsForIndividualNote.some(p => normalizeName(p) === normalizeName(k))) {
+              delete updatedSortOrders[k];
+            }
+          });
+        }
+
         const updatedSubscription = {
           name: newName,
           type: newType,
           grade: newGrade,
           price: newPrice,
           onlineCardsCount: newOnlineCards,
-          linkedSubscription: newType === 'ملازم فردية' ? newLinkedSubscription : '',
+          linkedSubscriptions: newType === 'ملازم فردية' ? selectedParentsForIndividualNote : [],
+          linkedSubscription: newType === 'ملازم فردية' ? selectedParentsForIndividualNote.join(', ') : '',
+          sortOrders: newType === 'ملازم فردية' ? updatedSortOrders : {},
           sortOrder: newType === 'ملازم فردية' ? newSortOrder : null
         };
         if (['ملازم', 'ملازم فردية'].includes(newType)) updatedSubscription.stock = newStock;
         transaction.update(subscriptionRef, updatedSubscription);
 
-        if (['ملازم', 'ملازم فردية'].includes(newType) && currentStock !== newStock) {
+        // تحديث الملازم التابعة ذرّياً في نفس العملية مع الحفاظ على باقي ارتباطاتها
+        for (const update of bookletUpdates) {
+          const bRef = doc(db, 'subscriptions', update.id);
+          transaction.update(bRef, {
+            linkedSubscriptions: update.linkedSubscriptions,
+            linkedSubscription: update.linkedSubscription,
+            sortOrders: update.sortOrders,
+            sortOrder: update.sortOrder
+          });
+        }
+
+        if (['ملازم', 'ملازم فردية'].includes(newType) && movementRef && currentStock !== newStock) {
           transaction.set(movementRef, {
             type: 'booklet_adjustment',
             subscriptionId: id,
@@ -586,8 +903,9 @@ window.editSubscription = async (id) => {
       window.showNotification('تعذر حفظ التعديلات. تحقق من الاتصال ثم حاول مرة أخرى.', 'error');
       return;
     }
+
     modal.remove();
-    window.showNotification('تم حفظ التعديلات بنجاح', 'success');
+    window.showNotification('تم حفظ التعديلات والملازم المرتبطة بنجاح', 'success');
     loadSubscriptions();
   };
 };

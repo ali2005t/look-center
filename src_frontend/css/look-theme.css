@@ -95,9 +95,13 @@ body.sidebar-collapsed .daily-closing-content {
     right: 0;
     transform: translateX(0);
     width: min(290px, 82vw);
-    height: calc(100% - 68px);
+    height: calc(100vh - 68px);
+    max-height: calc(100vh - 68px);
     top: 68px !important;
+    bottom: 0;
     z-index: 300;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
   }
 
   body.sidebar-open::after {

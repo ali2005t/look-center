@@ -1,6 +1,6 @@
 // js/invoices.js
 import { db } from "./firebase.js";
-import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, addDoc, runTransaction, Timestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, setDoc, runTransaction, Timestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { collection as collection2, getDocs as getDocs2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc as doc2, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -67,11 +67,13 @@ function getLinkedNotesForInvoice(invoice, subscriptionDocs) {
   return subscriptionDocs
     .filter(docSnap => {
       const note = docSnap.data();
-      const linkedReference = normalizeSubscriptionReference(note.linkedSubscription);
+      const noteLinkedSubs = Array.isArray(note.linkedSubscriptions) && note.linkedSubscriptions.length
+        ? note.linkedSubscriptions
+        : String(note.linkedSubscription || '').split(',').map(s => s.trim()).filter(Boolean);
       const noteGrade = normalizeGrade(note.grade);
       return String(note.type || '').trim() === 'ملازم فردية'
         && (!invoiceGrade || !noteGrade || noteGrade === invoiceGrade)
-        && parentReferences.has(linkedReference);
+        && noteLinkedSubs.some(s => parentReferences.has(normalizeSubscriptionReference(s)));
     })
     .map(docSnap => {
       const note = docSnap.data();
@@ -128,6 +130,7 @@ async function loadInvoices() {
     realtimeStarted = true;
     onSnapshot(collection(db, 'invoices'), () => loadInvoices());
     onSnapshot(collection(db, 'studentRegistrations'), () => loadInvoices());
+    onSnapshot(collection(db, 'vipRegistrations'), () => loadInvoices());
     onSnapshot(collection(db, 'users'), () => loadInvoices());
   }
 
@@ -138,7 +141,11 @@ async function loadInvoices() {
       getDocs(collection(db, "invoices")),
       getDocs(collection(db, "studentRegistrations")),
       getDocs(collection(db, "users")),
-      getDocs(collection(db, "subscriptions"))
+      getDocs(collection(db, "subscriptions")),
+      getDocs(collection(db, "vipRegistrations")).catch(error => {
+        console.warn('Could not read VIP registration invoice numbers:', error);
+        return { docs: [] };
+      })
     ]);
   } catch (error) {
     console.error('Could not load invoices:', error);
@@ -148,7 +155,7 @@ async function loadInvoices() {
     return;
   }
   if (requestId !== loadRequestId) return;
-  const [snapshot, portalSnapshot, usersSnapshot, subscriptionsSnapshot] = snapshots;
+  const [snapshot, portalSnapshot, usersSnapshot, subscriptionsSnapshot, vipRegistrationsSnapshot] = snapshots;
   const subscriptionDocs = subscriptionsSnapshot.docs;
   const userNames = new Map();
   usersSnapshot.forEach(userDoc => {
@@ -176,11 +183,17 @@ async function loadInvoices() {
       id: docSnap.id,
       num: inv.num ?? num,
       isVip: inv.isVip === true,
+      vipIsFree: inv.vipIsFree === true,
+      vipFinalPrice: inv.vipFinalPrice,
+      vipRegistrationId: inv.vipRegistrationId || '',
+      paidAmount: Number(inv.paidAmount ?? 0),
+      amountCollected: Number(inv.amountCollected ?? inv.paidAmount ?? 0),
       student: inv.student || '-',
       phone: inv.phone || '',
       subType: type,
       items: inv.items || [],
       payment: inv.payment || '-',
+      installment: inv.installment || null,
       studyType: inv.studyType || '-',
       grade: inv.grade || '-',
       date: inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-',
@@ -196,6 +209,59 @@ async function loadInvoices() {
   });
 
   // عرض تسجيلات الطلاب القادمة من QR بجانب فواتير الطلاب المشتركين.
+  portalSnapshot.docs.forEach(docSnap => {
+    highestInvoiceNumber = Math.max(highestInvoiceNumber, Number(docSnap.data().invoiceNumber) || 0);
+  });
+  vipRegistrationsSnapshot.docs.forEach(docSnap => {
+    highestInvoiceNumber = Math.max(highestInvoiceNumber, Number(docSnap.data().invoiceNumber) || 0);
+  });
+  const linkedVipRegistrationIds = new Set(snapshot.docs.map(docSnap => docSnap.data().vipRegistrationId).filter(Boolean));
+  vipRegistrationsSnapshot.docs.forEach(docSnap => {
+    const registration = docSnap.data();
+    const hasLinkedInvoice = linkedVipRegistrationIds.has(docSnap.id)
+      || (registration.invoiceId && snapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId));
+    if (registration.paymentStatus !== 'paid' || hasLinkedInvoice) return;
+    const subscriptions = Array.isArray(registration.selectedSubscriptions) ? registration.selectedSubscriptions : [];
+    const totalSourcePrice = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
+    const subscriptionAmount = Number(registration.subscriptionAmount ?? registration.requestedAmount ?? registration.paidAmount ?? 0);
+    let allocated = 0;
+    const items = subscriptions.map((item, index) => {
+      const price = index === subscriptions.length - 1
+        ? Number((subscriptionAmount - allocated).toFixed(2))
+        : totalSourcePrice > 0 ? Number((subscriptionAmount * Number(item.price || 0) / totalSourcePrice).toFixed(2)) : 0;
+      allocated += price;
+      return { ...item, price };
+    });
+    allInvoices.push({
+      id: docSnap.id,
+      isVip: true,
+      isVipRegistration: true,
+      vipIsFree: subscriptionAmount === 0,
+      vipFinalPrice: subscriptionAmount,
+      num: registration.invoiceNumber || `VIP-${docSnap.id.slice(-6)}`,
+      student: registration.studentName || '-',
+      phone: registration.phone || '',
+      subType: classifyPortalSubscriptions(subscriptions),
+      items,
+      selectedSubscriptions: subscriptions,
+      payment: registration.paymentMethod || (Number(registration.amountCollected ?? registration.paidAmount ?? 0) === 0 ? 'Ù…Ø¬Ø§Ù†ÙŠ' : 'Ù†Ù‚Ø¯ÙŠ'),
+      paymentStatus: 'paid',
+      paidAmount: Number(registration.amountCollected ?? registration.paidAmount ?? 0),
+      amountCollected: Number(registration.amountCollected ?? registration.paidAmount ?? 0),
+      studyType: registration.studyType || '-',
+      grade: registration.grade || '-',
+      date: (registration.paidAt || registration.registeredAt)?.toDate
+        ? (registration.paidAt || registration.registeredAt).toDate().toLocaleDateString('ar-EG')
+        : (registration.paidAt || registration.registeredAt || '-'),
+      status: 'VIP',
+      recipient: registration.teacherName || '-',
+      notes: registration.notes || 'VIP QR',
+      linkedSubTypes: [],
+      indivNotes: registration.indivNotes || [],
+      linkedNotes: [],
+      onlineCardsDelivery: registration.onlineCardsDelivery || []
+    });
+  });
   let nextPortalInvoiceNumber = highestInvoiceNumber + 1;
   portalSnapshot.forEach(docSnap => {
     const registration = docSnap.data();
@@ -237,6 +303,7 @@ async function loadInvoices() {
   renderInvoicesTable();
 }
 
+
 // عرض الفواتير في الجدول
 function renderInvoicesTable() {
   tableBody.innerHTML = '';
@@ -265,9 +332,9 @@ function renderInvoicesTable() {
     let recipientCell = `<span class="recipient-cell" style="display:inline-block;padding:4px 12px;border-radius:8px;background:linear-gradient(90deg,#e3f2fd 60%,#bbdefb 100%);color:#1976d2;font-weight:bold;font-size:1em;box-shadow:0 1px 4px #90caf922;">${inv.recipient && inv.recipient !== '-' ? inv.recipient : '<span style=\'color:#b3b3b3\'>غير محدد</span>'}</span>`;
     const tr = document.createElement("tr");
     if (inv.isPortalRegistration) tr.className = 'portal-registration-row';
-    let actions = `<button class='open-invoice-btn' data-id='${inv.id}' data-portal='${inv.isPortalRegistration ? 'true' : 'false'}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>فتح</button>`;
+    let actions = `<button class='open-invoice-btn' data-id='${inv.id}' data-portal='${inv.isPortalRegistration ? 'true' : 'false'}' data-vip-registration='${inv.isVipRegistration ? 'true' : 'false'}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>فتح</button>`;
     if (inv.isPortalRegistration) {
-      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus !== 'paid' ? 'selected' : ''}>لم يدفع</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
+      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus !== 'paid' ? 'selected' : ''} ${inv.paymentStatus === 'paid' ? 'disabled' : ''}>لم يدفع</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
     }
     if (canDeleteInvoice) {
       actions += `<button class='delete-invoice-btn' data-id='${inv.id}' style='background:#f44336;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;'>حذف</button>`;
@@ -298,7 +365,7 @@ function renderInvoicesTable() {
       <td class="type-cell">${inv.subType}</td>
       <td>${inv.grade}</td>
       <td class="amount-cell">${inv.isPortalRegistration ? `${inv.paymentStatus === 'paid' ? inv.paidAmount : inv.requestedAmount} ج` : `${inv.isVip ? (inv.vipFinalPrice ?? (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)) : (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)} ج`}</td>
-      <td>${inv.isPortalRegistration ? `<strong class="portal-status ${inv.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${inv.payment}</strong>` : inv.payment}</td>
+      <td>${inv.isPortalRegistration ? `<strong class="portal-status ${inv.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${inv.payment}</strong>` : inv.isVip ? `<strong class="portal-status paid">${inv.vipIsFree ? '\u0645\u062c\u0627\u0646\u064a - \u0645\u0643\u062a\u0645\u0644' : inv.payment === '\u062a\u0642\u0633\u064a\u0637' ? '\u062a\u0642\u0633\u064a\u0637 - \u0627\u0644\u0645\u062a\u0628\u0642\u064a ' + Number(inv.installment?.remaining || 0).toLocaleString('ar-EG') + ' \u062c' : '\u0645\u062f\u0641\u0648\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644'}</strong>` : inv.payment}</td>
       <td>${inv.studyType}</td>
       <td>${inv.date}</td>
       <td>${inv.isPortalRegistration ? (inv.notes && String(inv.notes).trim() ? `${inv.notes} — من الموقع` : 'تسجيل من الموقع') : (inv.notes || 'لا توجد')}</td>
@@ -312,7 +379,7 @@ function renderInvoicesTable() {
   // إعادة ربط الأحداث
   document.querySelectorAll('.open-invoice-btn').forEach(btn => {
     btn.onclick = () => {
-      showInvoiceModal(btn.getAttribute('data-id'), btn.dataset.portal === 'true');
+      showInvoiceModal(btn.getAttribute('data-id'), btn.dataset.portal === 'true', btn.dataset.vipRegistration === 'true');
       showNotification('تم فتح تفاصيل الفاتورة', 'info');
     };
   });
@@ -320,7 +387,7 @@ function renderInvoicesTable() {
     btn.onclick = async () => {
       const id = btn.getAttribute('data-id');
       const invoice = allInvoices.find(item => item.id === id);
-      const targetCollection = invoice && invoice.isPortalRegistration ? 'studentRegistrations' : 'invoices';
+      const targetCollection = invoice?.isVipRegistration ? 'vipRegistrations' : invoice?.isPortalRegistration ? 'studentRegistrations' : 'invoices';
       // نافذة تأكيد عصرية بنفس هوية الإشعارات
       const old = document.getElementById('custom-confirm');
       if (old) old.remove();
@@ -370,6 +437,10 @@ function renderInvoicesTable() {
     select.addEventListener('change', async () => {
       const status = select.value;
       const registration = allInvoices.find(item => item.id === select.dataset.id && item.isPortalRegistration);
+      if (status !== 'paid') {
+        select.value = select.dataset.previous;
+        return;
+      }
       const amount = status === 'paid'
         ? Number(registration?.requestedAmount || registration?.paidAmount || 0)
         : 0;
@@ -388,25 +459,33 @@ function renderInvoicesTable() {
       }
       try {
         select.disabled = true;
-        await updateDoc(doc(db, 'studentRegistrations', select.dataset.id), {
-          paymentStatus: status,
-          paidAmount: status === 'paid' ? amount : 0,
-          payment: status === 'paid' ? paymentMethod : 'لم يدفع',
-          paymentMethod: status === 'paid' ? paymentMethod : null,
-          paidAt: status === 'paid' ? Timestamp.now() : null
-        });
-        if (status === 'paid') {
-          await addDoc(collection(db, 'studentPortalPayments'), {
+        const registrationRef = doc(db, 'studentRegistrations', select.dataset.id);
+        const paymentRef = doc(db, 'studentPortalPayments', select.dataset.id);
+        const paidAt = Timestamp.now();
+        await runTransaction(db, async transaction => {
+          const currentSnapshot = await transaction.get(registrationRef);
+          if (!currentSnapshot.exists()) throw new Error('التسجيل لم يعد موجودًا. حدّث الصفحة وحاول مرة أخرى.');
+          const current = currentSnapshot.data();
+          if (current.paymentStatus === 'paid') throw new Error('تم اعتماد هذا التسجيل كمدفوع بالفعل.');
+          transaction.update(registrationRef, {
+            paymentStatus: 'paid',
+            paidAmount: amount,
+            payment: paymentMethod,
+            paymentMethod,
+            paidAt
+          });
+          transaction.set(paymentRef, {
             registrationId: select.dataset.id,
+            invoiceNumber: registration?.num || null,
             agentId: registration?.agentId || registration?.recipient || '-',
             studentName: registration?.student || '-',
             amount,
             payment: paymentMethod,
             paymentMethod,
-            paidAt: Timestamp.now(),
+            paidAt,
             source: 'invoices-page'
           });
-        }
+        });
         window.showNotification('تم تحديث حالة الدفع', 'success');
         await loadInvoices();
       } catch (error) {
@@ -426,7 +505,7 @@ function choosePaymentMethod(currentMethod = 'نقدي') {
     const overlay = document.createElement('div');
     overlay.id = 'payment-method-picker';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:10000;';
-    overlay.innerHTML = `<div style="background:#fff;width:min(360px,90vw);padding:24px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);text-align:center;direction:rtl;"><h3 style="margin:0 0 18px;color:#1976d2;">اختار طريقة الدفع</h3><div style="display:grid;gap:10px;"><button data-method="نقدي" style="padding:11px;border:0;border-radius:7px;background:#2e7d32;color:#fff;font-weight:bold;cursor:pointer;">نقدي</button><button data-method="محفظة" style="padding:11px;border:0;border-radius:7px;background:#1976d2;color:#fff;font-weight:bold;cursor:pointer;">محفظة</button><button data-method="تقسيط" style="padding:11px;border:0;border-radius:7px;background:#ef6c00;color:#fff;font-weight:bold;cursor:pointer;">تقسيط</button><button data-method="cancel" style="padding:8px;border:1px solid #aaa;border-radius:7px;background:#fff;color:#555;cursor:pointer;">إلغاء</button></div></div>`;
+    overlay.innerHTML = `<div style="background:#fff;width:min(360px,90vw);padding:24px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);text-align:center;direction:rtl;"><h3 style="margin:0 0 18px;color:#1976d2;">طريقة الدفع التي استلمها البرنامج</h3><div style="display:grid;gap:10px;"><button data-method="نقدي" style="padding:11px;border:0;border-radius:7px;background:#2e7d32;color:#fff;font-weight:bold;cursor:pointer;">نقدي</button><button data-method="فودافون كاش" style="padding:11px;border:0;border-radius:7px;background:#c62828;color:#fff;font-weight:bold;cursor:pointer;">فودافون كاش</button><button data-method="تقسيط" style="padding:11px;border:0;border-radius:7px;background:#ef6c00;color:#fff;font-weight:bold;cursor:pointer;">تقسيط</button><button data-method="cancel" style="padding:8px;border:1px solid #aaa;border-radius:7px;background:#fff;color:#555;cursor:pointer;">إلغاء</button></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelectorAll('[data-method]').forEach(button => {
       button.onclick = () => {
@@ -486,9 +565,10 @@ function filterInvoices() {
 }
 
 // عرض نافذة تفاصيل الفاتورة
-async function showInvoiceModal(id, isPortalRegistration = false) {
+async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistration = false) {
   // جلب الفاتورة مباشرة من قاعدة البيانات لضمان تحديث البيانات
-  const invDoc = await getDoc(doc(db, isPortalRegistration ? "studentRegistrations" : "invoices", id));
+  const sourceCollection = isVipRegistration ? 'vipRegistrations' : isPortalRegistration ? 'studentRegistrations' : 'invoices';
+  const invDoc = await getDoc(doc(db, sourceCollection, id));
   if (!invDoc.exists()) return alert("لم يتم العثور على الفاتورة!");
   const inv = invDoc.data();
   if (isPortalRegistration) {
@@ -519,6 +599,25 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
     inv.recipient = inv.recipient || inv.agentId || currentRecipient || '-';
   }
   // إصلاح تعريف isNotesSubscription
+  if (isVipRegistration) {
+    const subscriptions = Array.isArray(inv.selectedSubscriptions) ? inv.selectedSubscriptions : [];
+    inv.student = inv.studentName || "-";
+    inv.subType = classifyPortalSubscriptions(subscriptions);
+    const displayTotal = Number(inv.subscriptionAmount ?? inv.requestedAmount ?? inv.paidAmount ?? 0);
+    const sourceTotal = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
+    let assigned = 0;
+    inv.items = subscriptions.map((item, index) => {
+      const price = index === subscriptions.length - 1 ? Number((displayTotal - assigned).toFixed(2)) : sourceTotal > 0 ? Number((displayTotal * Number(item.price || 0) / sourceTotal).toFixed(2)) : 0;
+      assigned += price;
+      return { ...item, price };
+    });
+    inv.payment = inv.payment === '\u062a\u0642\u0633\u064a\u0637' ? '\u062a\u0642\u0633\u064a\u0637' : (inv.paymentMethod || (Number(inv.amountCollected ?? inv.paidAmount ?? 0) === 0 ? "VIP free" : "VIP paid"));
+    inv.num = inv.invoiceNumber || "-";
+    inv.date = inv.paidAt || inv.registeredAt || "-";
+    inv.recipient = inv.teacherName || "-";
+    inv.isVip = true;
+    inv.vipIsFree = displayTotal === 0;
+  }
   const isNotesSubscription = inv.subType && (inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم' || inv.subType === 'ملازم وكورسات');
 
   // Load only individual notes linked to the selected subscription.
@@ -531,7 +630,7 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
     }
     if (allNotesList.length > 0) {
       try {
-        await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { indivNotes: allNotesList });
+        await updateDoc(doc(db, sourceCollection, id), { indivNotes: allNotesList });
       } catch (e) { console.warn('Could not save indivNotes:', e); }
     }
   }
@@ -614,7 +713,7 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
       inv.onlineCardsDelivery = autoCards;
       // حفظها في الفاتورة مستقبلاً
       try {
-        await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { onlineCardsDelivery: autoCards });
+        await updateDoc(doc(db, sourceCollection, id), { onlineCardsDelivery: autoCards });
       } catch (e) { console.warn('Could not auto-save onlineCardsDelivery:', e); }
     }
   }
@@ -801,7 +900,7 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
     const payment = await choosePaymentMethod(inv.payment || 'نقدي');
     if (!payment) return;
     try {
-      const targetCollection = isPortalRegistration ? 'studentRegistrations' : 'invoices';
+      const targetCollection = sourceCollection;
       const paymentData = isPortalRegistration
         ? { paymentMethod: payment, payment: payment, paymentStatus: 'paid' }
         : { payment };
@@ -941,7 +1040,7 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
         const cardInfo = onlineCardsArr[idx];
         const isDelivered = cb.checked;
         const cardId = cardInfo.cardId || cardInfo.id;
-        const invoiceRef = doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id);
+        const invoiceRef = doc(db, sourceCollection, id);
         const cardRef = cardId ? doc(db, 'onlineCards', cardId) : null;
         const deliveryInvoiceItems = isPortalRegistration
           ? ([inv.selectedSubscriptions, inv.subscriptions, inv.selectedItems].find(items => Array.isArray(items) && items.length) || [])
@@ -991,19 +1090,42 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
       cb.disabled = false;
       cb.addEventListener('change', async function () {
         const idx = +cb.getAttribute('data-idx');
+        const note = allNotesList[idx];
+        if (!note) return;
         const delivered = cb.checked;
-        allNotesList[idx].delivered = cb.checked;
         cb.disabled = true;
         try {
-          await updateDoc(doc(db, isPortalRegistration ? 'studentRegistrations' : 'invoices', id), { indivNotes: allNotesList });
-          showNotification(delivered ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء الاستلام', 'success');
-          setTimeout(() => showInvoiceModal(id, isPortalRegistration), 200);
+          const invoiceRef = doc(db, sourceCollection, id);
+          const noteRef = note.noteId ? doc(db, 'subscriptions', note.noteId) : null;
+          if (!noteRef) throw new Error('Missing booklet inventory id.');
+          const result = await runTransaction(db, async transaction => {
+            const invoiceSnapshot = await transaction.get(invoiceRef);
+            if (!invoiceSnapshot.exists()) throw new Error('Invoice not found.');
+            const invoiceData = invoiceSnapshot.data();
+            const adjustStockAtDelivery = invoiceData.bookletStockDeducted === false || invoiceData.vipStockDeducted === false;
+            const noteSnapshot = adjustStockAtDelivery ? await transaction.get(noteRef) : null;
+            if (adjustStockAtDelivery && !noteSnapshot.exists()) throw new Error('Booklet inventory record not found.');
+            const notes = Array.isArray(invoiceData.indivNotes) ? [...invoiceData.indivNotes] : [];
+            const noteIndex = notes.findIndex(saved => (saved.noteId || saved.name) === note.noteId || saved.name === note.name);
+            const wasDelivered = noteIndex >= 0 && notes[noteIndex].delivered === true;
+            if (wasDelivered === delivered) return { changed: false, stock: noteSnapshot ? Number(noteSnapshot.data().stock) || 0 : null };
+            const updatedNote = { noteId: note.noteId, name: note.name, delivered };
+            if (noteIndex < 0) notes.push(updatedNote); else notes[noteIndex] = { ...notes[noteIndex], ...updatedNote };
+            const stock = noteSnapshot ? (Number(noteSnapshot.data().stock) || 0) + (delivered ? -1 : 1) : null;
+            transaction.update(invoiceRef, { indivNotes: notes });
+            if (adjustStockAtDelivery) transaction.update(noteRef, { stock });
+            return { changed: true, stock };
+          });
+          note.delivered = delivered;
+          if (!result.changed) return;
+          if (delivered && result.stock < 0) showNotification('\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629\u060c \u0648\u0623\u0635\u0628\u062d \u0627\u0644\u0645\u062e\u0632\u0648\u0646 \u0628\u0627\u0644\u0633\u0627\u0644\u0628 (' + result.stock + ').', 'info');
+          else showNotification(delivered ? (result.stock === null ? '\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629' : '\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629 \u0648\u062e\u0635\u0645 \u0643\u0645\u064a\u062a\u0647\u0627 \u0645\u0646 \u0627\u0644\u0645\u062e\u0632\u0648\u0646') : (result.stock === null ? '\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629' : '\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0633\u0644\u064a\u0645 \u0648\u0625\u0631\u062c\u0627\u0639 \u0643\u0645\u064a\u0629 \u0627\u0644\u0645\u0644\u0632\u0645\u0629 \u0644\u0644\u0645\u062e\u0632\u0648\u0646'), 'success');
+          setTimeout(() => showInvoiceModal(id, isPortalRegistration, isVipRegistration), 200);
         } catch (error) {
-          allNotesList[idx].delivered = !delivered;
           cb.checked = !delivered;
-          cb.closest('.indiv-note-box')?.querySelector('.indiv-note-delivered-status')?.replaceChildren(document.createTextNode(!delivered ? 'تم الاستلام' : 'لم يستلم'));
-          showNotification('تعذر حفظ حالة استلام الملزمة. تحقق من الاتصال والصلاحيات.', 'error');
-          console.error('Could not update linked note delivery status:', error);
+          cb.closest('.indiv-note-box')?.querySelector('.indiv-note-delivered-status')?.replaceChildren(document.createTextNode(!delivered ? '\u062a\u0645 \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645' : '\u0644\u0645 \u064a\u0633\u062a\u0644\u0645'));
+          showNotification('\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u062d\u0627\u0644\u0629 \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.', 'error');
+          console.error('Could not update booklet delivery and stock:', error);
         } finally {
           cb.disabled = false;
         }
@@ -1011,7 +1133,6 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
     });
   }
 
-  // إغلاق
   document.getElementById('close-invoice-modal').onclick = () => {
     modal.classList.remove('active');
     modal.style.display = 'none';
@@ -1257,17 +1378,37 @@ async function showInvoiceModal(id, isPortalRegistration = false) {
       };
 
       document.getElementById('confirm-yes').onclick = async () => {
-        const newPaidAmount = parseInt(document.getElementById('confirm-paid-amount').value) || remainingAmount;
+        const rawNewPaidAmount = document.getElementById('confirm-paid-amount').value;
+        const newPaidAmount = rawNewPaidAmount === '' ? NaN : Number(rawNewPaidAmount);
+        if (!Number.isFinite(newPaidAmount) || newPaidAmount <= 0 || newPaidAmount > remainingAmount) {
+          showNotification('\u0623\u062f\u062e\u0644 \u0642\u0633\u0637\u064b\u0627 \u0635\u0627\u0644\u062d\u064b\u0627 \u0644\u0627 \u064a\u062a\u062c\u0627\u0648\u0632 \u0627\u0644\u0645\u062a\u0628\u0642\u064a.', 'error');
+          return;
+        }
         const newRemainingAmount = totalAmount - (paidAmount + newPaidAmount);
 
         // تحديث الفاتورة
-        await updateDoc(doc(db, 'invoices', id), {
-          payment: newRemainingAmount <= 0 ? 'مدفوع كامل' : 'تقسيط',
-          installment: {
-            total: totalAmount,
-            paid: paidAmount + newPaidAmount,
-            remaining: Math.max(0, newRemainingAmount)
-          }
+        const updatedInstallment = {
+          total: totalAmount,
+          paid: paidAmount + newPaidAmount,
+          remaining: Math.max(0, newRemainingAmount)
+        };
+        const invoiceRef = doc(db, 'invoices', id);
+        const registrationId = inv.vipRegistrationId;
+        await runTransaction(db, async transaction => {
+          const invoiceSnapshot = await transaction.get(invoiceRef);
+          const registrationRef = registrationId ? doc(db, 'vipRegistrations', registrationId) : null;
+          const registrationSnapshot = registrationRef ? await transaction.get(registrationRef) : null;
+          if (!invoiceSnapshot.exists()) throw new Error('Invoice not found.');
+          if (registrationRef && !registrationSnapshot.exists()) throw new Error('VIP registration not found.');
+          const totalCollected = updatedInstallment.paid;
+          transaction.update(invoiceRef, {
+            payment: updatedInstallment.remaining <= 0 ? '\u0645\u062f\u0641\u0648\u0639 \u0643\u0627\u0645\u0644' : '\u062a\u0642\u0633\u064a\u0637',
+            paymentStatus: 'paid', installment: updatedInstallment, paidAmount: totalCollected, amountCollected: totalCollected
+          });
+          if (registrationRef) transaction.update(registrationRef, {
+            paymentStatus: 'paid', installment: updatedInstallment, paidAmount: totalCollected, amountCollected: totalCollected,
+            subscriptionAmount: totalAmount
+          });
         });
 
         overlay.remove();

@@ -136,6 +136,7 @@ async function loadReports() {
   };
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
+    if (inv.isVip === true) return;
     if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) return;
     // تطبيع اسم الفرقة
     const grade = normalizeGrade(inv.grade);
@@ -429,6 +430,7 @@ async function loadReports() {
   allInvoices = [];
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
+    if (inv.isVip === true) return;
     if (!filterInvoiceByDate(inv, period, dateVal, monthVal, yearVal, startDateVal, endDateVal)) return;
     allInvoices.push(inv);
     invoiceCount++;

@@ -1,5 +1,5 @@
 import { auth } from "./firebase.js";
-import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const form = document.getElementById("login-form");
 const errorMessage = document.getElementById("error-message");
@@ -25,6 +25,7 @@ form.addEventListener("submit", async (e) => {
   const rememberMe = document.getElementById("remember-me").checked;
 
   try {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
     await signInWithEmailAndPassword(auth, email, password);
     const signedInUsername = usernameInput.value.trim() || email.replace(/@lookcenter\.com$/i, '');
     localStorage.setItem('currentUsername', signedInUsername);
@@ -39,9 +40,10 @@ form.addEventListener("submit", async (e) => {
     const db = getFirestore();
     const usersSnap = await getDocs(collection(db, "users"));
     let userDoc = null;
+    let userDocId = null;
     usersSnap.forEach(docSnap => {
       const u = docSnap.data();
-      if (u.email === email) userDoc = u;
+      if (u.email === email) { userDoc = u; userDocId = docSnap.id; }
     });
     if (!userDoc || !Array.isArray(userDoc.permissions)) {
       await signOut(auth);
@@ -80,6 +82,7 @@ form.addEventListener("submit", async (e) => {
 
     localStorage.setItem('userPermissions', JSON.stringify(permissions));
     localStorage.setItem('userType', userDoc.type || '');
+    if (userDocId) localStorage.setItem('currentUserId', userDocId);
     window.location.href = pageMap[firstAllowedPage];
   } catch (error) {
     console.error('Login failed:', error);

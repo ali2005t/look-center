@@ -229,7 +229,9 @@ body {
   position: fixed;
   right: 0;
   top: 92px !important; /* توحيد الهامش بين الهيدر والقائمة الجانبية في جميع الصفحات */
-  height: calc(100% - 70px);
+  bottom: 0;
+  height: calc(100vh - 92px);
+  max-height: calc(100vh - 92px);
   width: 220px;
   background: linear-gradient(135deg, #0a1836 60%, #101c2c 100%);
   box-shadow: 0 2px 16px #1976d244;
@@ -238,10 +240,32 @@ body {
   flex-direction: column;
   font-family: 'Cairo', 'Tajawal', 'Vazirmatn', Arial, sans-serif;
   font-size: 20px;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 234, 255, 0.4) transparent;
 }
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 234, 255, 0.3);
+  border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 234, 255, 0.6);
+}
+
 .sidebar ul {
   list-style: none;
-  padding: 0;
+  padding: 0 0 24px 0;
   margin: 0;
   width: 100%;
 }
@@ -1545,11 +1569,13 @@ button:hover,
   .sidebar {
     position: fixed;
     top: 56px;
+    bottom: 0;
     right: 0;
     left: -100%;
-    width: 65%;
-    max-width: 280px;
-    height: calc(100vh - 56px);
+    width: min(82vw, 320px);
+    max-width: 320px;
+    height: auto;
+    max-height: none;
     z-index: 150;
     display: flex;
     flex-direction: column;

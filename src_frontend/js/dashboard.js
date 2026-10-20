@@ -100,14 +100,25 @@ async function loadDashboardStats() {
   const month = today.getMonth();
   const year = today.getFullYear();
   let todayStudentsCount = 0;
+  const todayStudentKeys = new Set();
   let monthIncome = 0;
   let todayIncome = 0;
   let lastInvoice = null;
   let lastInvoiceDate = null;
 
-  const snapshot = await getDocs(collection(db, "invoices"));
+  const [snapshot, portalRegistrationsSnapshot] = await Promise.all([
+    getDocs(collection(db, "invoices")),
+    getDocs(collection(db, "studentRegistrations"))
+  ]);
+  const addStudentKey = (student, phone) => {
+    const studentName = String(student || '').trim();
+    if (!studentName || studentName === '-') return;
+    const normalizedPhone = String(phone || '').replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).replace(/[^0-9]/g, '');
+    todayStudentKeys.add(normalizedPhone ? `phone:${normalizedPhone}` : `name:${studentName.toLocaleLowerCase()}`);
+  };
   snapshot.forEach(docSnap => {
     const inv = docSnap.data();
+    if (inv.isVip === true) return;
     // تاريخ الفاتورة
     let d = inv.date;
     if (d && typeof d === 'object' && d.toDate) d = d.toDate();
@@ -120,13 +131,8 @@ async function loadDashboardStats() {
     // أرباح اليوم
     if (d.toLocaleDateString('ar-EG') === todayStr) {
       todayIncome += (inv.items||[]).reduce((sum,x)=>sum+(+x.price||0),0);
-      // عدد الطلاب اليوم (فقط الفواتير الجماعية)
-      if (
-        inv.student && inv.student !== '-' && inv.student.trim() !== '' &&
-        (inv.subType === 'كورسات' || inv.subType === 'ملازم')
-      ) {
-        todayStudentsCount++;
-      }
+      // عدّ الطالب مرة واحدة باليوم من جميع فواتير البرنامج العادي، باستخدام الهاتف ثم الاسم.
+      addStudentKey(inv.student, inv.phone);
     }
     // آخر فاتورة
     if (!lastInvoiceDate || d > lastInvoiceDate) {
@@ -134,20 +140,24 @@ async function loadDashboardStats() {
       lastInvoice = inv;
     }
   });
+  portalRegistrationsSnapshot.forEach(registrationDoc => {
+    const registration = registrationDoc.data();
+    if (registration.source !== 'student-portal') return;
+    let registeredAt = registration.registeredAt;
+    if (registeredAt?.toDate) registeredAt = registeredAt.toDate();
+    else if (registeredAt) registeredAt = new Date(registeredAt);
+    if (registeredAt instanceof Date && !Number.isNaN(registeredAt.getTime()) && registeredAt.toLocaleDateString('ar-EG') === todayStr) {
+      addStudentKey(registration.studentName || registration.student, registration.phone);
+    }
+  });
+  todayStudentsCount = todayStudentKeys.size;
   // تحديث DOM
   document.getElementById('today-students').textContent = todayStudentsCount;
   document.getElementById('month-income').textContent = monthIncome + ' ج';
   document.getElementById('today-income').textContent = todayIncome + ' ج';
-  if (lastInvoice) {
-    // إذا كانت آخر فاتورة من نوع كورسات فقط
-    if (lastInvoice.subType === 'كورسات') {
-      document.getElementById('last-bill').textContent = 'كورسات';
-    } else {
-      document.getElementById('last-bill').textContent = '--';
-    }
-  } else {
-    document.getElementById('last-bill').textContent = '--';
-  }
+  document.getElementById('last-bill').textContent = lastInvoice
+    ? (lastInvoice.num || lastInvoice.invoiceNumber ? `#${lastInvoice.num || lastInvoice.invoiceNumber}` : (lastInvoice.subType || '--'))
+    : '--';
 }
 
 window.addEventListener('DOMContentLoaded', loadDashboardStats);

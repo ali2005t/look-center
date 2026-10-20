@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142435">
+  <title>دخول الأستاذ | بوابة VIP</title>
+  <style>
+    :root{font-family:Tahoma,Arial,sans-serif;color:#18304b;background:#f3f7fb;--ink:#142435;--teal:#00c99a;--muted:#65778b}*{box-sizing:border-box}body{min-height:100vh;margin:0;padding:clamp(14px,4vw,36px);display:grid;place-items:center;background:radial-gradient(circle at 15% 10%,#d8f7ef 0,transparent 32%),linear-gradient(145deg,#f3f7fb,#eaf1f8)}.login-shell{width:min(100%,460px)}.brand{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:0 4px}.brand-mark{display:grid;width:48px;height:48px;place-items:center;border-radius:13px;background:var(--ink);color:var(--teal);font-weight:900;letter-spacing:1px;box-shadow:0 5px 14px #14243525}.brand-name{font-size:14px;color:var(--muted)}.brand-name strong{display:block;color:var(--ink);font-size:17px}.login-card{padding:clamp(22px,5vw,36px);border:1px solid #dce6ef;border-radius:20px;background:#fff;box-shadow:0 18px 50px #17324d14}.eyebrow{margin:0 0 8px;color:#087f72;font-size:13px;font-weight:bold}.login-card h1{margin:0;color:var(--ink);font-size:clamp(25px,6vw,32px)}.intro{margin:9px 0 22px;color:var(--muted);line-height:1.8}.field{display:grid;gap:8px;margin:16px 0;color:#31475b;font-weight:bold}.field input{width:100%;min-height:48px;padding:11px 13px;border:1px solid #cbd7e2;border-radius:10px;background:#fff;color:#142435;font:inherit}.field input:focus{outline:3px solid #00c99a35;border-color:#087f72}.remember-row{display:flex;align-items:center;gap:9px;margin:7px 0 18px;color:#31475b;font-weight:bold}.remember-row input{width:18px;height:18px;margin:0;accent-color:#087f72}.submit{width:100%;min-height:49px;border:0;border-radius:10px;background:var(--teal);color:#10202c;font:900 16px Tahoma,Arial,sans-serif;cursor:pointer;box-shadow:0 4px 0 #142435}.submit:hover{background:#17d9aa}.submit:disabled{opacity:.6;cursor:wait}.error{margin:14px 0 0;padding:11px 12px;border-radius:9px;background:#fff0ef;color:#a12a20;line-height:1.7}.error[hidden]{display:none}.footnote{margin:14px 0 0;color:#78889a;font-size:12px;line-height:1.7;text-align:center}
+    @media(max-width:480px){body{padding:14px}.login-card{border-radius:16px}.brand{margin-bottom:12px}}
+  </style>
+</head>
+<body>
+  <main class="login-shell">
+    <div class="brand"><div class="brand-mark">VIP</div><div class="brand-name"><strong>مركز لوك</strong>بوابة الأستاذ</div></div>
+    <section class="login-card">
+      <p class="eyebrow">دخول آمن</p>
+      <h1>مرحبًا بك في بوابة VIP</h1>
+      <p class="intro">سجّل الدخول ببيانات الأستاذ المحفوظة في إعدادات البرنامج لمتابعة طلبات طلابك.</p>
+      <form id="teacher-login-form">
+        <label class="field">اسم الأستاذ<input id="teacher-username" autocomplete="username" required></label>
+        <label class="field">كلمة المرور<input id="teacher-password" type="password" autocomplete="current-password" required></label>
+        <label class="remember-row"><input id="vip-remember-me" type="checkbox"> تذكر اسم الأستاذ على هذا الجهاز</label>
+        <button id="teacher-login-button" class="submit" type="submit">دخول إلى البوابة</button>
+        <p id="teacher-login-error" class="error" role="alert" hidden></p>
+      </form>
+      <p class="footnote">خيار التذكر يحفظ اسم الأستاذ فقط على هذا الجهاز.</p>
+    </section>
+  </main>
+  <script type="module" src="./vip-teacher-login.js?v=1"></script>
+</body>
+</html>

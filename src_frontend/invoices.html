@@ -1,4 +1,4 @@
-﻿<!-- الطلاب المشتركين / الفواتير -->
+<!-- الطلاب المشتركين / الفواتير -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
@@ -6,11 +6,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الفواتير</title>
-  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
   <link rel="stylesheet" href="css/invoices.css" />
   <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="css/invoices.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <style>
+    .invoice-summary-card{background:#fff;border:1px solid #d7e5f2;border-radius:12px;padding:14px 18px;box-shadow:0 3px 12px #1b4c7a12}
+    .invoice-summary-card span{display:block;color:#51677d;font-size:14px}
+    .invoice-summary-card strong{display:block;margin-top:6px;color:#087f72;font-size:22px}
+  </style>
 </head>
 
 <body>
@@ -156,6 +161,7 @@
       </div>
     </div>
   </main>
+  </div>
   <div id="logout-modal"
     style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
     <div
@@ -178,7 +184,7 @@
   <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/electron-nav.js"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
-  <script type="module" src="js/invoices.js"></script>
+  <script type="module" src="js/invoices.js?v=portal-payments-v11"></script>
   <script type="module" src="js/help.js"></script>
   <script src="js/notifications.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>

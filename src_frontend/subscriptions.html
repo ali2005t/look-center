@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>الاشتراكات والأسعار</title>
-  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
   <link rel="stylesheet" href="css/subscriptions.css?v=inventory-v1" />
   <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
@@ -99,9 +99,13 @@
         <summary><i class="fas fa-plus" aria-hidden="true"></i> إضافة اشتراك جديد</summary>
         <form id="add-subscription-form">
         <div id="linked-subscription-group" style="display:none;margin-bottom:8px;">
-          <label for="linked-subscription" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">اختر
-            الاشتراك المرتبط</label>
-          <select id="linked-subscription">
+          <label style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">
+            📚 الاشتراكات الأب المرتبطة بهذه الملزمة <small style="color:#666;font-weight:normal;">(يمكنك اختيار أكثر من اشتراك)</small>
+          </label>
+          <div id="linked-subscriptions-checklist" style="max-height:140px;overflow-y:auto;border:1px solid #cde4ff;border-radius:6px;padding:8px;background:#fcfdff;margin-bottom:6px;">
+            <p style="margin:0;color:#888;font-size:12px;">اختر الفرقة لعرض باقات الملازم المتاحة</p>
+          </div>
+          <select id="linked-subscription" style="display:none;">
             <option value="">-- بدون اشتراك مرتبط --</option>
           </select>
         </div>
@@ -331,7 +335,7 @@
   <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script type="module" src="js/subscriptions.js?v=inventory-v1"></script>
+  <script type="module" src="js/subscriptions.js?v=inventory-v4"></script>
   <script>
     // تغيير اسم الحقل حسب النوع المختار
     document.getElementById('type').addEventListener('change', function () {

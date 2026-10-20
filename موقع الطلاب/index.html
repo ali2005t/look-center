@@ -14,8 +14,12 @@
       <p class="eyebrow">بوابة الطلاب</p>
       <h1>تسجيل بيانات الطالب</h1>
       <p class="intro">سجّل بياناتك مرة واحدة من الهاتف المرتبط بهذا الرابط.</p>
-
       <div class="agent-banner" id="agent-banner">جاري التحقق من رابط التسجيل...</div>
+      <div class="qr-container" id="qr-container" hidden>
+        <img id="qr-image" alt="QR code for registration" />
+        <p class="qr-caption">امسح QR للتسجيل</p>
+      </div>
+
       <div class="notice error" id="portal-error" hidden></div>
 
       <form id="student-form" hidden>

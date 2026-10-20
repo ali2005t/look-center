@@ -201,8 +201,10 @@
 .sidebar {
   position: fixed;
   right: 0;
-  top: 60px;
-  height: calc(100% - 60px);
+  top: 92px !important;
+  bottom: 0;
+  height: calc(100vh - 92px);
+  max-height: calc(100vh - 92px);
   width: 220px;
   background: linear-gradient(135deg, #0a1836 60%, #101c2c 100%);
   box-shadow: 0 2px 16px #1976d244;
@@ -210,6 +212,8 @@
   display: flex;
   flex-direction: column;
   font-family: 'Cairo', 'Tajawal', 'Vazirmatn', sans-serif;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 .sidebar ul {
   list-style: none;

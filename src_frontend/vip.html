@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>صفحة VIP</title>
-    <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+    <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
     <link rel="stylesheet" href="css/vip.css?v=vip-v3" />
     <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
@@ -75,7 +75,7 @@
             </div>
             <div class="field">
               <label for="vip-teacher-input">اسم الأستاذ</label>
-              <input type="text" id="vip-teacher-input" placeholder="اكتب اسم الأستاذ" autocomplete="username" />
+              <input type="text" id="vip-teacher-input" placeholder="الاسم المحفوظ في إعدادات VIP" autocomplete="username" />
             </div>
             <div class="field">
               <label for="vip-password-input">كلمة المرور</label>
@@ -116,7 +116,8 @@
 
       <div id="vip-main-panel" class="hidden">
         <div class="vip-top-actions">
-          <button class="vip-tab-btn active" data-tab="students"><i class="fas fa-user-graduate"></i> الطلاب المشتركين</button>
+          <button class="vip-tab-btn" data-tab="students"><i class="fas fa-user-graduate"></i> الطلاب المشتركين</button>
+          <button class="vip-tab-btn" data-tab="registrations"><i class="fas fa-bell"></i> طلبات التسجيل <span id="vip-pending-badge" class="vip-pending-badge" style="display:none"></span></button>
           <button class="vip-tab-btn" data-tab="sales"><i class="fas fa-wallet"></i> المبيعات</button>
           <button class="vip-tab-btn" data-tab="reports"><i class="fas fa-chart-bar"></i> التقارير</button>
           <button class="vip-tab-btn" data-tab="daily"><i class="fas fa-calendar-check"></i> قفل اليومي</button>
@@ -130,6 +131,6 @@
     <script type="module" src="js/firebase.js"></script>
     <script type="module" src="js/header.js?v=permissions-v10"></script>
     <script src="js/mobile-dropdown-menu.js"></script>
-    <script type="module" src="js/vip.js?v=vip-v3"></script>
+    <script type="module" src="js/vip.js?v=vip-v12"></script>
   </body>
 </html>

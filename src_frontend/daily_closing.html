@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>التقفيل اليومي</title>
-  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
   <link rel="stylesheet" href="css/daily_closing.css" />
   <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
@@ -209,6 +209,12 @@
 
     /* نمط الطباعة */
     @media print {
+      @page { size: A4 landscape; margin: 12mm; }
+      .daily-print-header { display:block !important; margin:0 0 18px; padding:0 0 12px; border-bottom:3px solid #00a982; text-align:center; color:#142435; }
+      .daily-print-header div { color:#087f72; font-size:13px; font-weight:900; letter-spacing:1px; }
+      .daily-print-header h1 { margin:6px 0; font-size:22px; }
+      .daily-print-header p { display:inline-block; margin:4px 12px; font-size:11px; }
+      #booklet-stock-panel { display:none !important; }
       body {
         margin: 0;
         padding: 0;
@@ -298,6 +304,38 @@
       }
     }
   </style>
+  <style>
+    .daily-print-header{display:none}
+    @media print{
+      main{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+      main>:not(#daily-print-header):not(#daily-closing-table):not(#daily-summary):not(#vodafone-section){display:none!important}
+      .daily-print-header{display:block!important;color:#000!important}
+      body,body *{color:#000!important;font-family:Arial,Tahoma,sans-serif!important;font-weight:700!important;text-shadow:none!important}
+      main{font-size:13px!important}
+      .daily-print-header div,.daily-print-header h1,.daily-print-header p{color:#000!important;font-weight:900!important}
+      #daily-closing-table{width:100%!important;min-width:0!important;table-layout:fixed!important;margin:10px 0 16px!important;border-collapse:collapse!important;border:2px solid #000!important}
+      #daily-closing-table th:nth-child(1){width:16%}#daily-closing-table th:nth-child(2),#daily-closing-table th:nth-child(3){width:10%}#daily-closing-table th:nth-child(4),#daily-closing-table th:nth-child(5){width:11%}#daily-closing-table th:nth-child(6),#daily-closing-table th:nth-child(7),#daily-closing-table th:nth-child(8){width:14%}
+      #daily-closing-table thead{display:table-header-group!important}
+      #daily-closing-table tbody{display:table-row-group!important}
+      #daily-closing-table tr{display:table-row!important;width:auto!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;break-inside:avoid!important}
+      #daily-closing-table th,#daily-closing-table td{display:table-cell!important;position:static!important;width:auto!important;height:auto!important;text-align:center!important;vertical-align:middle!important}
+      #daily-closing-table td::before{content:none!important;display:none!important}
+      #daily-closing-table,#vodafone-section table{border-collapse:collapse!important;border:2px solid #000!important}
+      #daily-closing-table th,#daily-closing-table td,#vodafone-section table th,#vodafone-section table td{border:2px solid #000!important;padding:9px 7px!important;color:#000!important;font-size:12px!important;font-weight:800!important;line-height:1.35!important;overflow-wrap:anywhere!important;word-break:normal!important}
+      #daily-closing-table th,#vodafone-section table th{background:#e5e7eb!important;color:#000!important;font-weight:900!important}
+      #daily-closing-table tr:nth-child(even) td,#vodafone-section table tr:nth-child(even) td{background:#f3f4f6!important}
+      #daily-summary{border:2px solid #000!important;border-radius:0!important;box-shadow:none!important;background:#fff!important}
+      #daily-summary h3,#daily-summary p{color:#000!important;font-weight:900!important}
+      #daily-summary>div:first-of-type{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;margin:0!important;border:2px solid #000!important}
+      #daily-summary>div:first-of-type>div{min-height:80px!important;border:0!important;border-left:2px solid #000!important;border-radius:0!important;box-shadow:none!important;background:#fff!important}
+      #daily-summary>div:first-of-type>div:last-child{border-left:0!important}
+      #daily-summary>div>div{border-radius:0!important;box-shadow:none!important;background:#fff!important}
+      #daily-summary>div>div p:first-child{font-size:12px!important}
+      #daily-summary>div>div p:last-child{font-size:19px!important;font-weight:900!important}
+      #vodafone-section{border:2px solid #000!important;box-shadow:none!important;background:#fff!important}
+      main table thead{display:table-header-group!important}main table tr{break-inside:avoid!important;page-break-inside:avoid!important}
+    }
+  </style>
 </head>
 <body>
   <header class="main-header" style="background: linear-gradient(90deg, #0a1836, #101c2c);">
@@ -375,10 +413,13 @@
   </aside>
 
   <main>
+    <header id="daily-print-header" class="daily-print-header"><div>LOOK CENTER</div><h1>تقرير التقفيل اليومي</h1><p>تاريخ التقفيل: <strong id="daily-print-date">-</strong></p><p>وقت استخراج التقرير: <strong id="daily-print-generated">-</strong></p></header>
     <!-- تحسين تصميم قسم التصفية -->
     <div class="filter-section" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background-color: #0a1836; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); margin: 20px auto; width: 100%;">
-      <label for="filter-date" style="font-weight: bold; color: #1976d2;">تصفية حسب التاريخ:</label>
-      <input type="date" id="filter-date" style="padding: 8px; border: 1px solid #0a1836; border-radius: 5px;" />
+      <label for="filter-date-from" style="font-weight: bold; color: #1976d2;">من تاريخ:</label>
+      <input type="date" id="filter-date-from" style="padding: 8px; border: 1px solid #0a1836; border-radius: 5px;" />
+      <label for="filter-date-to" style="font-weight: bold; color: #1976d2;">إلى تاريخ:</label>
+      <input type="date" id="filter-date-to" style="padding: 8px; border: 1px solid #0a1836; border-radius: 5px;" />
       <div style="display: flex; gap: 10px;">
         <button id="filter-btn" style="background-color: #085aac; color: #ffffff; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer;">تصفية</button>
         <button id="export-btn" style="background-color: #eb0909; color: #0a1836; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer;">تصدير البيانات</button>
@@ -433,7 +474,7 @@
           <i class="fas fa-save"></i> حفظ التقفيل اليومي
         </button>
         <button id="print-report-btn" style="background-color: #1976d2; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
-          <i class="fas fa-print"></i> طباعة التقرير
+          <i class="fas fa-file-pdf"></i> &#1578;&#1589;&#1583;&#1610;&#1585; PDF / &#1591;&#1576;&#1575;&#1593;&#1577;
         </button>
         <button id="send-report-btn" style="background-color: #9c27b0; color: #fff; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
           <i class="fas fa-envelope"></i> إرسال التقرير
@@ -492,7 +533,7 @@
   <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/electron-nav.js"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
-  <script type="module" src="js/daily_closing.js?v=portal-payments-v4"></script>
+  <script type="module" src="js/daily_closing.js?v=closing-filter-v11"></script>
   <script>
       // الكود الخاص بالتصفية والتصدير تم نقله إلى ملف js/daily_closing.js
       document.addEventListener('DOMContentLoaded', function() {

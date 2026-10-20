@@ -19,6 +19,7 @@ async function loadLateStudents() {
     allInvoices = [];
     snapshot.forEach(docSnap => {
       const inv = docSnap.data();
+      if (inv.isVip === true) return;
       inv._id = docSnap.id;
       allInvoices.push(inv);
     });

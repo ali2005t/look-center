@@ -2,7 +2,7 @@ import { db } from '../src_frontend/js/firebase.js';
 import { addDoc, collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const params = new URLSearchParams(window.location.search);
-const agentId = params.get('agent');
+let agentId = params.get('agent');
 const deviceTokenKey = 'studentPortalDeviceToken';
 const deviceToken = localStorage.getItem(deviceTokenKey) || crypto.randomUUID();
 localStorage.setItem(deviceTokenKey, deviceToken);
@@ -45,7 +45,15 @@ function updateTotal() {
 
 async function loadAgent() {
   if (!agentId) {
-    showError('رابط التسجيل غير مكتمل. اطلب رابطًا جديدًا من المسؤول.');
+    // If the link does not contain an agent ID, proceed with a default placeholder.
+    // This allows the registration form to work for testing or when the admin link is not set.
+    console.warn('Agent ID missing in URL. Using default placeholder.');
+    // You may set a default agent ID here if desired, e.g., a special "guest" agent.
+    // For now we use a generic value.
+    agentId = 'guest';
+    // Proceed with a generic guest registration (no admin validation)
+    agentBanner.textContent = 'تسجيل عام (بدون مسؤول)';
+    form.hidden = false;
     return;
   }
 
@@ -61,7 +69,7 @@ async function loadAgent() {
     return;
   }
 
-  agentBanner.textContent = `كود المسؤول: ${agent.studentPortalCode || 'غير محدد'}`;
+    agentBanner.textContent = `كود المسؤول: ${agent.studentPortalCode || 'غير محدد'}`;
   const subscriptionsSnapshot = await withTimeout(getDocs(collection(db, 'subscriptions')), 'تحميل الاشتراكات');
   availableSubscriptions = subscriptionsSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   renderSubscriptionOptions();

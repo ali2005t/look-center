@@ -20,3 +20,9 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Keep VIP teacher authentication separate from the cashier/program session.
+export const vipApp = initializeApp(firebaseConfig, 'vip-teacher-session');
+export const vipAuth = getAuth(vipApp);
+export const vipDb = getFirestore(vipApp);
+
+

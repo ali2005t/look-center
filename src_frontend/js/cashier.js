@@ -26,7 +26,7 @@ if (printBtn) {
   });
 }
 import { db } from './firebase.js';
-import { collection, getDocs, addDoc, Timestamp, doc, getDoc, updateDoc, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { collection, getDocs, addDoc, Timestamp, doc, getDoc, updateDoc, query, where, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const isVipMode = new URLSearchParams(window.location.search).get('vip') === 'true';
@@ -392,9 +392,12 @@ function getStudentLinkedBooklets(invoiceRecord, subscriptionDocs) {
   return subscriptionDocs.filter(subscriptionDoc => {
     const note = subscriptionDoc.data();
     const noteGrade = normalizeStudentText(note.grade);
+    const noteLinkedSubs = Array.isArray(note.linkedSubscriptions) && note.linkedSubscriptions.length
+      ? note.linkedSubscriptions
+      : String(note.linkedSubscription || '').split(',').map(s => s.trim()).filter(Boolean);
     return String(note.type || '').trim() === 'ملازم فردية'
       && (!invoiceGrade || !noteGrade || noteGrade === invoiceGrade)
-      && parentReferences.has(normalizeProfileReference(note.linkedSubscription));
+      && noteLinkedSubs.some(s => parentReferences.has(normalizeProfileReference(s)));
   }).map(subscriptionDoc => {
     const note = subscriptionDoc.data();
     return {
@@ -662,20 +665,30 @@ async function updateStudentBookletDelivery(checkbox) {
   checkbox.disabled = true;
   try {
     const invoiceRef = doc(db, target.record.collection, target.record.id);
-    await runTransaction(db, async transaction => {
+    const deliveryResult = await runTransaction(db, async transaction => {
       const snapshot = await transaction.get(invoiceRef);
       if (!snapshot.exists()) throw new Error('سجل الفاتورة غير موجود');
       const data = snapshot.data();
       if (target.kind === 'linked') {
+        if (!target.noteId) throw new Error('Missing booklet subscription id.');
         const notes = Array.isArray(data.indivNotes) ? [...data.indivNotes] : [];
-        const noteIndex = notes.findIndex(note => (note.noteId || note.name) === target.noteId
-          || note.name === target.noteName);
-        if (noteIndex < 0) {
-          notes.push({ noteId: target.noteId, name: target.noteName, delivered: checkbox.checked });
-        } else {
-          notes[noteIndex] = { ...notes[noteIndex], delivered: checkbox.checked };
+        const noteIndex = notes.findIndex(note => (note.noteId || note.name) === target.noteId || note.name === target.noteName);
+        const wasDelivered = noteIndex >= 0 && notes[noteIndex].delivered === true;
+        if (wasDelivered === checkbox.checked) return { changed: false, stock: null };
+        const updatedNote = { noteId: target.noteId, name: target.noteName, delivered: checkbox.checked };
+        if (noteIndex < 0) notes.push(updatedNote); else notes[noteIndex] = { ...notes[noteIndex], ...updatedNote };
+        const deferBookletStock = data.bookletStockDeducted === false || data.vipStockDeducted === false;
+        if (!deferBookletStock) {
+          transaction.update(invoiceRef, { indivNotes: notes });
+          return { changed: true, stock: null };
         }
+        const noteRef = doc(db, 'subscriptions', target.noteId);
+        const noteSnapshot = await transaction.get(noteRef);
+        if (!noteSnapshot.exists()) throw new Error('Booklet inventory record not found.');
+        const stock = (Number(noteSnapshot.data().stock) || 0) + (checkbox.checked ? -1 : 1);
         transaction.update(invoiceRef, { indivNotes: notes });
+        transaction.update(noteRef, { stock });
+        return { changed: true, stock };
       } else if (target.kind === 'card') {
         const cardRef = doc(db, 'onlineCards', target.cardInfo.cardId);
         const cardSnapshot = await transaction.get(cardRef);
@@ -696,17 +709,36 @@ async function updateStudentBookletDelivery(checkbox) {
       } else {
         const items = Array.isArray(data.items) ? [...data.items] : [];
         if (!items[target.itemIndex]) throw new Error('الملزمة غير موجودة ضمن الفاتورة');
-        items[target.itemIndex] = { ...items[target.itemIndex], delivered: checkbox.checked };
+        const currentItem = items[target.itemIndex];
+        if (currentItem.delivered === checkbox.checked) return { changed: false, stock: null };
+        items[target.itemIndex] = { ...currentItem, delivered: checkbox.checked };
+        const deferBookletStock = data.bookletStockDeducted === false || data.vipStockDeducted === false;
+        if (deferBookletStock) {
+          const noteId = target.noteId || currentItem.id || currentItem.subscriptionId;
+          if (!noteId) throw new Error('Missing booklet inventory id.');
+          const noteRef = doc(db, 'subscriptions', noteId);
+          const noteSnapshot = await transaction.get(noteRef);
+          if (!noteSnapshot.exists()) throw new Error('Booklet inventory record not found.');
+          const stock = (Number(noteSnapshot.data().stock) || 0) + (checkbox.checked ? -1 : 1);
+          transaction.update(invoiceRef, { items });
+          transaction.update(noteRef, { stock });
+          return { changed: true, stock };
+        }
         transaction.update(invoiceRef, { items });
+        return { changed: true, stock: null };
       }
     });
     studentLookupRecordsCache = null;
-    showNotification(
-      target.kind === 'card'
-        ? (checkbox.checked ? 'تم تسجيل استلام كارت الأونلاين وخصم المخزون' : 'تم إلغاء استلام الكارت وإرجاع المخزون')
-        : (checkbox.checked ? 'تم تسجيل استلام الملزمة' : 'تم إلغاء تسجيل الاستلام'),
-      'success'
-    );
+    if ((target.kind === 'linked' || target.kind === 'item') && deliveryResult?.changed && checkbox.checked && deliveryResult.stock < 0) {
+      showNotification('\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629\u060c \u0648\u0623\u0635\u0628\u062d \u0645\u062e\u0632\u0648\u0646\u0647\u0627 \u0628\u0627\u0644\u0633\u0627\u0644\u0628 (' + deliveryResult.stock + ').', 'info');
+    } else {
+      showNotification(
+        target.kind === 'card'
+          ? (checkbox.checked ? '\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0643\u0627\u0631\u062a \u0627\u0644\u0623\u0648\u0646\u0644\u0627\u064a\u0646 \u0648\u062e\u0635\u0645 \u0627\u0644\u0643\u0645\u064a\u0629 \u0645\u0646 \u0627\u0644\u0645\u062e\u0632\u0648\u0646' : '\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0643\u0627\u0631\u062a \u0648\u0625\u0631\u062c\u0627\u0639 \u0627\u0644\u0643\u0645\u064a\u0629 \u0644\u0644\u0645\u062e\u0632\u0648\u0646')
+          : (checkbox.checked ? (deliveryResult?.stock === null ? '\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629' : '\u062a\u0645 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629 \u0648\u062e\u0635\u0645 \u0643\u0645\u064a\u062a\u0647\u0627 \u0645\u0646 \u0627\u0644\u0645\u062e\u0632\u0648\u0646') : (deliveryResult?.stock === null ? '\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u0644\u0632\u0645\u0629' : '\u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0633\u0644\u064a\u0645 \u0648\u0625\u0631\u062c\u0627\u0639 \u0643\u0645\u064a\u0629 \u0627\u0644\u0645\u0644\u0632\u0645\u0629 \u0644\u0644\u0645\u062e\u0632\u0648\u0646')),
+        'success'
+      );
+    }
     await openStudentProfile(studentGroupKey(target.record));
   } catch (error) {
     console.error(target.kind === 'card' ? 'تعذر تحديث استلام كارت الأونلاين:' : 'تعذر تحديث استلام الملزمة:', error);
@@ -1128,6 +1160,12 @@ if (invoiceForm) {
       return;
     }
 
+    const requestedSubscriptionIds = allSelectedItems.map(item => item?.id).filter(Boolean);
+    if (new Set(requestedSubscriptionIds).size !== requestedSubscriptionIds.length) {
+      showNotification('\u0627\u0644\u0639\u0646\u0635\u0631 \u0646\u0641\u0633\u0647 \u0645\u062e\u062a\u0627\u0631 \u0623\u0643\u062b\u0631 \u0645\u0646 \u0645\u0631\u0629. \u0627\u062d\u0630\u0641 \u0627\u0644\u062a\u0643\u0631\u0627\u0631 \u0642\u0628\u0644 \u0627\u0644\u062d\u0641\u0638.', 'error', 4000);
+      return;
+    }
+
     const isSubscriberInvoice = subTypesSelected.some(st => st !== 'محاضرات فردية' && st !== 'ملازم فردية');
 
     if (isSubscriberInvoice) {
@@ -1244,6 +1282,7 @@ if (invoiceForm) {
           vipPayer: document.getElementById('vip-reason')?.value?.trim() || 'VIP',
           vipCreatedBy: localStorage.getItem('currentUsername') || localStorage.getItem('currentUserName') || currentRecipient || 'مدير',
           vipAssignedTeacher: vipOwner,
+          bookletStockDeducted: false,
           onlineCardsDelivery
         };
 
@@ -1281,6 +1320,27 @@ if (invoiceForm) {
       const onlineCardRefs = [...cardStockCounts.keys()].map(id => doc(db, 'onlineCards', id));
 
       // Only booklet stock is tracked; courses remain open inventory-wise.
+        if (phone) {
+          const [invoiceMatches, vipMatches, portalMatches] = await Promise.all([
+            getDocs(query(collection(db, 'invoices'), where('phone', '==', phone))),
+            getDocs(query(collection(db, 'vipRegistrations'), where('phone', '==', phone))),
+            getDocs(query(collection(db, 'studentRegistrations'), where('phone', '==', phone)))
+          ]);
+          const requestedById = new Map(allSelectedItems.filter(item => item?.id).map(item => [item.id, item.name || item.id]));
+          const duplicateNames = new Set();
+          const checkExisting = snapshot => snapshot.docs.forEach(docSnapshot => {
+            const existing = docSnapshot.data();
+            const existingItems = existing.items || existing.selectedSubscriptions || existing.subscriptions || existing.selectedItems || [];
+            existingItems.forEach(item => {
+              const id = item?.id || item?.subscriptionId;
+              if (id && requestedById.has(id)) duplicateNames.add(requestedById.get(id));
+            });
+          });
+          [invoiceMatches, vipMatches, portalMatches].forEach(checkExisting);
+          if (duplicateNames.size) {
+            throw new Error('الطالب مشترك بالفعل في: ' + [...duplicateNames].join('، ') + '. اختر اشتراكًا أو ملزمة مختلفة.');
+          }
+        }
       await runTransaction(db, async transaction => {
         const subscriptionSnapshots = [];
         for (const subscriptionRef of subscriptionRefs) {
@@ -1293,11 +1353,6 @@ if (invoiceForm) {
 
         subscriptionSnapshots.forEach(snapshot => {
           if (!snapshot.exists()) throw new Error('A selected subscription no longer exists');
-          if (!['ملازم', 'ملازم فردية'].includes(snapshot.data().type)) return;
-          const currentStock = Number(snapshot.data().stock) || 0;
-          transaction.update(doc(db, 'subscriptions', snapshot.id), {
-            stock: currentStock - (subscriptionCounts.get(snapshot.id) || 0)
-          });
         });
         onlineCardSnapshots.forEach(snapshot => {
           if (!snapshot.exists()) throw new Error('A selected online card no longer exists');
@@ -1648,18 +1703,20 @@ function showConfirmDialog(message, onConfirm, onCancel) {
 
 // جلب رقم الفاتورة التالي حسب النوع والفرقة
 async function fetchNextInvoiceNumber() {
-  const subType = document.getElementById('sub-type')?.value || selectedSubType;
-  const dbType = mapSubTypeToDbType(subType);
-  const snapshot = await getDocs(collection(db, 'invoices'));
-  let count = 0;
-  snapshot.forEach(docSnap => {
-    const inv = docSnap.data();
-    const invType = String(inv?.subType || '').trim();
-    if (inv && (invType === dbType || invType === subType || invType === `اشتراك ${dbType}`)) {
-      count++;
-    }
-  });
-  nextInvoiceNumber = count + 1;
+  const [invoicesSnapshot, portalRegistrationsSnapshot, vipRegistrationsSnapshot] = await Promise.all([
+    getDocs(collection(db, 'invoices')),
+    getDocs(collection(db, 'studentRegistrations')),
+    getDocs(collection(db, 'vipRegistrations')).catch(error => {
+      console.warn('Could not read VIP registration invoice numbers:', error);
+      return { docs: [] };
+    })
+  ]);
+  const usedNumbers = [
+    ...invoicesSnapshot.docs.map(item => Number(item.data().num) || 0),
+    ...portalRegistrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0),
+    ...vipRegistrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0)
+  ];
+  nextInvoiceNumber = usedNumbers.reduce((highest, number) => Math.max(highest, number), 0) + 1;
   updateInvoicePreview();
 }
 

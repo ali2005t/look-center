@@ -28,3 +28,23 @@ button:hover { background:var(--cyan); }
 .portal-total { display:block; margin-top:14px; padding-top:10px; border-top:2px solid var(--ink); }
 [hidden] { display:none !important; }
 @media (max-width:480px) { .portal-shell { padding:14px; } .portal-card { padding:24px 18px; } }
+
+/* QR code container styling */
+.qr-container {
+  margin: 20px 0;
+  text-align: center;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+.qr-container img {
+  max-width: 180px;
+  max-height: 180px;
+  margin-bottom: 8px;
+}
+.qr-caption {
+  font-weight: 800;
+  color: var(--ink);
+}

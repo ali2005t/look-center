@@ -10,6 +10,7 @@ export async function getUserInvoiceSummary({month, day} = {}) {
   const userSummary = {};
   invoicesSnap.forEach(invSnap => {
     const data = invSnap.data();
+    if (data.isVip === true) return;
     // تجاهل الفواتير بدون مستلم
     const recipient = data.recipient || '-';
     if (!recipient || recipient === '-') return;

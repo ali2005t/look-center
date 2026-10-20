@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0a1836" />
   <title>لوحة التحكم</title>
-  <link rel="stylesheet" href="css/main.css?v=sidebar-v3" />
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
   <link rel="stylesheet" href="css/dashboard.css?v=dashboard-v3" />
   <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
@@ -99,19 +99,19 @@
     <section class="dashboard-main-cards" aria-label="إحصائيات المركز">
       <article class="dashboard-stat-card students-card">
         <span class="dashboard-stat-icon"><i class="fas fa-user-graduate"></i></span>
-        <div><h3>طلاب اليوم</h3><strong id="today-students">--</strong><small>طلاب تم تسجيل فواتيرهم اليوم</small></div>
+        <div><h3>طلاب اليوم</h3><strong id="today-students">--</strong><small>تسجيلات موقع الطلاب العادي وفواتير البرنامج، دون تكرار أو VIP</small></div>
       </article>
       <article class="dashboard-stat-card today-income-card">
         <span class="dashboard-stat-icon"><i class="fas fa-coins"></i></span>
-        <div><h3>إيراد اليوم</h3><strong id="today-income">--</strong><small>إجمالي قيمة الفواتير اليوم</small></div>
+        <div><h3>قيمة فواتير اليوم</h3><strong id="today-income">--</strong><small>مجموع بنود الفواتير العادية المسجلة اليوم، وليس التحصيل النقدي</small></div>
       </article>
       <article class="dashboard-stat-card income-card">
         <span class="dashboard-stat-icon"><i class="fas fa-chart-line"></i></span>
-        <div><h3>إيراد الشهر</h3><strong id="month-income">--</strong><small>من بداية الشهر الحالي</small></div>
+        <div><h3>قيمة فواتير الشهر</h3><strong id="month-income">--</strong><small>مجموع بنود الفواتير العادية منذ بداية الشهر</small></div>
       </article>
       <article class="dashboard-stat-card last-bill-card">
         <span class="dashboard-stat-icon"><i class="fas fa-receipt"></i></span>
-        <div><h3>آخر فاتورة</h3><strong id="last-bill">--</strong><small>نوع آخر فاتورة مسجلة</small></div>
+        <div><h3>آخر فاتورة</h3><strong id="last-bill">--</strong><small>رقم آخر فاتورة عادية مسجلة، أو نوعها عند غياب الرقم</small></div>
       </article>
     </section>
     <section id="booklet-stock-panel" class="booklet-stock-panel" hidden aria-labelledby="booklet-stock-title">
@@ -164,7 +164,7 @@
   <script type="module" src="js/firebase.js"></script>
   <script type="module" src="js/header.js?v=permissions-v10"></script>
   <script src="js/mobile-dropdown-menu.js"></script>
-  <script type="module" src="js/dashboard.js?v=inventory-v1"></script>
+  <script type="module" src="js/dashboard.js?v=dashboard-invoice-students-v2"></script>
   <script>
     // معالج النقر على القائمة الجانبية - بسيط وفعال
     document.addEventListener('DOMContentLoaded', function() {

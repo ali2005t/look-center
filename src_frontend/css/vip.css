@@ -10,6 +10,21 @@
   --vip-muted: #607d8b;
 }
 
+/* badge عدد الطلبات المنتظرة */
+.vip-pending-badge {
+  display: inline-block;
+  background: #e53935;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 50px;
+  margin-right: 4px;
+  min-width: 18px;
+  text-align: center;
+  vertical-align: middle;
+}
+
 body {
   background: var(--vip-bg);
   font-family: Arial, sans-serif;

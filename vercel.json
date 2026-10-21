@@ -2,7 +2,7 @@
   "buildCommand": "echo Static deployment - no build required",
   "framework": null,
   "outputDirectory": ".",
-  "cleanUrls": true,
+  "cleanUrls": false,
   "trailingSlash": false,
   "redirects": [
     {

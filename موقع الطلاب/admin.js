@@ -55,14 +55,26 @@ function getAutoDetectedPortalUrl() {
   }
 }
 
+function normalizeStudentPortalUrl(value) {
+  const parsed = value instanceof URL ? new URL(value.href) : new URL(value);
+  parsed.hash = '';
+  parsed.search = '';
+
+  // Keep the public portal as a real HTML file. This prevents Vercel's
+  // clean-URL handling from resolving relative assets from the wrong path.
+  const normalizedPath = parsed.pathname.replace(/\/+$/, '');
+  if (/\/موقع الطلاب$/u.test(normalizedPath)) {
+    parsed.pathname = `${normalizedPath}/index.html`;
+  }
+
+  return parsed;
+}
+
 function getStudentPortalBaseUrl() {
   const customUrl = localStorage.getItem(portalPublicUrlKey)?.trim();
   if (customUrl) {
     try {
-      const parsed = new URL(customUrl);
-      parsed.hash = '';
-      parsed.search = '';
-      return parsed;
+      return normalizeStudentPortalUrl(customUrl);
     } catch (e) {
       console.warn('Invalid custom portal URL in localStorage:', e);
     }
@@ -73,7 +85,7 @@ function getStudentPortalBaseUrl() {
   if (autoUrl) return autoUrl;
 
   try {
-    return new URL('index.html', window.location.href);
+    return normalizeStudentPortalUrl(new URL('index.html', window.location.href));
   } catch (e) {
     return new URL('index.html', 'http://localhost/');
   }

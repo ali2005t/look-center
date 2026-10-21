@@ -2,17 +2,12 @@
   "buildCommand": "echo Static deployment - no build required",
   "framework": null,
   "outputDirectory": ".",
-  "cleanUrls": false,
+  "cleanUrls": true,
   "trailingSlash": false,
   "redirects": [
     {
       "source": "/موقع الطلاب",
-      "destination": "/موقع الطلاب/index.html",
-      "permanent": false
-    },
-    {
-      "source": "/موقع الطلاب/",
-      "destination": "/موقع الطلاب/index.html",
+      "destination": "/موقع الطلاب/",
       "permanent": false
     }
   ]

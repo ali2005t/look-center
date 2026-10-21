@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>التقارير | بوابة الإدارة</title>
+  <link rel="stylesheet" href="portal.css?v=1">
+  <link rel="stylesheet" href="admin.css?v=6">
+</head>
+<body data-page="reports">
+  <main class="admin-shell">
+    <header class="admin-header">
+      <div class="brand-lockup">
+        <div class="brand-arabic">مركـــــــــــز <span>لــــــــوك</span></div>
+        <div class="brand-english">LOOK</div>
+        <h1 id="portal-title">بوابة المسؤولين</h1>
+      </div>
+    </header>
+
+    <section id="login-panel" class="admin-panel login-panel">
+      <p class="eyebrow">بوابة المستخدمين</p>
+      <h2>تسجيل الدخول</h2>
+      <form id="admin-login-form">
+        <label>اسم المستخدم أو البريد<input id="admin-email" required autocomplete="username"></label>
+        <label>كلمة المرور<input id="admin-password" type="password" required autocomplete="current-password"></label>
+        <label class="remember-login"><input id="admin-remember-me" type="checkbox"> تذكرني على هذا الجهاز</label>
+        <button type="submit">دخول</button>
+      </form>
+      <div class="notice error" id="login-error" hidden></div>
+    </section>
+
+    <section id="dashboard-panel" class="admin-app" hidden>
+      <aside id="admin-sidebar" class="admin-sidebar" aria-label="التنقل الرئيسي">
+        <div class="sidebar-brand"><strong>LOOK</strong><span>إدارة الطلاب</span></div>
+        <nav class="sidebar-nav">
+          <a class="sidebar-link" href="admin.html"><span aria-hidden="true">⌂</span>الرئيسية</a>
+          <a class="sidebar-link" href="admin-registrations.html"><span aria-hidden="true">▤</span>تسجيلات الطلاب</a>
+          <a class="sidebar-link active" href="admin-reports.html" aria-current="page"><span aria-hidden="true">▥</span>التقارير</a>
+        </nav>
+        <button id="sidebar-logout" class="sidebar-logout" type="button">تسجيل الخروج</button>
+      </aside>
+      <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+      <div class="admin-main-area">
+        <div class="mobile-toolbar"><button id="sidebar-toggle" type="button" aria-label="فتح القائمة" aria-controls="admin-sidebar" aria-expanded="false">☰</button><strong id="current-view-title">لوحة التسجيلات</strong><button id="refresh-button" class="secondary-button" type="button">تحديث</button></div>
+        <section id="dashboard-view" class="admin-view" hidden>
+          <div class="stats-grid">
+            <article><strong id="total-students">0</strong><span>الطلاب المسجلون</span></article>
+            <article><strong id="paid-students">0</strong><span>تم الدفع</span></article>
+            <article><strong id="unpaid-students">0</strong><span>لم يتم الدفع</span></article>
+            <article><strong id="today-students">0</strong><span>تسجيلات اليوم</span></article>
+            <article><strong id="today-payments">0 ج</strong><span>مدفوعات اليوم</span></article>
+            <article><strong id="total-payments">0 ج</strong><span>إجمالي المدفوعات</span></article>
+          </div>
+          <section class="admin-panel">
+            <div class="panel-heading"><h2>روابط تسجيل الطلاب</h2></div>
+            <form id="portal-url-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;margin:0 0 16px;align-items:flex-end;">
+              <label style="grid-column:1/-1;">رابط صفحة تسجيل الطلاب الأساسي:
+                <input id="portal-public-url" type="url" inputmode="url" placeholder="الرابط التلقائي..." dir="ltr" style="width:100%;box-sizing:border-box;" readonly>
+              </label>
+              <button type="submit" class="secondary-button" hidden>حفظ رابط مخصص</button>
+              <button type="button" id="reset-portal-url-btn" class="secondary-button" style="background:#e2e8f0;color:#1e293b;">توليد الرابط تلقائيًا</button>
+              <div id="portal-url-status" role="status" style="grid-column:1/-1;margin-top:4px;font-size:14px;line-height:1.6;"></div>
+            </form>
+            <div id="agents-list" class="agents-list"></div>
+          </section>
+          <section class="admin-panel">
+            <div class="panel-heading"><h2>تسجيلات الطلاب</h2><label id="agent-filter-label" class="agent-filter-label">المسؤول<select id="agent-filter"><option value="">كل المسؤولين</option></select></label></div>
+            <div class="table-wrap"><table><thead><tr><th>الطالب</th><th>الهاتف</th><th>الفرقة</th><th>المسؤول</th><th>التسجيل</th><th>المبلغ المحصل</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead><tbody id="students-body"></tbody></table></div>
+          </section>
+        </section>
+        <section id="reports-view" class="admin-view">
+          <section class="admin-panel" id="portal-reports">
+            <div class="panel-heading report-heading"><div><h2>تقارير بوابة الطلاب</h2><p>تابع التسجيلات والتحصيل الفعلي حسب الفترة والمسؤول وطريقة الدفع.</p></div><div class="report-actions"><button id="export-report-pdf" class="secondary-button" type="button">تصدير PDF</button><button id="export-report" class="secondary-button" type="button">تصدير CSV</button></div></div>
+            <header class="report-print-header">
+              <div class="print-brand">LOOK <span>مركز لوك</span></div>
+              <h1>تقرير تسجيلات الطلاب والتحصيل</h1>
+              <p>الفترة: <strong id="report-print-period">كل الفترات</strong></p>
+              <p>المسؤول: <strong id="report-print-agent">كل المسؤولين</strong> · طريقة الدفع: <strong id="report-print-method">كل الطرق</strong></p>
+              <p>تاريخ إعداد التقرير: <strong id="report-print-generated"></strong></p>
+            </header>
+            <div class="report-filters">
+              <label>من<input id="report-from" type="date"></label>
+              <label>إلى<input id="report-to" type="date"></label>
+              <label id="report-agent-filter-label">المسؤول<select id="report-agent-filter"><option value="">كل المسؤولين</option></select></label>
+              <label>طريقة الدفع<select id="report-method"><option value="">كل الطرق</option><option>نقدي</option><option>فودافون كاش</option><option>تقسيط</option></select></label>
+              <label>بحث<input id="report-search" type="search" placeholder="اسم الطالب أو الهاتف"></label>
+              <button id="clear-report-filters" class="secondary-button" type="button">مسح الفلاتر</button>
+            </div>
+            <div class="report-stats">
+              <article><strong id="report-total">0</strong><span>تسجيلات الفترة</span></article>
+              <article><strong id="report-paid">0</strong><span>تم الدفع</span></article>
+              <article><strong id="report-pending">0</strong><span>بانتظار الدفع</span></article>
+              <article><strong id="report-collected">0 ج</strong><span>المحصل فعليًا</span></article>
+            </div>
+            <div class="report-breakdown"><h3>التحصيل حسب طريقة الدفع</h3><div id="payment-breakdown" class="breakdown-list"></div></div>
+            <div class="report-breakdown" id="agent-report-breakdown"><h3>ملخص كل مسؤول</h3><div id="agent-breakdown" class="breakdown-list"></div></div>
+            <section class="report-print-table"><h3>تفاصيل التسجيلات المشمولة بالتقرير</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>الطالب</th><th>الهاتف</th><th>الفرقة</th><th>المسؤول</th><th>تاريخ التسجيل</th><th>طريقة الدفع</th><th>الحالة</th><th>المحصل</th></tr></thead><tbody id="report-print-rows"></tbody></table></div></section>
+          </section>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="admin.js?v=8"></script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+/* فرض محاذاة يمين صارمة لكل عناصر صفحة المساعدة */
+.help-content, .help-main-content, .help-content-body, .help-card, .help-card *, h2, h3, ul, li, p, div, section, aside, main, header, body, html {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: plaintext !important;
+  /* لإجبار المتصفح على تطبيق القواعد حتى مع وجود تعارض */
+  box-sizing: border-box !important;
+}
+
+/* معالجة أي تعارض محتمل مع main.css أو أي ملف آخر */
+.help-content *, .help-main-content *, .help-content-body * {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: plaintext !important;
+  box-sizing: border-box !important;
+}
+
+/* إصلاح محاذاة القوائم داخل الكروت */
+.help-card ul, .help-card ol {
+  padding-right: 28px !important;
+  padding-left: 0 !important;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+  list-style-position: inside !important;
+}
+
+/* إصلاح محاذاة العناوين داخل الكروت */
+.help-card h3, .help-card h2 {
+  text-align: right !important;
+  direction: rtl !important;
+}
+
+/* إصلاح محاذاة النصوص داخل الكروت */
+.help-card p, .help-card li {
+  text-align: right !important;
+  direction: rtl !important;
+}
+
+/* إصلاح محاذاة الكروت نفسها */
+.help-card {
+  float: none !important;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* إصلاح sidebar في صفحة المساعدة فقط */
+.help-content .sidebar, .help-content .sidebar *, .help-sidebar, .help-sidebar * {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* تحسين مظهر كروت المساعدة والعناوين بشكل عصري وواضح */
+.help-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px #b3e5fc44;
+  padding: 28px 24px 18px 18px;
+  margin-bottom: 32px;
+  margin-top: 18px;
+  color: #222;
+  font-size: 1.15em;
+  line-height: 2.1;
+  border-right: 6px solid #90caf9;
+  transition: box-shadow 0.2s, border 0.2s;
+}
+.help-card h3 {
+  color: #1976d2;
+  font-size: 1.35em;
+  font-weight: bold;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.help-card ul {
+  margin: 16px 0 0 0;
+  padding-right: 28px;
+  list-style: disc inside;
+  font-size: 1em;
+}
+
+/* تحسين مظهر العنوان الرئيسي */
+.help-content-body > h2 {
+  color: #1976d2;
+  font-weight: bold;
+  margin-bottom: 18px;
+  font-size: 2rem;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* تحسين مظهر الكارت التمهيدي */
+.help-content-body > .help-card:first-of-type {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-size: 1.1em;
+  border: none;
+  box-shadow: none;
+  margin-bottom: 32px;
+}
+
+/* إصلاح محاذاة في الشاشات الصغيرة */
+@media (max-width: 900px) {
+  .help-content, .help-main-content, .help-content-body, .help-card, .help-card *, h2, h3, ul, li, p, div, section, aside, main, header, body, html {
+    direction: rtl !important;
+    text-align: right !important;
+    unicode-bidi: plaintext !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* توحيد حجم ووزن الخط في جميع عناصر القوائم الجانبية */
+.sidebar ul li,
+.sidebar ul li a,
+.sidebar ul li .sidebar-icon {
+  font-size: 17px !important;
+  font-weight: 500 !important;
+}
+
+/* بطاقة التذكير */
+.reminder-section {
+  position: relative;
+  display: flex;
+  width: min(760px, 100%);
+  flex-direction: column;
+  align-items: center;
+  margin: 56px auto 36px;
+  padding: clamp(28px, 5vw, 52px);
+  overflow: hidden;
+  border: 1px solid #d8e2d3;
+  border-radius: 22px;
+  background:
+    radial-gradient(ellipse at 100% 0, rgba(224, 184, 91, 0.16), transparent 38%),
+    linear-gradient(145deg, #fffefa 0%, #f4f7ef 100%);
+  box-shadow: 0 18px 44px rgba(34, 63, 49, 0.1);
+  color: #203b31;
+  animation: reminder-arrive 450ms ease-out both;
+  text-align: center !important;
+  direction: rtl !important;
+}
+
+.reminder-section::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #d5aa4c, #4f8065, #d5aa4c);
+  content: '';
+}
+
+.reminder-section *,
+.reminder-title,
+.reminder-quote {
+  text-align: center !important;
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+}
+
+.reminder-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid #dbe6d8;
+  border-radius: 999px;
+  background: #fff;
+  color: #54735f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reminder-kicker i {
+  color: #bd9140;
+}
+
+.reminder-title {
+  margin: 18px 0 8px;
+  color: #244737;
+  font-size: clamp(27px, 4vw, 38px);
+  font-weight: 900;
+}
+
+.reminder-thanks {
+  margin: 0;
+  color: #718077;
+  font-size: 15px;
+}
+
+.reminder-thanks strong {
+  color: #395c48;
+}
+
+.reminder-quote {
+  position: relative;
+  max-width: 590px;
+  margin: 27px 0 20px;
+  padding: 18px 24px;
+  border-right: 3px solid #d0a54d;
+  color: #35483e;
+  font-size: clamp(17px, 2.5vw, 21px);
+  font-weight: 700;
+  line-height: 1.9;
+}
+
+.reminder-quote span {
+  display: block;
+  margin-top: 8px;
+  color: #68786d;
+  font-size: 0.88em;
+  font-weight: 500;
+}
+
+.reminder-signature {
+  margin: 0;
+  color: #68786d;
+  font-size: 14px;
+}
+
+.reminder-signature span {
+  color: #a57a2d;
+  font-weight: 900;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.developer-reminder-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 24px;
+  padding: 10px 18px;
+  border: 1px solid #244737;
+  border-radius: 10px;
+  background: #244737;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.developer-reminder-button:hover {
+  transform: translateY(-2px);
+  background: #315d46;
+  box-shadow: 0 7px 16px rgba(36, 71, 55, 0.2);
+}
+
+.developer-reminder-button:focus-visible {
+  outline: 3px solid rgba(189, 145, 64, 0.45);
+  outline-offset: 3px;
+}
+
+.developer-reminder-status {
+  min-height: 20px;
+  margin-top: 10px;
+  color: #54735f;
+  font-size: 13px;
+}
+
+@keyframes reminder-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .reminder-section {
+    margin: 36px auto 24px;
+    padding: 30px 20px;
+    border-radius: 16px;
+  }
+
+  .reminder-quote {
+    margin: 20px 0 16px;
+    padding: 14px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-section {
+    animation: none;
+  }
+
+  .developer-reminder-button {
+    transition: none;
+  }
+}

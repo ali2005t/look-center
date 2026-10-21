@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>بوابة الأستاذ VIP</title>
+  <style>
+    :root{font-family:Tahoma,Arial,sans-serif;color:#18304b;background:#f4f7fc}*{box-sizing:border-box}body{margin:0;padding:24px}.wrap{max-width:1100px;margin:auto}.card{background:#fff;border:1px solid #dce6f5;border-radius:16px;padding:22px;margin:16px 0;box-shadow:0 5px 20px #16365b0a}h1{margin:0 0 8px;color:#1769aa}p{color:#60748b}.login{max-width:440px;margin:8vh auto}.field{display:grid;gap:7px;margin:14px 0}input,button,select{font:inherit;padding:11px;border:1px solid #cbd7e8;border-radius:9px}button{background:#087f72;color:#fff;border:0;cursor:pointer;font-weight:bold}button:disabled{opacity:.55;cursor:wait}.remember-row{display:flex;align-items:center;gap:9px;margin:8px 0 16px;font-weight:bold}.remember-row input{width:18px;height:18px;margin:0;accent-color:#087f72}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{padding:15px;background:#f3f8ff;border-radius:12px}.stat b{display:block;font-size:22px;margin-top:6px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{text-align:right;padding:11px;border-bottom:1px solid #e6edf7;vertical-align:top}th{background:#142435;color:#fff}.status{font-weight:bold;color:#946200}.paid{color:#087f46}.items{color:#53677f;font-size:13px}.error{color:#b42318}.muted{color:#718198;font-size:13px}@media(max-width:650px){body{padding:12px}.card{padding:15px}.stats{grid-template-columns:1fr}}
+  </style>
+  <style>
+    html,body{width:100%;min-height:100%;overflow-x:hidden}body{padding:clamp(8px,3vw,24px)}
+    .wrap{width:min(100%,1100px)}.table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+    .table-wrap table{min-width:820px}.table-wrap th,.table-wrap td{white-space:normal;word-break:break-word}
+    input,button,select{max-width:100%;min-height:44px}.stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+    #teacher-qr-overlay{position:fixed;inset:0;z-index:10000;background:#10253dcc;display:none;align-items:center;justify-content:center;padding:14px}
+    #teacher-qr-dialog{background:#fff;width:min(410px,96vw);max-height:92vh;overflow:auto;padding:20px;border-radius:16px;text-align:center;box-shadow:0 15px 50px #0005}
+    #teacher-qr-dialog img{width:min(260px,72vw);height:min(260px,72vw);object-fit:contain}
+    @media(max-width:650px){body{padding:8px}.card{padding:12px;margin:10px 0;border-radius:12px}h1{font-size:22px}.stats{grid-template-columns:1fr}.table-wrap{padding:8px}.table-wrap table{min-width:780px}#teacher-name{width:100%}#teacher-qr-dialog{padding:16px}}
+  
+    .qr-button{display:block;margin:12px auto 0;padding:12px 24px;background:#00c99a;color:#111;border:2px solid #111;box-shadow:3px 3px #111}
+    .account-bar,.account-actions,.report-heading,.report-filters{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .account-actions{justify-content:flex-end}.secondary{background:#e8eef6;color:#18304b;border:1px solid #cbd7e8}
+    .portal-tabs{display:flex;gap:8px;border-bottom:1px solid #dce6f5;padding:0 4px 10px;margin:8px 0 16px;overflow-x:auto}
+    .portal-tab{white-space:nowrap;background:#e7eef7;color:#28445f}.portal-tab.active{background:#087f72;color:#fff}
+    .stats,.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin:12px 0}
+    .request-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:14px;align-items:start}
+    .request-card{min-width:0;background:#fff;border:1px solid #dce6f5;border-radius:16px;padding:18px;box-shadow:0 5px 20px #16365b0a}
+    .student-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid #e6edf7;padding-bottom:12px;margin-bottom:12px}
+    .student-head h3{margin:0 0 5px;overflow-wrap:anywhere;color:#17324d}.student-contact{color:#60748b;direction:ltr;text-align:right;overflow-wrap:anywhere}.grade-pill,.state-pill{display:inline-flex;align-items:center;border-radius:30px;padding:5px 10px;background:#eaf2fb;color:#26496b;font-size:13px;white-space:normal}
+    .state-pill{background:#fff3cd;color:#805d00}.state-pill.approved{background:#e0f5e9;color:#087f46}.subscription-list{display:grid;gap:7px;margin:12px 0}.subscription-item{padding:9px 11px;background:#f5f8fc;border-radius:9px;overflow-wrap:anywhere}.request-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#64748b;font-size:13px}
+    .payment-editor{margin-top:14px;padding:13px;background:#f5f8fc;border:1px solid #e1eaf4;border-radius:12px}.payment-mode{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:8px 0 12px}.mode-option{position:relative;display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px;border:1px solid #cbd7e8;border-radius:9px;background:#fff;color:#34516e;cursor:pointer;text-align:center;font-weight:bold}.mode-option input{position:absolute;opacity:0;pointer-events:none}.mode-option:has(input:checked){border-color:#087f72;background:#e2f5f1;color:#05685d;box-shadow:0 0 0 1px #087f72}.mode-option.free:has(input:checked){border-color:#d28b00;background:#fff6dc;color:#805d00}
+    .amount-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.amount-field{min-width:0;display:grid;gap:6px;color:#52677d;font-size:13px}.amount-field input{width:100%;min-width:0;background:#fff;text-align:left;direction:ltr}.amount-field output{min-height:44px;display:flex;align-items:center;padding:10px;border:1px solid #d7e2ef;border-radius:9px;background:#edf4fa;color:#17324d;font-weight:bold;direction:ltr}
+    .request-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}.request-actions button{min-height:42px}.request-actions .save-amount{min-width:130px}.muted{overflow-wrap:anywhere}
+    .report-heading h2{margin:0;color:#1769aa}.report-heading p{margin:5px 0}.report-filters{justify-content:flex-start}.report-filters label{display:grid;gap:5px;color:#52677d}.report-filters input{min-width:155px;background:#fff}.report-card{padding:16px;background:#fff;border:1px solid #dce6f5;border-radius:13px;box-shadow:0 4px 15px #16365b0a;min-width:0}.report-card span{display:block;color:#60748b;font-size:13px;overflow-wrap:anywhere}.report-card b{display:block;color:#17324d;font-size:23px;margin-top:8px;overflow-wrap:anywhere}.report-card.collected b{color:#087f46}.report-card.due b{color:#b45309}.report-breakdown h3{margin-top:0}.report-table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.report-table-wrap table{width:100%;min-width:480px;border-collapse:collapse}.report-table-wrap th,.report-table-wrap td{padding:10px;text-align:right;border-bottom:1px solid #e6edf7;white-space:nowrap}.report-table-wrap th{background:#142435;color:#fff}.empty-state{grid-column:1/-1;text-align:center;padding:22px;color:#718198}
+    @media(max-width:700px){body{padding:8px}.card{padding:13px;margin:10px 0;border-radius:13px}.wrap{width:100%}.stats{grid-template-columns:1fr}.request-list{grid-template-columns:minmax(0,1fr)}.request-card{padding:13px}.student-head{display:grid;grid-template-columns:minmax(0,1fr) auto}.student-contact{grid-column:1/-1;text-align:right}.payment-mode{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.mode-option{font-size:13px;padding:7px 4px}.amount-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.amount-field:last-child{grid-column:1/-1}.report-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.report-filters label,.report-filters input{min-width:0;width:100%}.report-heading{align-items:flex-start}.report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.report-card{padding:12px}.report-card b{font-size:20px}}
+    @media(max-width:380px){.request-card{padding:10px}.amount-grid{grid-template-columns:1fr}.amount-field:last-child{grid-column:auto}.report-grid{grid-template-columns:1fr}.payment-mode{grid-template-columns:1fr}.student-head{grid-template-columns:1fr}.grade-pill{justify-self:start}.report-filters{grid-template-columns:1fr}.account-actions{width:100%}.account-actions button{flex:1}}
+    #dashboard:not([hidden]){display:grid;grid-template-columns:245px minmax(0,1fr);gap:20px;align-items:start}
+    .teacher-sidebar{position:sticky;top:16px;min-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:20px;padding:18px 14px;border-radius:16px;background:#142435;color:#fff;box-shadow:0 10px 25px #14243520;z-index:80}
+    .teacher-sidebar-brand{display:flex;align-items:center;gap:11px;padding:6px 6px 16px;border-bottom:1px solid #ffffff26}
+    .teacher-logo{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#00c99a;color:#10202c;font-weight:900}
+    .teacher-sidebar-brand strong,.teacher-sidebar-brand small{display:block}.teacher-sidebar-brand small{margin-top:5px;color:#b8c8d7;font-size:12px}
+    .teacher-sidebar-nav{display:grid;gap:8px}
+    .teacher-sidebar .portal-tab{width:100%;display:flex;align-items:center;gap:10px;min-height:48px;margin:0;padding:10px 12px;border:1px solid transparent;border-radius:10px;background:transparent;color:#e7f0f6;text-align:right;box-shadow:none;white-space:normal}
+    .teacher-sidebar .portal-tab span{width:28px;height:28px;flex:0 0 28px;display:grid;place-items:center;border-radius:7px;background:#ffffff1a}
+    .teacher-sidebar .portal-tab:hover,.teacher-sidebar .portal-tab.active{background:#00c99a;color:#10202c}
+    .teacher-sidebar-note{margin-top:auto;padding:12px;border:1px solid #ffffff26;border-radius:10px;color:#c9d8e3;font-size:12px;line-height:1.8}
+    .teacher-main{min-width:0}.teacher-mobile-toolbar{display:none}.teacher-sidebar-backdrop{display:none}
+    @media(max-width:800px){
+      #dashboard:not([hidden]){display:block}
+      .teacher-mobile-toolbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;margin:0 0 10px;padding:9px;border:1px solid #dce6f5;border-radius:12px;background:#fff}
+      .teacher-mobile-toolbar button{width:44px;min-width:44px;min-height:44px;margin:0;padding:8px}
+      .teacher-mobile-toolbar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .teacher-sidebar{position:fixed;inset:0 0 0 auto;width:min(84vw,310px);height:100dvh;min-height:0;box-sizing:border-box;border-radius:0;transform:translateX(110%);transition:transform .2s ease}
+      .teacher-sidebar.is-open{transform:translateX(0)}
+      .teacher-sidebar-backdrop:not([hidden]){position:fixed;inset:0;display:block;background:#10253dcc;z-index:79}
+    }
+    @media(max-width:380px){.teacher-mobile-toolbar{gap:8px;padding:7px}.teacher-mobile-toolbar strong{font-size:14px}}
+    .report-actions{display:flex;gap:8px;flex-wrap:wrap}.report-actions button{min-height:42px}.vip-report-print-header{display:none}
+    .report-students{margin-top:14px}.report-students h3{margin-top:0}.report-students table{min-width:820px}
+    @page{size:A4 landscape;margin:12mm}
+    @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}html,body{width:auto;min-height:0;background:#fff!important;color:#142435!important;overflow:visible!important}body{padding:0!important}.wrap{width:100%;max-width:none;margin:0}.wrap>section:first-child,#teacher-sidebar,#teacher-sidebar-backdrop,.teacher-mobile-toolbar,.account-bar,#requests-view,#vip-registration-link,.report-filters,.report-actions{display:none!important}#dashboard:not([hidden]){display:block!important}.teacher-main{display:block!important}#reports-view,#reports-view[hidden]{display:block!important;margin:0;padding:0}#reports-view>.report-heading{display:block;margin:0 0 12px;padding:0 0 10px;border:0;border-bottom:3px solid #00a982;border-radius:0;box-shadow:none;text-align:right}#reports-view>.report-heading h2{margin:0;color:#142435;font-size:23px}#reports-view>.report-heading p{margin:5px 0 0;font-size:11px}.report-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}.report-card,.report-breakdown,.report-students{break-inside:avoid;border:1px solid #d3dee6;border-radius:5px;box-shadow:none}.report-card{padding:9px;background:#f1f8f6!important}.report-card b{font-size:17px}.report-breakdown,.report-students{margin:10px 0;padding:10px}.report-table-wrap{overflow:visible!important}.report-table-wrap table,.report-students table{width:100%!important;min-width:0!important;border-collapse:collapse;font-size:9px}.report-table-wrap th,.report-table-wrap td,.report-students th,.report-students td{padding:6px 5px;border:1px solid #d3dee6;white-space:normal}.report-table-wrap th,.report-students th{background:#142435!important;color:#fff!important}.report-table-wrap tr:nth-child(even) td,.report-students tr:nth-child(even) td{background:#f1f8f6!important}}
+</style>
+<style>
+  @media print{.vip-report-print-header{display:block!important;margin:0 0 12px;padding:0 0 10px;border-bottom:3px solid #00a982;text-align:right}.vip-report-print-header h1{margin:7px 0;color:#142435;font-size:22px}.vip-report-print-header p{display:inline-block;margin:4px 18px 0 0;font-size:11px}}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>بوابة الأستاذ VIP</h1>
+      <p>&#1578;&#1575;&#1576;&#1593; &#1591;&#1604;&#1576;&#1575;&#1578; &#1591;&#1604;&#1575;&#1576;&#1603; &#1608;&#1575;&#1593;&#1578;&#1605;&#1583; &#1575;&#1604;&#1583;&#1601;&#1593; &#1608;&#1575;&#1606;&#1588;&#1574; &#1601;&#1608;&#1575;&#1578;&#1610;&#1585; &#1575;&#1604;&#1575;&#1588;&#1578;&#1585;&#1575;&#1603; &#1605;&#1606; &#1606;&#1601;&#1587; &#1575;&#1604;&#1576;&#1608;&#1575;&#1576;&#1577;.</p>
+    </section>
+    <section id="dashboard" hidden>
+      <aside id="teacher-sidebar" class="teacher-sidebar" aria-label="قائمة بوابة الأستاذ">
+        <div class="teacher-sidebar-brand"><span class="teacher-logo">VIP</span><div><strong>بوابة الأستاذ</strong><small>مركز لوك</small></div></div>
+        <nav class="teacher-sidebar-nav" aria-label="أقسام البوابة">
+          <button class="portal-tab active" type="button" data-view="requests-view"><span aria-hidden="true">▦</span>طلبات التسجيل</button>
+          <button class="portal-tab" type="button" data-view="reports-view"><span aria-hidden="true">▤</span>التقارير</button>
+          <button class="portal-tab" type="button" data-view="vip-registration-link"><span aria-hidden="true">⌗</span>رابط وQR التسجيل</button>
+        </nav>
+        <div class="teacher-sidebar-note">تابع طلبات طلابك واعتمد المدفوعات من مكان واحد.</div>
+      </aside>
+      <div id="teacher-sidebar-backdrop" class="teacher-sidebar-backdrop" hidden></div>
+      <div class="teacher-main">
+        <div class="teacher-mobile-toolbar"><button id="teacher-menu-toggle" type="button" aria-label="فتح القائمة" aria-controls="teacher-sidebar" aria-expanded="false">☰</button><strong id="teacher-view-title">طلبات التسجيل</strong></div>
+        <div class="card account-bar"><strong id="teacher-name"></strong><div class="account-actions"><button id="refresh">&#1578;&#1581;&#1583;&#1610;&#1579; &#1575;&#1604;&#1591;&#1604;&#1576;&#1575;&#1578;</button><button id="logout" class="secondary">&#1578;&#1587;&#1580;&#1610;&#1604; &#1575;&#1604;&#1582;&#1585;&#1608;&#1580;</button></div></div>
+        <section class="card portal-view" id="vip-registration-link" hidden>
+          <h2>&#1585;&#1575;&#1576;&#1591; &#1578;&#1587;&#1580;&#1610;&#1604; VIP &#1604;&#1604;&#1591;&#1604;&#1575;&#1576;</h2>
+          <p>&#1588;&#1575;&#1585;&#1603; &#1575;&#1604;&#1585;&#1575;&#1576;&#1591; &#1571;&#1608; &#1585;&#1605;&#1586; QR &#1605;&#1593; &#1575;&#1604;&#1591;&#1604;&#1575;&#1576; &#1604;&#1578;&#1587;&#1580;&#1610;&#1604; &#1591;&#1604;&#1576;&#1575;&#1578;&#1607;&#1605;.</p>
+          <button id="show-vip-qr" type="button" class="qr-button">&#1578;&#1580;&#1607;&#1610;&#1586; QR VIP &#1604;&#1604;&#1587;&#1603;&#1575;&#1606;</button>
+        </section>
+      <section id="requests-view" class="portal-view">
+        <div class="stats">
+          <div class="stat">&#1573;&#1580;&#1605;&#1575;&#1604;&#1610; &#1575;&#1604;&#1591;&#1604;&#1576;&#1575;&#1578;<b id="count-all">0</b></div>
+          <div class="stat">&#1576;&#1575;&#1606;&#1578;&#1592;&#1575;&#1585; &#1575;&#1593;&#1578;&#1605;&#1575;&#1583; &#1575;&#1604;&#1576;&#1585;&#1606;&#1575;&#1605;&#1580;<b id="count-pending">0</b></div>
+          <div class="stat">&#1575;&#1604;&#1605;&#1576;&#1575;&#1604;&#1594; &#1575;&#1604;&#1605;&#1581;&#1589;&#1604;&#1577; &#1575;&#1604;&#1605;&#1593;&#1578;&#1605;&#1583;&#1577;<b id="total-paid">0 &#1580;</b></div>
+        </div>
+        <div id="requests" class="request-list"><p class="card muted">&#1587;&#1580;&#1604; &#1575;&#1604;&#1583;&#1582;&#1608;&#1604; &#1604;&#1593;&#1585;&#1590; &#1575;&#1604;&#1591;&#1604;&#1576;&#1575;&#1578;.</p></div>
+      </section>
+      <section id="reports-view" class="portal-view" hidden>
+        <section class="card report-heading"><div><h2>&#1578;&#1602;&#1575;&#1585;&#1610;&#1585; &#1591;&#1604;&#1575;&#1576; VIP</h2><p>&#1575;&#1582;&#1578;&#1585; &#1601;&#1578;&#1585;&#1577; &#1604;&#1593;&#1585;&#1590; &#1591;&#1604;&#1576;&#1575;&#1578; &#1581;&#1587;&#1575;&#1576;&#1603; &#1608;&#1575;&#1604;&#1605;&#1576;&#1575;&#1604;&#1594; &#1575;&#1604;&#1605;&#1587;&#1580;&#1604;&#1577; &#1604;&#1607;&#1575;.</p></div><div class="report-actions"><button id="export-report-pdf" type="button">&#1578;&#1589;&#1583;&#1610;&#1585; PDF</button><button id="export-report" class="secondary" type="button">&#1578;&#1589;&#1583;&#1610;&#1585; CSV</button></div></section>
+        <header class="vip-report-print-header"><strong>LOOK CENTER · VIP</strong><h1>&#1578;&#1602;&#1585;&#1610;&#1585; &#1591;&#1604;&#1575;&#1576; VIP</h1><p>&#1575;&#1604;&#1601;&#1578;&#1585;&#1577;: <b id="vip-report-print-period"></b></p><p>&#1578;&#1575;&#1585;&#1610;&#1582; &#1575;&#1604;&#1578;&#1589;&#1583;&#1610;&#1585;: <b id="vip-report-print-generated"></b></p></header>
+        <section class="card report-filters"><label>&#1605;&#1606; <input id="report-from" type="date"></label><label>&#1573;&#1604;&#1609; <input id="report-to" type="date"></label><button id="clear-report-filter" class="secondary">&#1603;&#1604; &#1575;&#1604;&#1601;&#1578;&#1585;&#1575;&#1578;</button></section>
+        <div class="report-grid">
+          <div class="report-card"><span>&#1591;&#1604;&#1576;&#1575;&#1578; &#1575;&#1604;&#1601;&#1578;&#1585;&#1577;</span><b id="report-count">0</b></div>
+          <div class="report-card"><span>&#1575;&#1588;&#1578;&#1585;&#1575;&#1603;&#1575;&#1578; &#1605;&#1593;&#1578;&#1605;&#1583;&#1577;</span><b id="report-approved">0</b></div>
+          <div class="report-card"><span>&#1575;&#1588;&#1578;&#1585;&#1575;&#1603;&#1575;&#1578; &#1605;&#1580;&#1575;&#1606;&#1610;&#1577;</span><b id="report-free">0</b></div>
+          <div class="report-card"><span>&#1575;&#1588;&#1578;&#1585;&#1575;&#1603;&#1575;&#1578; &#1576;&#1575;&#1604;&#1578;&#1602;&#1587;&#1610;&#1591;</span><b id="report-installments">0</b></div>
+          <div class="report-card"><span>&#1575;&#1604;&#1602;&#1610;&#1605;&#1577; &#1575;&#1604;&#1605;&#1593;&#1578;&#1605;&#1583;&#1577; &#1604;&#1604;&#1601;&#1608;&#1575;&#1578;&#1610;&#1585;</span><b id="report-invoice-total">0 &#1580;</b></div>
+          <div class="report-card collected"><span>&#1575;&#1604;&#1605;&#1581;&#1589;&#1604; &#1601;&#1593;&#1604;&#1610;&#1611;&#1575;</span><b id="report-collected">0 &#1580;</b></div>
+          <div class="report-card due"><span>&#1575;&#1604;&#1605;&#1578;&#1576;&#1602;&#1610; &#1593;&#1604;&#1609; &#1575;&#1604;&#1591;&#1604;&#1575;&#1576;</span><b id="report-remaining">0 &#1580;</b></div>
+        </div>
+        <section class="card report-breakdown"><h3>&#1578;&#1601;&#1589;&#1610;&#1604; &#1581;&#1587;&#1576; &#1575;&#1604;&#1601;&#1585;&#1602;&#1577;</h3><div class="report-table-wrap"><table><thead><tr><th>&#1575;&#1604;&#1601;&#1585;&#1602;&#1577;</th><th>&#1593;&#1583;&#1583; &#1575;&#1604;&#1591;&#1604;&#1576;&#1575;&#1578;</th><th>&#1575;&#1604;&#1605;&#1581;&#1589;&#1604;</th><th>&#1575;&#1604;&#1605;&#1578;&#1576;&#1602;&#1610;</th></tr></thead><tbody id="report-by-grade"></tbody></table></div></section>
+        <section class="card report-students"><h3>&#1578;&#1601;&#1575;&#1589;&#1610;&#1604; &#1575;&#1604;&#1591;&#1604;&#1575;&#1576;</h3><div class="report-table-wrap"><table><thead><tr><th>&#1575;&#1604;&#1591;&#1575;&#1604;&#1576;</th><th>&#1575;&#1604;&#1607;&#1575;&#1578;&#1601;</th><th>&#1575;&#1604;&#1601;&#1585;&#1602;&#1577;</th><th>&#1575;&#1604;&#1575;&#1588;&#1578;&#1585;&#1575;&#1603;&#1575;&#1578;</th><th>&#1575;&#1604;&#1581;&#1575;&#1604;&#1577;</th><th>&#1602;&#1610;&#1605;&#1577; &#1575;&#1604;&#1601;&#1575;&#1578;&#1608;&#1585;&#1577;</th><th>&#1575;&#1604;&#1605;&#1581;&#1589;&#1604;</th><th>&#1575;&#1604;&#1605;&#1578;&#1576;&#1602;&#1610;</th><th>&#1578;&#1575;&#1585;&#1610;&#1582; &#1575;&#1604;&#1591;&#1604;&#1576;</th></tr></thead><tbody id="report-student-rows"></tbody></table></div></section>
+      </section>
+      </div>
+    </section>
+  </main>
+  <div id="teacher-qr-overlay" role="dialog" aria-modal="true" aria-labelledby="teacher-qr-title">
+    <div id="teacher-qr-dialog">
+      <button id="close-teacher-qr" type="button" style="float:left;background:#eee;color:#222;padding:6px 10px;">إغلاق</button>
+      <h2 id="teacher-qr-title" style="clear:both;color:#087f72;">QR VIP</h2>
+      <div id="teacher-qr-content">جارٍ تجهيز الرمز...</div>
+    </div>
+  </div>
+  <script type="module" src="./vip-teacher.js?v=13"></script>
+</body>
+</html>

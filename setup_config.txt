@@ -1,0 +1,10 @@
+;!@InstallPath@!UTF-8!
+Title="LOOK CASHIER Setup v2.0.0"
+BeginPrompt="Do you want to install LOOK CASHIER v2.0.0?"
+ExtractPathText="Installation folder:"
+ExtractTitle="Installing LOOK CASHIER..."
+ExtractCancelText="Cancel"
+ShowInstallDialog=yes
+TempMode=OnlyDelete
+RunProgram="install.bat"
+;GUIMode="1"

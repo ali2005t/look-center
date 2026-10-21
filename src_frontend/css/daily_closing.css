@@ -1,0 +1,302 @@
+/* التقفيل اليومي - أنماط مبدئية */
+
+/* استيراد الأنماط المشتركة */
+@import url('shared.css');
+@import url('main.css');
+
+body {
+    font-family: 'Cairo', sans-serif;
+    margin: 0;
+    background-color: #f4f8fc;
+    direction: rtl;
+}
+
+/* تنسيق الـ main content بشكل صحيح */
+main {
+    margin-right: 220px;
+    margin-top: 60px;
+    padding: 20px;
+    width: calc(100% - 240px);
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+/* Container للعناصر الرئيسية */
+.filter-section,
+#daily-closing-table,
+#vodafone-section,
+#daily-summary {
+    width: calc(100% - 0px) !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box;
+}
+
+/* تصميم الجدول الرئيسي */
+#daily-closing-table {
+    width: 100% !important;
+    border-collapse: collapse;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    background: white;
+    box-sizing: border-box;
+    display: table;
+}
+
+#daily-closing-table th, #daily-closing-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: center;
+    word-wrap: break-word;
+    white-space: normal;
+}
+
+#daily-closing-table th {
+    background-color: #0a1836;
+    color: white;
+    font-weight: bold;
+}
+
+#daily-closing-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+#daily-closing-table tr:hover {
+    background-color: #e3f2fd;
+}
+
+#daily-closing-table td {
+    color: #333;
+}
+
+/* قسم التصفية */
+.filter-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 20px 0;
+    padding: 15px;
+    width: 100% !important;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    box-sizing: border-box;
+    max-width: 100% !important;
+}
+
+#filter-btn, #export-btn {
+    background-color: #1976d2;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#filter-btn:hover, #export-btn:hover {
+    background-color: #1565c0;
+}
+
+/* توحيد عرض الجدول مع الفلتر */
+#daily-closing-table {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* قسم ملخص اليوم */
+#daily-summary {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+#daily-summary h3 {
+    color: #1976d2;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#daily-summary > div {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+#daily-summary > div > div {
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+#daily-summary > div > div p {
+    margin: 5px 0;
+}
+
+#daily-summary > div > div p:first-child {
+    font-size: 13px;
+    color: #666;
+}
+
+#daily-summary > div > div p:last-child {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* قسم فودافون كاش */
+#vodafone-section {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: #fff3e0;
+    border: 2px solid #ff9800;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+#vodafone-section h3 {
+    color: #ff9800;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#vodafone-invoices-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    background: white;
+}
+
+#vodafone-invoices-table thead tr {
+    background-color: #ff9800;
+    color: white;
+}
+
+#vodafone-invoices-table th {
+    padding: 12px;
+    text-align: center;
+    border: 1px solid #ff7c00;
+    font-weight: bold;
+}
+
+#vodafone-invoices-table td {
+    padding: 12px 14px;
+    text-align: center;
+    border: 1px solid #ffe0b2;
+}
+
+#vodafone-invoices-table tbody tr:nth-child(even) {
+    background-color: #fffbf0;
+}
+
+#vodafone-invoices-table tbody tr:nth-child(odd) {
+    background-color: #fff5e6;
+}
+
+/* أزرار فودافون */
+#vodafone-print-btn, #vodafone-clear-btn {
+    background-color: #ff9800;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 10px;
+    transition: background-color 0.3s;
+}
+
+#vodafone-clear-btn {
+    background-color: #f44336;
+}
+
+#vodafone-print-btn:hover {
+    background-color: #e68900;
+}
+
+#vodafone-clear-btn:hover {
+    background-color: #da190b;
+}
+
+/* أزرار الملخص */
+#export-summary-btn, #save-closing-btn, #print-report-btn, #send-report-btn {
+    background-color: #ff9800;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 5px;
+    transition: background-color 0.3s;
+}
+
+#save-closing-btn {
+    background-color: #43a047;
+}
+
+#print-report-btn {
+    background-color: #1976d2;
+}
+
+#send-report-btn {
+    background-color: #9c27b0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    main {
+        margin-right: 0;
+        width: 100%;
+    }
+    
+    #daily-closing-table {
+        width: 100%;
+        overflow-x: auto;
+    }
+    
+    #vodafone-section {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    main {
+        margin-right: 0;
+        width: 100%;
+        margin-top: 60px;
+        padding: 10px;
+    }
+    
+    #daily-closing-table th, #daily-closing-table td {
+        padding: 8px;
+        font-size: 12px;
+    }
+    
+    .filter-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    #daily-summary > div {
+        grid-template-columns: 1fr;
+    }
+}

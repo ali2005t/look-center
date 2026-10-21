@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الاشتراكات والأسعار</title>
+  <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
+  <link rel="stylesheet" href="css/subscriptions.css?v=inventory-v1" />
+  <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+</head>
+
+<body>
+
+  <!-- الهيدر -->
+  <header class="main-header">
+    <div class="header-left">
+      <img src="img/placeholder-logo.png" alt="شعار السنتر" />
+      <span id="center-name" style="
+        font-family: 'Montserrat', Arial, sans-serif;
+        font-size: 2.2em;
+        font-weight: bold;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1976d2, #43a047);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 2px 2px 8px #90caf9;
+        padding: 12px 32px;
+        border-radius: 18px;
+        box-shadow: 0 4px 24px #1976d244;
+        display: inline-block;
+      ">
+        <i class="fas fa-graduation-cap" style="margin-left:12px;color:#43a047;"></i>
+        LOOK CENTER
+      </span>
+    </div>
+    <div class="header-right">
+      <button id="mobile-menu-btn" class="mobile-menu-btn" title="القائمة"><i class="fas fa-bars"></i></button>
+      <button id="logout-btn">تسجيل الخروج</button>
+    </div>
+  </header>
+
+  <!-- القائمة المنسدلة للموبايل -->
+  <nav class="mobile-menu">
+    <ul class="mobile-menu-list">
+      <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i><span>لوحة التحكم</span></a></li>
+      <li><a href="cashier.html"><i class="fas fa-cash-register"></i><span>الكاشير</span></a></li>
+      <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
+      <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
+      <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
+      <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
+      <li><a href="expenses.html"><i class="fas fa-money-bill-wave"></i><span>المصروفات</span></a></li>
+      <li><a href="settings.html"><i class="fas fa-cog"></i><span>الإعدادات</span></a></li>
+      <li><a href="help.html"><i class="fas fa-question-circle"></i><span>دليل المساعدة</span></a></li>
+    </ul>
+  </nav>
+  </header>
+
+  <!-- القائمة الجانبية -->
+  <aside class="sidebar">
+    <ul>
+      <li data-link="dashboard.html"><a href="dashboard.html"><span class="sidebar-icon"><i
+              class="fas fa-tachometer-alt" style="color:#1976d2;"></i></span><span>لوحة التحكم</span></a></li>
+      <li data-link="cashier.html"><a href="cashier.html"><span class="sidebar-icon"><i class="fas fa-cash-register"
+              style="color:#43a047;"></i></span><span>الكاشير</span></a></li>
+      <li data-link="daily_closing.html"><a href="daily_closing.html"><span class="sidebar-icon"><i
+              class="fas fa-calendar-check" style="color:#ff9800;"></i></span><span>التقفيل اليومي</span></a></li>
+
+      <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice"
+              style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
+      <li data-link="unsubscribed_students.html"><a href="unsubscribed_students.html"><span class="sidebar-icon"><i
+              class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
+      <li data-link="late_students.html"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock"
+              style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+      <li class="active" data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i
+              class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
+      <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users"
+              style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
+      <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar"
+              style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
+      <li data-link="expenses.html"><a href="expenses.html"><span class="sidebar-icon"><i class="fas fa-money-bill-wave"
+              style="color:#c2185b;"></i></span><span>المصروفات</span></a></li>
+      <li data-link="settings.html"><a href="settings.html"><span class="sidebar-icon"><i class="fas fa-cog"
+              style="color:#455a64;"></i></span><span>الإعدادات</span></a></li>
+      <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle"
+              style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- المحتوى -->
+  <main class="subscriptions-content">
+    <section class="form-section">
+      <details class="add-subscription-details">
+        <summary><i class="fas fa-plus" aria-hidden="true"></i> إضافة اشتراك جديد</summary>
+        <form id="add-subscription-form">
+        <div id="linked-subscription-group" style="display:none;margin-bottom:8px;">
+          <label style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">
+            📚 الاشتراكات الأب المرتبطة بهذه الملزمة <small style="color:#666;font-weight:normal;">(يمكنك اختيار أكثر من اشتراك)</small>
+          </label>
+          <div id="linked-subscriptions-checklist" style="max-height:140px;overflow-y:auto;border:1px solid #cde4ff;border-radius:6px;padding:8px;background:#fcfdff;margin-bottom:6px;">
+            <p style="margin:0;color:#888;font-size:12px;">اختر الفرقة لعرض باقات الملازم المتاحة</p>
+          </div>
+          <select id="linked-subscription" style="display:none;">
+            <option value="">-- بدون اشتراك مرتبط --</option>
+          </select>
+        </div>
+          <div id="booklet-order-field" hidden>
+            <label for="booklet-order" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">ترتيب الملزمة داخل الاشتراك</label>
+            <input id="booklet-order" type="number" min="1" step="1" placeholder="مثال: 1" />
+          </div>
+          <label id="name-label" for="name" style="display:block;margin-bottom:4px;font-weight:bold;color:#1976d2;">📝 اسم
+            الاشتراك</label>
+        <input type="text" placeholder="مثال: مقيد، اشتراك نصف سنة..." id="name" required />
+
+        <label for="type" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📂 نوع
+          الاشتراك</label>
+        <select id="type">
+          <option value="">اختر النوع</option>
+          <option value="كورسات">كورسات</option>
+          <option value="ملازم">ملازم</option>
+          <option value="محاضرات فردية">محاضرات فردية</option>
+          <option value="ملازم فردية">ملازم فردية</option>
+        </select>
+
+        <label for="grade" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">🎓
+          الفرقة الدراسية</label>
+        <select id="grade">
+          <option value="">اختر الفرقة</option>
+          <option value="أولى">أولى</option>
+          <option value="ثانية">ثانية</option>
+          <option value="ثالثة">ثالثة</option>
+          <option value="رابعة">رابعة</option>
+        </select>
+
+        <label for="price" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">💰
+          السعر (بالجنيه)</label>
+        <input type="number" id="price" placeholder="مثال: 250" required />
+
+        <div id="booklet-stock-field" hidden>
+          <label for="stock" style="display:block;margin-top:10px;margin-bottom:4px;font-weight:bold;color:#1976d2;">📦
+            المخزون المتوفر <small style="color:#888;font-weight:normal;">(للملازم فقط)</small></label>
+          <input type="number" id="stock" placeholder="مثال: 50" min="0" step="1" value="0" />
+        </div>
+
+        <button type="submit">إضافة</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="table-section">
+      <div class="subscriptions-table-toolbar">
+        <h2>كل الاشتراكات</h2>
+        <label for="subscription-type-filter">تصفية النوع</label>
+        <select id="subscription-type-filter">
+          <option value="">كل الأنواع</option>
+          <option value="كورسات">كورسات</option>
+          <option value="ملازم">ملازم</option>
+          <option value="ملازم فردية">ملازم فردية</option>
+          <option value="محاضرات فردية">محاضرات فردية</option>
+        </select>
+      </div>
+      <table id="subscriptions-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>الاسم (أ–ي)</th>
+            <th>النوع</th>
+            <th>مرتبط بـ</th>
+            <th>الفرقة</th>
+            <th>السعر</th>
+            <th>المخزون</th>
+            <th>كروت أونلاين</th>
+            <th>الحالة / نشر</th>
+            <th>المحتويات</th>
+            <th>تعديل</th>
+            <th>حذف</th>
+          </tr>
+        </thead>
+        <tbody id="subscriptions-table-body">
+          <!-- الاشتراكات هتتحط هنا -->
+        </tbody>
+      </table>
+      <section class="inventory-report" aria-labelledby="inventory-report-title">
+        <div class="inventory-report-heading">
+          <div>
+            <span class="inventory-report-kicker">INVENTORY OVERVIEW</span>
+            <h2 id="inventory-report-title">ملخص الاشتراكات والملازم والمخزون</h2>
+          </div>
+          <button type="button" id="refresh-inventory-report" class="inventory-refresh-btn">
+            <i class="fas fa-rotate" aria-hidden="true"></i> تحديث
+          </button>
+        </div>
+        <div id="inventory-summary-cards" class="inventory-summary-cards" aria-live="polite"></div>
+        <div class="inventory-table-wrap">
+          <table class="inventory-grade-table">
+            <thead>
+              <tr>
+                <th>الفرقة</th>
+                <th>اشتراكات كورسات</th>
+                <th>اشتراكات ملازم</th>
+                <th>ملازم فردية</th>
+                <th>إجمالي الاشتراكات</th>
+                <th>نسخ المخزون</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-grade-report"></tbody>
+          </table>
+        </div>
+        <h3 class="inventory-history-title">سجل حركات مخزون الملازم</h3>
+        <div class="inventory-table-wrap">
+          <table class="inventory-history-table">
+            <thead>
+              <tr>
+                <th>التاريخ والوقت</th>
+                <th>الفرقة</th>
+                <th>الملزمة</th>
+                <th>نوع الحركة</th>
+                <th>تغيير الكمية</th>
+                <th>الرصيد بعد الحركة</th>
+                <th>المستخدم</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-movements-report"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== قسم كروت الأونلاين المستقل ===== -->
+    <section class="form-section online-cards-form-section">
+      <div class="online-cards-section-heading">
+        <span class="online-cards-section-icon"><i class="fas fa-id-card" aria-hidden="true"></i></span>
+        <div>
+          <span class="online-cards-kicker">ONLINE CARDS</span>
+          <h2>إدارة كروت الأونلاين</h2>
+          <p>اربط الكارت باشتراك واحد أو أكثر، وتابع الرصيد وحالة التسليم على الفاتورة.</p>
+        </div>
+      </div>
+      <form id="add-online-card-form">
+        <div class="online-card-form-grid">
+          <label class="online-card-field">
+            اسم الكارت
+            <input type="text" id="card-name" placeholder="مثال: كود منصة الترم" required />
+          </label>
+          <label class="online-card-field">
+            نوع الكارت
+            <select id="card-type">
+              <option value="للاشتراكات">مرتبط باشتراك</option>
+              <option value="فردي">كارت فردي</option>
+            </select>
+          </label>
+          <label class="online-card-field" id="card-per-sub-field">
+            عدد الكروت لكل اشتراك
+            <input type="number" id="card-per-sub" placeholder="1" min="1" step="1" value="1" />
+          </label>
+          <label class="online-card-field" id="card-price-field">
+            سعر الكارت الفردي (يظهر في الفاتورة)
+            <input type="number" id="card-price" placeholder="مثال: 50" min="0.01" step="0.01" value="0" />
+          </label>
+          <label class="online-card-field">
+            عدد الكروت المتوفرة
+            <input type="number" id="card-stock" placeholder="مثال: 100" min="0" step="1" required />
+          </label>
+        </div>
+        <fieldset id="card-linked-subscriptions-group" class="card-linked-subscriptions-group">
+          <legend>الاشتراكات المرتبطة بالكارت <small>يمكن اختيار أكثر من اشتراك</small></legend>
+          <div id="card-linked-subscriptions" class="card-linked-subscriptions" aria-live="polite"></div>
+        </fieldset>
+        <fieldset id="card-individual-types-group" class="card-linked-subscriptions-group" hidden>
+          <legend>يظهر الكارت مع <small>اختر نوعًا واحدًا أو أكثر</small></legend>
+          <div class="card-individual-types">
+            <label class="card-subscription-option"><input type="checkbox" name="card-individual-type" value="محاضرات فردية" /> محاضرات فردية</label>
+            <label class="card-subscription-option"><input type="checkbox" name="card-individual-type" value="ملازم فردية" /> ملازم فردية</label>
+          </div>
+        </fieldset>
+        <button type="submit" class="online-card-submit"><i class="fas fa-plus" aria-hidden="true"></i> إضافة الكارت</button>
+      </form>
+    </section>
+
+    <section class="table-section online-cards-table-section">
+      <div class="online-cards-table-heading">
+        <div>
+          <span class="online-cards-kicker">CARD STOCK</span>
+          <h2>كروت الأونلاين والمخزون</h2>
+        </div>
+        <div id="online-card-stock-summary" class="online-card-stock-summary" aria-live="polite">إجمالي الرصيد: —</div>
+      </div>
+      <table class="online-cards-table">
+        <thead>
+          <tr>
+            <th>اسم الكرت</th>
+            <th>النوع</th>
+            <th>الاشتراكات المرتبطة</th>
+            <th>كروت / اشتراك</th>
+            <th>💰 السعر</th>
+            <th>📦 المخزون</th>
+            <th>تعديل</th>
+            <th>حذف</th>
+          </tr>
+        </thead>
+        <tbody id="online-cards-table-body">
+          <!-- الكروت هتتحط هنا -->
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="logout-modal"
+    style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
+    <div
+      style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">
+      <button
+        style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:22px;color:#1976d2;cursor:pointer;"
+        onclick="document.getElementById('logout-modal').style.display='none'">&times;</button>
+      <h2 style="color:#1976d2;margin-bottom:18px;font-size:1.5em;font-weight:bold;letter-spacing:1px;">تسجيل الخروج
+      </h2>
+      <p style="color:#333;margin-bottom:22px;font-size:1.1em;">اختر نوع الخروج المطلوب:</p>
+      <button id="temp-logout-btn"
+        style="background:linear-gradient(90deg,#43a047 60%,#1976d2 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;margin-bottom:16px;box-shadow:0 2px 8px #43a04722;transition:background 0.2s;">خروج
+        مؤقت</button><br>
+      <button id="end-shift-btn"
+        style="background:linear-gradient(90deg,#ff9800 60%,#fbc02d 100%);color:#fff;padding:12px 32px;border:none;border-radius:10px;cursor:pointer;font-size:17px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:background 0.2s;">إنهاء
+        الشيفت</button>
+    </div>
+  </div>
+
+  <script src="js/notifications.js"></script>
+  <script src="js/electron-nav.js"></script>
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/header.js?v=permissions-v10"></script>
+  <script src="js/mobile-dropdown-menu.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script type="module" src="js/subscriptions.js?v=inventory-v4"></script>
+  <script>
+    // تغيير اسم الحقل حسب النوع المختار
+    document.getElementById('type').addEventListener('change', function () {
+      var val = this.value;
+      var label = document.getElementById('name-label');
+      var nameInput = document.getElementById('name');
+      if (val === 'ملازم' || val === 'ملازم فردية') {
+        label.textContent = 'اسم الملزمة';
+        nameInput.placeholder = 'اسم الملزمة';
+      } else if (val === 'كورسات') {
+        label.textContent = 'إضافة كورس';
+        nameInput.placeholder = 'اسم الكورس';
+      } else if (val === 'محاضرات فردية') {
+        label.textContent = 'اسم المحاضرة';
+        nameInput.placeholder = 'اسم المحاضرة';
+      } else {
+        label.textContent = 'اسم الاشتراك';
+        nameInput.placeholder = 'اسم الاشتراك';
+      }
+    });
+  </script>
+  <script>
+    // توجيه عند الضغط على أي جزء من المربع وليس فقط الكلمة
+    document.querySelectorAll('.sidebar ul li').forEach(li => {
+      li.addEventListener('click', function (e) {
+        window.location.href = li.getAttribute('data-link');
+      });
+    });
+
+    function handleMobileTabs() {
+      const tabs = document.querySelector('.mobile-tabs');
+      if (window.innerWidth <= 900) {
+        tabs && (tabs.style.display = 'flex');
+      } else {
+        tabs && (tabs.style.display = 'none');
+      }
+    }
+    window.addEventListener('resize', handleMobileTabs);
+    window.addEventListener('DOMContentLoaded', handleMobileTabs);
+    if (document.querySelector('.mobile-tabs')) {
+      document.querySelectorAll('.mobile-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          window.location.href = btn.getAttribute('data-link');
+        });
+      });
+    }
+  </script>
+  <script>
+    // اختبار أزرار تسجيل الخروج
+    document.getElementById('temp-logout-btn').addEventListener('click', function () {
+      console.log('تم الضغط على زر الخروج المؤقت');
+    });
+
+    document.getElementById('end-shift-btn').addEventListener('click', function () {
+      console.log('تم الضغط على زر إنهاء الشيفت');
+    });
+  </script>
+  <script>
+    // التأكد من تفعيل الأحداث عند فتح المودال
+    document.getElementById('logout-btn').addEventListener('click', function () {
+      const modal = document.getElementById('logout-modal');
+      modal.style.display = 'flex';
+
+      // إضافة الأحداث بعد عرض المودال
+      const tempLogoutBtn = document.getElementById('temp-logout-btn');
+      const endShiftBtn = document.getElementById('end-shift-btn');
+
+      if (tempLogoutBtn) {
+        tempLogoutBtn.addEventListener('click', function () {
+          console.log('تم الضغط على زر الخروج المؤقت');
+        });
+      }
+
+      if (endShiftBtn) {
+        endShiftBtn.addEventListener('click', function () {
+          console.log('تم الضغط على زر إنهاء الشيفت');
+        });
+      }
+
+      // معالج النقر على القائمة الجانبية
+      const sidebarLinks = document.querySelectorAll('.sidebar ul li a');
+      sidebarLinks.forEach(link => {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const href = this.getAttribute('href');
+          if (href && href.trim()) {
+            window.location.href = href;
+          }
+        });
+      });
+    });
+  </script>
+
+  <footer
+    style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;">
+    <b>Powered by Eng. Lol</b>
+  </footer>
+  <script src="js/sidebar-toggle.js?v=sidebar-v2"></script>
+  <script src="js/zoom-controls.js"></script>
+</body>
+
+</html>

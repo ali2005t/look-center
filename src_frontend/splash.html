@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>LOOK CASHIER | جاري التشغيل</title>
+    <link rel="stylesheet" href="css/splash.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+
+<body>
+    <main class="splash-stage" aria-label="شاشة بدء تشغيل LOOK CASHIER">
+        <div class="signal-grid" aria-hidden="true"></div>
+        <div class="scan-line" aria-hidden="true"></div>
+
+        <section class="brand-panel">
+            <div class="brand-mark" aria-hidden="true">
+                <img id="center-logo" src="logo.png" alt="">
+            </div>
+
+            <p class="kicker">ASAS MARKET POS</p>
+            <h1 class="splash-title" id="splash-center-name">LOOK CASHIER</h1>
+            <p class="splash-subtitle">نظام كاشير سريع، واضح، وجاهز للشغل.</p>
+
+            <div class="progress-wrap" aria-label="نسبة التحميل" aria-live="polite">
+                <div class="progress-meta">
+                    <span class="loading-status" id="loading-status">جاري تهيئة الواجهة</span>
+                    <strong id="progress-percent">0%</strong>
+                </div>
+                <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="تقدم تشغيل النظام">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </div>
+
+            <div class="loading-steps" aria-label="خطوات بدء التشغيل">
+                <div class="step active" id="step-1">
+                    <i class="fas fa-bolt"></i>
+                    <span>تهيئة الواجهة</span>
+                </div>
+                <div class="step" id="step-2">
+                    <i class="fas fa-database"></i>
+                    <span>تحميل البيانات</span>
+                </div>
+                <div class="step" id="step-3">
+                    <i class="fas fa-cash-register"></i>
+                    <span>فتح الكاشير</span>
+                </div>
+            </div>
+        </section>
+
+        <aside class="system-rail" aria-hidden="true">
+            <div class="rail-header">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="rail-line">
+                <span>SALES</span>
+                <strong>24,890</strong>
+            </div>
+            <div class="rail-line">
+                <span>ORDERS</span>
+                <strong>128</strong>
+            </div>
+            <div class="rail-line">
+                <span>SYNC</span>
+                <strong>LIVE</strong>
+            </div>
+            <div class="mini-chart">
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+            </div>
+        </aside>
+    </main>
+
+    <footer class="splash-footer">
+        <span>Powered by Eng. Lol</span>
+        <strong>LOOK CASHIER 2025</strong>
+    </footer>
+
+    <script>
+        const logo = document.getElementById('center-logo');
+        const logoPath = localStorage.getItem('centerLogo');
+        const centerName = localStorage.getItem('centerName');
+
+        if (logoPath) {
+            logo.src = logoPath;
+        }
+
+        if (centerName) {
+            document.getElementById('splash-center-name').textContent = centerName;
+        }
+    </script>
+
+    <script src="js/splash.js"></script>
+    <script src="js/zoom-controls.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141414">
+  <title>تسجيل VIP - بوابة الطالب</title>
+  <link rel="stylesheet" href="./portal.css?v=4">
+  <style>
+    .vip-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+      background: #f6d860;
+      box-shadow: 4px 4px 0 var(--ink);
+      font-weight: 900;
+      font-size: 15px;
+    }
+    .vip-badge::before { content: '👑'; }
+    .agent-banner { background: #f6d860; }
+  </style>
+</head>
+<body>
+  <main class="portal-shell">
+    <section class="portal-card" id="registration-card">
+      <div class="brand-mark">LOOK</div>
+      <p class="eyebrow">بوابة الطلاب VIP</p>
+      <h1>تسجيل <span class="vip-badge">VIP</span></h1>
+      <p class="intro">سجّل بياناتك في اشتراك VIP الخاص بالأستاذ.</p>
+
+      <div class="agent-banner" id="agent-banner">جاري التحقق من رابط التسجيل...</div>
+      <div class="notice error" id="portal-error" hidden></div>
+
+      <form id="student-form" hidden>
+        <label>اسم الطالب<input id="student-name" required autocomplete="name" placeholder="الاسم كاملاً"></label>
+        <label>رقم الهاتف<input id="student-phone" required inputmode="tel" autocomplete="tel" placeholder="01xxxxxxxxx"></label>
+        <label>الفرقة الدراسية
+          <select id="student-grade" required>
+            <option value="">اختر الفرقة</option>
+            <option>أولى</option><option>ثانية</option><option>ثالثة</option><option>رابعة</option>
+          </select>
+        </label>
+        <label>نوع الدراسة
+          <select id="study-type" required>
+            <option value="">اختر نوع الدراسة</option>
+            <option>انتظام</option><option>انتساب</option>
+          </select>
+        </label>
+        <fieldset class="portal-options">
+          <legend>اختر الاشتراك</legend>
+          <div id="subscription-options" class="subscription-options">
+            <p>اختر الفرقة أولًا لعرض الاشتراكات والأسعار.</p>
+          </div>
+          <strong class="portal-total">الإجمالي: <span id="selected-total">0</span> ج</strong>
+        </fieldset>
+
+        <label>ملاحظات
+          <textarea id="student-notes" rows="3" placeholder="اختياري: أي ملاحظات أو تفاصيل إضافية"></textarea>
+        </label>
+        <button type="submit">إرسال بيانات VIP 👑</button>
+      </form>
+
+      <div class="notice success" id="success-message" hidden>
+        ✅ تم تسجيل بيانات VIP بنجاح. سيتواصل معك الأستاذ لتأكيد الاشتراك.
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./vip-portal.js?v=6"></script>
+</body>
+</html>

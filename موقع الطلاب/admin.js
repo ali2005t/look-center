@@ -60,11 +60,12 @@ function normalizeStudentPortalUrl(value) {
   parsed.hash = '';
   parsed.search = '';
 
-  // Keep the public portal as a real HTML file. This prevents Vercel's
-  // clean-URL handling from resolving relative assets from the wrong path.
+  // Use a clean public URL while keeping the HTML file in the repository.
   const normalizedPath = parsed.pathname.replace(/\/+$/, '');
   if (/\/موقع الطلاب$/u.test(normalizedPath)) {
-    parsed.pathname = `${normalizedPath}/index.html`;
+    parsed.pathname = `${normalizedPath}/index`;
+  } else if (/\/موقع الطلاب\/index\.html$/u.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/\.html$/iu, '');
   }
 
   return parsed;

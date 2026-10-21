@@ -10,5 +10,23 @@
       "destination": "/موقع الطلاب/",
       "permanent": false
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/portal.css",
+      "destination": "/موقع الطلاب/portal.css"
+    },
+    {
+      "source": "/portal.js",
+      "destination": "/موقع الطلاب/portal.js"
+    },
+    {
+      "source": "/admin.css",
+      "destination": "/موقع الطلاب/admin.css"
+    },
+    {
+      "source": "/admin.js",
+      "destination": "/موقع الطلاب/admin.js"
+    }
   ]
 }

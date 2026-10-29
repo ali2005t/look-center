@@ -51,21 +51,28 @@ byId("teacher-qr-overlay").addEventListener("click", event => { if (event.target
 function formatMoney(value) { return Number(value || 0).toLocaleString('ar-EG') + ' \u062c'; }
 function selectedMode(item, invoiceAmount, paidNow) {
   if (item.paymentStatus === 'paid') return item.installment?.remaining > 0 ? 'installment' : (Number(item.subscriptionAmount ?? invoiceAmount) === 0 ? 'free' : 'full');
-  if (item.teacherReportedPaymentMode) return item.teacherReportedPaymentMode;
-  return paidNow === 0 ? 'free' : paidNow < invoiceAmount ? 'installment' : 'full';
+  if (Number(invoiceAmount) <= 0) return 'free';
+  if (['full', 'installment', 'free'].includes(item.teacherReportedPaymentMode)) return item.teacherReportedPaymentMode;
+  if (paidNow > 0) return paidNow < invoiceAmount ? 'installment' : 'full';
+  return 'full';
 }
 function applyChargeMode(row, mode) {
   const invoiceInput = row.querySelector('.invoice-amount');
   const paidInput = row.querySelector('.paid-now');
-  if (mode === 'free' || (mode === 'full' && Number(invoiceInput.value) === 0)) { row.querySelector('.charge-mode[value="free"]').checked = true; invoiceInput.value = '0'; paidInput.value = '0'; }
-  else if (mode === 'full') paidInput.value = invoiceInput.value;
-  else {
-    const total = Number(invoiceInput.value);
+  if (mode === 'free') {
+    invoiceInput.value = '0';
+    paidInput.value = '0';
+  } else {
+    const total = Number(invoiceInput.value) > 0 ? Number(invoiceInput.value) : Number(invoiceInput.dataset.requestedAmount || 0);
     const paid = Number(paidInput.value);
     if (total <= 0) {
       row.querySelector('.charge-mode[value="free"]').checked = true;
       invoiceInput.value = '0'; paidInput.value = '0';
-    } else if (paid <= 0 || paid >= total) paidInput.value = '';
+    } else {
+      invoiceInput.value = String(total);
+      if (mode === 'full') paidInput.value = String(total);
+      else if (paid <= 0 || paid >= total) paidInput.value = '';
+    }
   }
   updateRemaining(row);
 }
@@ -87,11 +94,13 @@ async function loadRequests() {
       const items = Array.isArray(item.selectedSubscriptions) ? item.selectedSubscriptions : [];
       const isPaid = item.paymentStatus === 'paid';
       const invoiceAmount = Number(item.teacherReportedAmount ?? item.subscriptionAmount ?? item.requestedAmount ?? 0);
+      const requestedAmount = Number(item.requestedAmount) > 0 ? Number(item.requestedAmount) : invoiceAmount;
       const hasRecordedPaid = item.teacherReportedPaidAmount !== undefined
         || item.amountCollected !== undefined
         || item.paidAmount !== undefined;
-      const paidNow = Number(item.teacherReportedPaidAmount ?? item.amountCollected ?? item.paidAmount ?? (isPaid ? invoiceAmount : 0));
-      const mode = selectedMode(item, invoiceAmount, paidNow);
+      const recordedPaid = Number(item.teacherReportedPaidAmount ?? item.amountCollected ?? item.paidAmount ?? (isPaid ? invoiceAmount : 0));
+      const mode = selectedMode(item, invoiceAmount, recordedPaid);
+      const paidNow = mode === 'free' ? 0 : mode === 'full' ? invoiceAmount : recordedPaid;
       const remaining = mode === 'free' ? 0 : Number(item.installment?.remaining ?? Math.max(0, invoiceAmount - paidNow));
       const date = item.registeredAt?.toDate ? item.registeredAt.toDate().toLocaleString('ar-EG') : '\u2014';
       let state = '\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c';
@@ -108,7 +117,7 @@ async function loadRequests() {
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="full" ' + (mode === 'full' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062f\u0641\u0639 \u0643\u0627\u0645\u0644</span></label>' +
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="installment" ' + (mode === 'installment' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062a\u0642\u0633\u064a\u0637</span></label>' +
         '<label class="mode-option free"><input class="charge-mode" type="radio" name="' + radioName + '" value="free" ' + (mode === 'free' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u0645\u062c\u0627\u0646\u064a</span></label></div>' +
-        '<div class="amount-grid"><label class="amount-field">\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 (\u062a\u0644\u0642\u0627\u0626\u064a)<input class="invoice-amount" type="number" min="0" step="0.01" value="' + safeText(mode === 'free' ? 0 : invoiceAmount) + '" readonly ' + (isPaid ? 'disabled' : '') + '></label>' +
+        '<div class="amount-grid"><label class="amount-field">\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 (\u062a\u0644\u0642\u0627\u0626\u064a)<input class="invoice-amount" type="number" min="0" step="0.01" data-requested-amount="' + safeText(requestedAmount) + '" value="' + safeText(mode === 'free' ? 0 : invoiceAmount) + '" readonly ' + (isPaid ? 'disabled' : '') + '></label>' +
         '<label class="amount-field">\u0627\u0644\u0645\u062f\u0641\u0648\u0639 \u0627\u0644\u0622\u0646<input class="paid-now" type="number" min="0" step="0.01" placeholder="\u0627\u0643\u062a\u0628 \u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0641\u0639\u0629" value="' + safeText(mode === 'free' ? 0 : (mode === 'installment' && !hasRecordedPaid ? '' : paidNow)) + '" ' + (isPaid ? 'disabled' : '') + '></label>' +
         '<label class="amount-field">\u0627\u0644\u0645\u062a\u0628\u0642\u064a<output class="remaining-amount">' + formatMoney(remaining) + '</output></label></div>' +
         '<div class="request-actions"><button class="save-amount secondary" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u062d\u0641\u0638 \u0627\u0644\u0645\u0628\u0627\u0644\u063a</button><button class="approve-payment" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062f\u0641\u0639 \u0648\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629</button></div></div></article>';

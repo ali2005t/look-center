@@ -27,6 +27,40 @@ function normalizePhoneForDuplicate(value) {
     .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).replace(/\D/g, '');
 }
 
+function isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs) {
+  const registration = registrationDoc.data();
+  const invoiceId = String(registration.invoiceId || '');
+  if (!invoiceId) return false;
+  return !invoiceDocs.some(invoiceDoc => invoiceDoc.id === invoiceId
+    || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id);
+}
+
+function nextAvailableVipInvoiceNumber(invoiceDocs, vipRegistrationDocs, regularRegistrationDocs) {
+  const usedNumbers = new Set();
+  invoiceDocs.forEach(invoiceDoc => {
+    const invoice = invoiceDoc.data();
+    const number = Number(invoice.num);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  regularRegistrationDocs.forEach(registrationDoc => {
+    const number = Number(registrationDoc.data().invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  vipRegistrationDocs.forEach(registrationDoc => {
+    const registration = registrationDoc.data();
+    if (isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs)) return;
+    const linkedInvoice = invoiceDocs.find(invoiceDoc => invoiceDoc.id === String(registration.invoiceId || '')
+      || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id);
+    const linkedInvoiceNumber = Number(linkedInvoice?.data().num);
+    if (Number.isInteger(linkedInvoiceNumber) && linkedInvoiceNumber > 0) return;
+    const number = Number(registration.invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  let nextNumber = 1;
+  while (usedNumbers.has(nextNumber)) nextNumber += 1;
+  return nextNumber;
+}
+
 function withTimeout(promise, label, timeoutMs = 12000) {
   return Promise.race([
     promise,
@@ -137,11 +171,11 @@ form.addEventListener('submit', async (event) => {
       getDocs(collection(db, 'vipRegistrations')),
       getDocs(collection(db, 'studentRegistrations'))
     ]);
-    const invoiceNumber = [
-      ...invoicesSnapshot.docs.map(item => Number(item.data().num) || 0),
-      ...registrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0),
-      ...standardRegistrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0)
-    ].reduce((highest, value) => Math.max(highest, value), 0) + 1;
+    const invoiceNumber = nextAvailableVipInvoiceNumber(
+      invoicesSnapshot.docs,
+      registrationsSnapshot.docs,
+      standardRegistrationsSnapshot.docs
+    );
 
     const phone = document.getElementById('student-phone').value.trim();
     const phoneKey = normalizePhoneForDuplicate(phone);
@@ -149,6 +183,7 @@ form.addEventListener('submit', async (event) => {
     const duplicateNames = new Set();
     [invoicesSnapshot, registrationsSnapshot, standardRegistrationsSnapshot].forEach(snapshot => snapshot.docs.forEach(existingDoc => {
       const existing = existingDoc.data();
+      if (snapshot === registrationsSnapshot && isDeletedVipInvoiceRegistration(existingDoc, invoicesSnapshot.docs)) return;
       if (normalizePhoneForDuplicate(existing.phone || existing.studentPhone) !== phoneKey) return;
       const existingItems = existing.items || existing.selectedSubscriptions || existing.subscriptions || existing.selectedItems || [];
       existingItems.forEach(item => {

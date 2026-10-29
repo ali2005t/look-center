@@ -36,7 +36,7 @@ form.addEventListener("submit", async (e) => {
       localStorage.removeItem("rememberedEmail");
     }
     // جلب صلاحيات المستخدم من Firestore
-    const { getFirestore, collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const { getFirestore, collection, getDocs, doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const db = getFirestore();
     const usersSnap = await getDocs(collection(db, "users"));
     let userDoc = null;
@@ -52,6 +52,14 @@ form.addEventListener("submit", async (e) => {
       errorMessage.textContent = "لم يتم العثور على صلاحيات لهذا المستخدم. تواصل مع المدير.";
       errorMessage.style.display = "block";
       return;
+    }
+    if (userDocId && auth.currentUser?.uid && userDoc.uid !== auth.currentUser.uid) {
+      try {
+        await updateDoc(doc(db, 'users', userDocId), { uid: auth.currentUser.uid });
+        userDoc.uid = auth.currentUser.uid;
+      } catch (identityError) {
+        console.warn('Could not refresh the user identity link:', identityError);
+      }
     }
 
     const permissions = userDoc.permissions;

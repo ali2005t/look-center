@@ -22,6 +22,11 @@ export function getInstallmentSummary(invoice) {
 
 export function isInstallmentInvoice(invoice) {
   const installmentMethod = '\u062a\u0642\u0633\u064a\u0637';
+  if (invoice?.isVip && ['full', 'free'].includes(invoice.vipPaymentMode)) return false;
+  if (invoice?.isVip && !invoice.vipPaymentMode
+    && invoice.payment !== installmentMethod && invoice.paymentMethod !== installmentMethod
+    && !(Number(invoice.installment?.remaining || 0) > 0)
+    && (invoice.paymentStatus === 'paid' || invoice.payment === '\u0645\u062c\u0627\u0646\u064a' || invoice.paymentMethod === '\u0645\u062c\u0627\u0646\u064a')) return false;
   if (invoice?.payment === installmentMethod || invoice?.paymentMethod === installmentMethod) return true;
   const summary = getInstallmentSummary(invoice);
   if (invoice?.isPortalRegistration && summary.remaining > 0) return true;

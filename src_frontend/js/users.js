@@ -97,9 +97,11 @@ addUserForm.addEventListener("submit", async (e) => {
   }
 
   if (!fullname || !username || !password || !type) return window.showNotification("يرجى ملء كل الحقول", 'error');
+  let createdAuthUid = '';
   try {
     // إنشاء المستخدم في Authentication
-    await createUserWithEmailAndPassword(userCreationAuth, email, password);
+    const credential = await createUserWithEmailAndPassword(userCreationAuth, email, password);
+    createdAuthUid = credential.user.uid;
     await firebaseSignOut(userCreationAuth);
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
@@ -111,6 +113,7 @@ addUserForm.addEventListener("submit", async (e) => {
     }
   }
   await addDoc(collection(db, "users"), {
+    uid: createdAuthUid,
     fullname,
     username,
     email,

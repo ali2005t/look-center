@@ -1,7 +1,7 @@
 // Remove local imports and use Firebase CDN
 // Firebase App (the core Firebase SDK) is always required and must be listed first
 import { db } from "./firebase.js";
-import { collection, getDocs, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, getDoc, getDocs, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const auth = getAuth();
 let dailyRealtimeStarted = false;
@@ -101,6 +101,31 @@ function normalizeUserAlias(value) {
   return String(value ?? '').trim().toLocaleLowerCase();
 }
 
+function looksLikeOpaqueUserId(value) {
+  const rawValue = String(value ?? '').trim();
+  return rawValue.length >= 20
+    && /^[A-Za-z0-9_-]+$/.test(rawValue)
+    && /[a-z]/.test(rawValue)
+    && /[A-Z]/.test(rawValue)
+    && /\d/.test(rawValue);
+}
+
+function dailySessionIdentity(session, userIdentity) {
+  const candidates = [session?.userId, session?.email, session?.username].filter(Boolean);
+  return candidates.find(identity => userIdentity?.isKnown(identity))
+    || candidates.find(identity => !looksLikeOpaqueUserId(identity))
+    || candidates[0]
+    || '';
+}
+
+function dailyProfileDisplayName(profile) {
+  const email = String(profile?.email || '').trim();
+  return [profile?.username, profile?.fullname, profile?.name, email.split('@')[0], email]
+    .map(value => String(value || '').trim())
+    .find(value => value && !looksLikeOpaqueUserId(value))
+    || 'غير محدد';
+}
+
 function localDateInputValue(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -149,10 +174,114 @@ function portalCollectedAmount(payment, registration) {
   return installmentAmount ?? explicitlyCollectedAmounts[0] ?? 0;
 }
 
-function portalPaymentOwner(record, relatedRecord, userIdentity) {
-  const owner = [record?.recordedBy, record?.paidBy, relatedRecord?.paidBy, record?.agentId, relatedRecord?.agentId]
-    .find(value => String(value ?? '').trim() && String(value).trim() !== '-');
-  return userIdentity.resolve(owner || 'غير محدد');
+function portalPaymentOwner(record, relatedRecord, userIdentity, fallbackOwner = '') {
+  // تسجيل الموقع يتبع المستخدم الذي أنشأ رابط QR، وليس الموظف الذي سجّل الدفع.
+  const candidates = [
+    relatedRecord?.agentId,
+    record?.agentId,
+    relatedRecord?.recordedBy,
+    relatedRecord?.paidBy,
+    record?.recordedBy,
+    record?.paidBy,
+    fallbackOwner
+  ];
+
+  for (const value of candidates) {
+    const rawValue = String(value ?? '').trim();
+    const normalized = rawValue.toLocaleLowerCase();
+    if (!rawValue || normalized === '-' || normalized === 'guest' || rawValue === 'غير محدد') continue;
+
+    const resolved = userIdentity.resolve(rawValue);
+    if (resolved !== 'غير محدد') return resolved;
+  }
+
+  return 'غير محدد';
+}
+
+function isVipDailyInvoice(invoice) {
+  return invoice?.isVip === true || Boolean(invoice?.vipRegistrationId);
+}
+
+function normalizeDailyPhone(value) {
+  let digits = String(value ?? '')
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/\D/g, '');
+  if (digits.startsWith('0020')) digits = digits.slice(4);
+  else if (digits.startsWith('20') && digits.length >= 12) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
+  return digits;
+}
+
+function dailySubscriptionKey(value) {
+  return String(value ?? '').trim().toLocaleLowerCase()
+    .replace(/^اشتراك\s*/, '')
+    .replace(/[\sـ]+/g, '');
+}
+
+function dailyInvoiceTypes(invoice) {
+  return new Set([invoice?.subType, ...(Array.isArray(invoice?.linkedSubTypes) ? invoice.linkedSubTypes : [])]
+    .map(dailySubscriptionKey).filter(Boolean));
+}
+
+function dailyRecordDate(value) {
+  return toDailyDate(value);
+}
+
+function sameDailyCalendarDate(left, right) {
+  return Boolean(left && right
+    && left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate());
+}
+
+function dailyInvoiceCollectedAmount(invoice) {
+  if (invoice.payment === 'تقسيط' || installmentPayments(invoice).length) return installmentInitialPaid(invoice);
+  const recordedAmount = [invoice.amountCollected, invoice.paidAmount]
+    .find(value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value)));
+  return recordedAmount === undefined
+    ? (invoice.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0)
+    : Number(recordedAmount);
+}
+
+function portalInvoiceAssociation(registration, payment, invoiceDocs) {
+  const registrationId = String(registration?.id || payment?.registrationId || '');
+  const phone = normalizeDailyPhone(registration?.phone || registration?.studentPhone || payment?.phone || payment?.studentPhone);
+  const paidDate = dailyRecordDate(payment?.paidAt || registration?.paidAt || registration?.registeredAt);
+  const subscriptionTypes = (registration?.selectedSubscriptions || registration?.subscriptions || [])
+    .map(item => dailySubscriptionKey(item?.type)).filter(Boolean);
+  if (!phone || !paidDate) return null;
+
+  const candidates = invoiceDocs.filter(invoiceDoc => {
+    const invoice = invoiceDoc.data();
+    if (isVipDailyInvoice(invoice)) return false;
+    if (String(invoice.portalRegistrationId || invoice.registrationId || '') === registrationId && registrationId) return true;
+    const invoicePhone = normalizeDailyPhone(invoice.phone || invoice.studentPhone);
+    const invoiceDate = dailyRecordDate(invoice.date);
+    if (!invoicePhone || invoicePhone !== phone || !sameDailyCalendarDate(invoiceDate, paidDate)) return false;
+    if (!subscriptionTypes.length) return false;
+    const invoiceTypes = dailyInvoiceTypes(invoice);
+    return subscriptionTypes.every(type => invoiceTypes.has(type));
+  });
+  if (!candidates.length) return null;
+
+  const invoiceDoc = candidates[0];
+  const invoice = invoiceDoc.data();
+  const sameRecipient = candidates.every(candidate => String(candidate.data().recipient || '').trim() === String(invoice.recipient || '').trim());
+  if (candidates.length > 1 && !sameRecipient) return null;
+  const explicitLink = registrationId && candidates.some(candidate => {
+    const candidateInvoice = candidate.data();
+    return String(candidateInvoice.portalRegistrationId || candidateInvoice.registrationId || '') === registrationId;
+  });
+  const portalAmount = Number(portalCollectedAmount(payment, registration));
+  const portalMethod = String(payment?.paymentMethod || payment?.payment || registration?.paymentMethod || registration?.payment || '').trim();
+  const invoiceMethods = new Set(candidates.map(candidate => String(candidate.data().paymentMethod || candidate.data().payment || '').trim()).filter(Boolean));
+  const sameMethod = !portalMethod || !invoiceMethods.size || (invoiceMethods.size === 1 && invoiceMethods.has(portalMethod));
+  const invoiceAmount = candidates.reduce((sum, candidate) => sum + dailyInvoiceCollectedAmount(candidate.data()), 0);
+  return {
+    invoiceDoc,
+    duplicate: Boolean(explicitLink || (sameMethod && Number.isFinite(portalAmount) && Math.abs(portalAmount - invoiceAmount) < 0.01))
+  };
 }
 
 function createUserIdentityResolver(userDocs) {
@@ -161,20 +290,42 @@ function createUserIdentityResolver(userDocs) {
   userDocs.forEach(userDoc => {
     const profile = userDoc.data();
     const email = String(profile.email || '').trim();
-    const displayName = profile.username || profile.fullname || profile.name || email || userDoc.id;
+    const displayName = dailyProfileDisplayName(profile);
     userNames.set(userDoc.id, displayName);
-    const possibleAliases = [userDoc.id, profile.uid, profile.username, profile.fullname, profile.name, profile.email, email.split('@')[0]];
+    const possibleAliases = [
+      userDoc.id, profile.uid, profile.authUid, profile.authUID, profile.userId, profile.firebaseUid,
+      profile.username, profile.fullname, profile.name, profile.email, email.split('@')[0]
+    ];
     possibleAliases.filter(Boolean).forEach(alias => {
       const key = normalizeUserAlias(alias);
       if (key && !aliases.has(key)) aliases.set(key, displayName);
     });
   });
+  const signedInUser = auth.currentUser;
+  if (signedInUser?.uid) {
+    const signedInProfile = userDocs.find(userDoc => {
+      const profile = userDoc.data();
+      return userDoc.id === localStorage.getItem('currentUserId')
+        || String(profile.email || '').trim().toLocaleLowerCase() === String(signedInUser.email || '').trim().toLocaleLowerCase();
+    });
+    const signedInName = signedInProfile
+      ? dailyProfileDisplayName(signedInProfile.data())
+      : [localStorage.getItem('currentUsername'), localStorage.getItem('currentUserName')]
+        .find(value => value && !looksLikeOpaqueUserId(value));
+    if (signedInName) aliases.set(normalizeUserAlias(signedInUser.uid), signedInName);
+  }
   return {
     userNames,
     resolve(value) {
       const rawValue = String(value ?? '').trim();
       if (!rawValue || rawValue === '-') return 'غير محدد';
-      return aliases.get(normalizeUserAlias(rawValue)) || userNames.get(rawValue) || rawValue;
+      const knownName = aliases.get(normalizeUserAlias(rawValue)) || userNames.get(rawValue);
+      if (knownName) return knownName;
+      return looksLikeOpaqueUserId(rawValue) ? 'غير محدد' : rawValue;
+    },
+    isKnown(value) {
+      const rawValue = String(value ?? '').trim();
+      return Boolean(rawValue && (aliases.has(normalizeUserAlias(rawValue)) || userNames.has(rawValue)));
     }
   };
 }
@@ -290,16 +441,15 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     console.log("Date range:", todayStart, "to", todayEnd);
     
     // جلب الفواتير لليوم المحدد
-    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, vipRegistrationsSnapshot, usersSnapshot] = await Promise.all([
+    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, usersSnapshot] = await Promise.all([
       getDocs(collection(db, "invoices")),
       getDocs(collection(db, "studentPortalPayments")),
       getDocs(collection(db, "studentRegistrations")),
-      getDocs(collection(db, "vipRegistrations")),
       getDocs(collection(db, "users"))
     ]);
     if (!isLatestRequest()) return;
     const userIdentity = createUserIdentityResolver(usersSnapshot.docs);
-    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(registrationDoc => [registrationDoc.id, registrationDoc.data()]));
+    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(registrationDoc => [registrationDoc.id, { ...registrationDoc.data(), id: registrationDoc.id }]));
     const invoicesByUser = {};
 
     const countPortalSubscriptionTypes = (summary, registration) => {
@@ -310,7 +460,7 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     };
     invoicesSnapshot.forEach(docSnap => {
       const invoice = docSnap.data();
-      if (invoice.isVip === true) return;
+      if (isVipDailyInvoice(invoice)) return;
       let invDate = invoice.date;
       if (invDate && typeof invDate.toDate === "function") {
         invDate = invDate.toDate();
@@ -359,31 +509,12 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     // ضم دفعات الأقساط التي تم تحصيلها في التاريخ المحدد.
     invoicesSnapshot.forEach(docSnap => {
       const invoice = docSnap.data();
+      if (isVipDailyInvoice(invoice)) return;
       installmentPayments(invoice).forEach(payment => {
         const paymentDate = toDailyDate(payment.paidAt || payment.date);
         if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
         if ((payment.method || payment.paymentMethod || payment.payment) === 'فودافون كاش') return;
         const username = userIdentity.resolve(payment.receivedBy || invoice.recipient || 'غير محدد');
-        if (!invoicesByUser[username]) {
-          invoicesByUser[username] = {
-            'كورسات': 0, 'ملازم': 0, 'محاضرات فردية': 0, 'ملازم فردية': 0,
-            invoiceCount: 0, totalAmount: 0
-          };
-        }
-        invoicesByUser[username].totalAmount += Number(payment.amount) || 0;
-      });
-    });
-
-    const linkedVipRegistrationIds = new Set(invoicesSnapshot.docs.map(invoiceDoc => invoiceDoc.data().vipRegistrationId).filter(Boolean));
-    vipRegistrationsSnapshot.forEach(registrationDoc => {
-      const registration = registrationDoc.data();
-      if (linkedVipRegistrationIds.has(registrationDoc.id)
-        || invoicesSnapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId)) return;
-      installmentPayments(registration).forEach(payment => {
-        const paymentDate = toDailyDate(payment.paidAt || payment.date);
-        if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
-        if ((payment.method || payment.paymentMethod || payment.payment) === 'فودافون كاش') return;
-        const username = userIdentity.resolve(payment.receivedBy || registration.teacherName || registration.paidBy || 'غير محدد');
         if (!invoicesByUser[username]) {
           invoicesByUser[username] = {
             'كورسات': 0, 'ملازم': 0, 'محاضرات فردية': 0, 'ملازم فردية': 0,
@@ -415,7 +546,12 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
       else if (paymentDate) paymentDate = new Date(paymentDate);
       if (!paymentDate || Number.isNaN(paymentDate.getTime()) || paymentDate < todayStart || paymentDate > todayEnd) return;
 
-      const username = portalPaymentOwner(payment, registration, userIdentity);
+      const association = portalInvoiceAssociation(registration, payment, invoicesSnapshot.docs);
+      if (association?.duplicate) {
+        if (payment.registrationId) recordedPortalRegistrations.add(payment.registrationId);
+        return;
+      }
+      const username = portalPaymentOwner(payment, registration, userIdentity, association?.invoiceDoc?.data()?.recipient);
       if (payment.registrationId) recordedPortalRegistrations.add(payment.registrationId);
       if (!invoicesByUser[username]) {
         invoicesByUser[username] = {
@@ -434,14 +570,16 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     // دعم السجلات التي تغيرت حالتها إلى مدفوع قبل إنشاء سجل الدفع المنفصل.
     portalRegistrationsSnapshot.forEach(registrationDoc => {
       if (recordedPortalRegistrations.has(registrationDoc.id)) return;
-      const registration = registrationDoc.data();
+      const registration = { ...registrationDoc.data(), id: registrationDoc.id };
       if (registration.paymentStatus !== 'paid') return;
       let paidDate = registration.paidAt || registration.registeredAt;
       if (paidDate?.toDate) paidDate = paidDate.toDate();
       else if (paidDate) paidDate = new Date(paidDate);
       if (!paidDate || Number.isNaN(paidDate.getTime()) || paidDate < todayStart || paidDate > todayEnd) return;
 
-      const username = portalPaymentOwner(registration, null, userIdentity);
+      const association = portalInvoiceAssociation(registration, null, invoicesSnapshot.docs);
+      if (association?.duplicate) return;
+      const username = portalPaymentOwner(registration, null, userIdentity, association?.invoiceDoc?.data()?.recipient);
       if (!invoicesByUser[username]) {
         invoicesByUser[username] = {
           'كورسات': 0, 'ملازم': 0, 'محاضرات فردية': 0, 'ملازم فردية': 0,
@@ -475,7 +613,9 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
       else if (paymentDate) paymentDate = new Date(paymentDate);
       if (paymentDate && paymentDate >= todayStart && paymentDate <= todayEnd) {
         const registration = portalRegistrations.get(payment.registrationId) || {};
-        sessions.push({ username: portalPaymentOwner(payment, registration, userIdentity), loginTime: paymentDate, logoutTime: null });
+        const association = portalInvoiceAssociation(registration, payment, invoicesSnapshot.docs);
+        const username = portalPaymentOwner(payment, registration, userIdentity, association?.invoiceDoc?.data()?.recipient);
+        if (username !== 'غير محدد') sessions.push({ username, loginTime: paymentDate, logoutTime: null });
       }
     });
 
@@ -484,6 +624,8 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     // تصفية الجلسات للتاريخ المحدد
     const sessionsForDate = sessions.filter(session => {
       if (!session.loginTime) return false;
+      const identity = dailySessionIdentity(session, userIdentity);
+      if (looksLikeOpaqueUserId(identity) && !userIdentity.isKnown(identity)) return false;
       const loginTime = session.loginTime.toDate ? session.loginTime.toDate() : new Date(session.loginTime);
       return loginTime >= todayStart && loginTime <= todayEnd;
     });
@@ -518,7 +660,7 @@ async function loadDailyClosingData(dateFrom = null, dateTo = dateFrom) {
     
     // المرة الأولى: احصل على أول جلسة تسجيل دخول لكل مستخدم
     sessionsForDate.forEach(session => {
-      const username = userIdentity.resolve(session.username);
+      const username = userIdentity.resolve(dailySessionIdentity(session, userIdentity));
       
       if (!uniqueUsersMap[username]) {
         uniqueUsersMap[username] = {
@@ -652,7 +794,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const refreshToday = () => loadDailyClosingData(document.getElementById('filter-date-from')?.value || null, document.getElementById('filter-date-to')?.value || null);
     onSnapshot(collection(db, 'studentPortalPayments'), refreshToday);
     onSnapshot(collection(db, 'studentRegistrations'), refreshToday);
-    onSnapshot(collection(db, 'vipRegistrations'), refreshToday);
     onSnapshot(collection(db, 'invoices'), refreshToday);
   }
   
@@ -809,24 +950,44 @@ async function recordLoginTimeOnce() {
   const user = auth.currentUser;
   if (!user) return;
   try {
-    // تحقق من وجود sessionId في localStorage
     const sessionKey = `activeSessionId_${user.email}`;
+    const username = localStorage.getItem('currentUsername')
+      || localStorage.getItem('currentUserName')
+      || user.email?.split('@')[0]
+      || 'غير محدد';
     let sessionId = localStorage.getItem(sessionKey);
     if (sessionId) {
-      // تحقق من أن الجلسة مازالت نشطة في قاعدة البيانات
-      const sessionDoc = await getDocs(query(collection(db, "user_sessions"), where("username", "==", user.email), where("logoutTime", "==", null)));
-      if (!sessionDoc.empty) {
-        // الجلسة مازالت نشطة
+      const activeSession = await getDoc(doc(db, 'user_sessions', sessionId));
+      if (activeSession.exists() && !activeSession.data().logoutTime) {
+        if (activeSession.data().username !== username) {
+          await updateDoc(activeSession.ref, { username });
+        }
         return;
       } else {
-        // الجلسة انتهت، احذف sessionId من localStorage
         localStorage.removeItem(sessionKey);
       }
     }
-    // لا يوجد جلسة نشطة، أنشئ واحدة جديدة
-    const username = user.displayName || user.email.split('@')[0] || "Unknown User";
+
+    // ترحيل الجلسات القديمة التي كانت تحفظ البريد أو معرّف Firebase كاسم.
+    const legacyIdentities = [...new Set([user.email, user.uid, user.displayName].filter(Boolean))];
+    for (const legacyIdentity of legacyIdentities) {
+      const legacySessions = await getDocs(query(
+        collection(db, 'user_sessions'),
+        where('username', '==', legacyIdentity),
+        where('logoutTime', '==', null)
+      ));
+      if (!legacySessions.empty) {
+        const legacySession = legacySessions.docs[0];
+        await updateDoc(legacySession.ref, { username });
+        localStorage.setItem(sessionKey, legacySession.id);
+        return;
+      }
+    }
+
     const docRef = await addDoc(collection(db, "user_sessions"), {
       username: username,
+      userId: localStorage.getItem('currentUserId') || '',
+      email: user.email || '',
       loginTime: serverTimestamp(),
       logoutTime: null,
     });
@@ -1002,11 +1163,10 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
     const todayStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0);
     const todayEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
     
-    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, vipRegistrationsSnapshot, usersSnapshot] = await Promise.all([
+    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, usersSnapshot] = await Promise.all([
       getDocs(collection(db, "invoices")),
       getDocs(collection(db, "studentPortalPayments")),
       getDocs(collection(db, "studentRegistrations")),
-      getDocs(collection(db, "vipRegistrations")),
       getDocs(collection(db, "users"))
     ]);
     const userIdentity = createUserIdentityResolver(usersSnapshot.docs);
@@ -1014,7 +1174,7 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
     
     invoicesSnapshot.forEach(docSnap => {
       const invoice = docSnap.data();
-      if (invoice.isVip === true) return;
+      if (isVipDailyInvoice(invoice)) return;
       let invDate = invoice.date;
       
       if (invDate && typeof invDate.toDate === "function") {
@@ -1028,13 +1188,14 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
       // تصفية حسب التاريخ والمستخدم
       if (userIdentity.resolve(invoice.recipient) === userIdentity.resolve(username) && invDate >= todayStart && invDate <= todayEnd) {
         const isInstallmentInvoice = invoice.payment === 'تقسيط' || installmentPayments(invoice).length > 0;
+        const invoiceItems = invoice.items || [];
         userInvoices.push({
           ...invoice,
           id: docSnap.id,
           date: invDate,
           items: isInstallmentInvoice
             ? [{ name: 'المقدم عند تسجيل التقسيط', price: installmentInitialPaid(invoice) }]
-            : (invoice.items || [])
+            : invoiceItems
         });
       }
     });
@@ -1042,6 +1203,7 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
     // عرض كل دفعة تقسيط كسجل قبض مستقل في تفاصيل التقفيل بتاريخ استلامها.
     invoicesSnapshot.forEach(docSnap => {
       const invoice = docSnap.data();
+      if (isVipDailyInvoice(invoice)) return;
       if (userIdentity.resolve(invoice.recipient) !== userIdentity.resolve(username)) return;
       installmentPayments(invoice).forEach((payment, paymentIndex) => {
         const paymentDate = toDailyDate(payment.paidAt || payment.date);
@@ -1061,32 +1223,7 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
       });
     });
 
-    const linkedVipRegistrationIds = new Set(invoicesSnapshot.docs.map(invoiceDoc => invoiceDoc.data().vipRegistrationId).filter(Boolean));
-    vipRegistrationsSnapshot.forEach(registrationDoc => {
-      const registration = registrationDoc.data();
-      if (linkedVipRegistrationIds.has(registrationDoc.id)
-        || invoicesSnapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId)) return;
-      installmentPayments(registration).forEach((payment, paymentIndex) => {
-        const paymentDate = toDailyDate(payment.paidAt || payment.date);
-        if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
-        const paymentOwner = payment.receivedBy || registration.teacherName || registration.paidBy || 'غير محدد';
-        if (userIdentity.resolve(paymentOwner) !== userIdentity.resolve(username)) return;
-        const method = payment.method || payment.paymentMethod || payment.payment || 'نقدي';
-        userInvoices.push({
-          id: `${registrationDoc.id}-installment-${paymentIndex}`,
-          num: registration.invoiceNumber || `VIP-${registrationDoc.id.slice(-6)}`,
-          student: registration.studentName || registration.student || '-',
-          subType: (registration.selectedSubscriptions || []).map(item => item.type).filter(Boolean).join(' + ') || 'قسط تقسيط',
-          items: [{ name: `تحصيل قسط · ${method}`, price: Number(payment.amount) || 0 }],
-          payment: method,
-          date: paymentDate,
-          isVodafone: method === 'فودافون كاش',
-          sourceLabel: 'دفعة على اشتراك VIP'
-        });
-      });
-    });
-
-    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(registrationDoc => [registrationDoc.id, registrationDoc.data()]));
+    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(registrationDoc => [registrationDoc.id, { ...registrationDoc.data(), id: registrationDoc.id }]));
     const recordedPortalRegistrations = new Set();
 
     // عرض مدفوعات بوابة الطلاب داخل تفاصيل فواتير المستخدم.
@@ -1107,7 +1244,12 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
       if (!paymentDate || Number.isNaN(paymentDate.getTime()) || paymentDate < todayStart || paymentDate > todayEnd) return;
       if (payment.registrationId && recordedPortalRegistrations.has(payment.registrationId)) return;
 
-      const paymentUsername = portalPaymentOwner(payment, registration, userIdentity);
+      const association = portalInvoiceAssociation(registration, payment, invoicesSnapshot.docs);
+      if (association?.duplicate) {
+        if (payment.registrationId) recordedPortalRegistrations.add(payment.registrationId);
+        return;
+      }
+      const paymentUsername = portalPaymentOwner(payment, registration, userIdentity, association?.invoiceDoc?.data()?.recipient);
       if (paymentUsername !== userIdentity.resolve(username)) return;
       const selectedSubscriptions = registration.selectedSubscriptions || [];
       if (payment.registrationId) recordedPortalRegistrations.add(payment.registrationId);
@@ -1126,13 +1268,15 @@ async function showUserInvoices(username, dateFrom, dateTo = dateFrom) {
 
     // دعم المدفوعات القديمة المحفوظة داخل التسجيل فقط.
     portalRegistrationsSnapshot.forEach(registrationDoc => {
-      const registration = registrationDoc.data();
+      const registration = { ...registrationDoc.data(), id: registrationDoc.id };
       if (recordedPortalRegistrations.has(registrationDoc.id) || registration.paymentStatus !== 'paid') return;
       let paidDate = registration.paidAt || registration.registeredAt;
       if (paidDate?.toDate) paidDate = paidDate.toDate();
       else if (paidDate) paidDate = new Date(paidDate);
       if (!paidDate || Number.isNaN(paidDate.getTime()) || paidDate < todayStart || paidDate > todayEnd) return;
-      const registrationUsername = portalPaymentOwner(registration, null, userIdentity);
+      const association = portalInvoiceAssociation(registration, null, invoicesSnapshot.docs);
+      if (association?.duplicate) return;
+      const registrationUsername = portalPaymentOwner(registration, null, userIdentity, association?.invoiceDoc?.data()?.recipient);
       if (registrationUsername !== userIdentity.resolve(username)) return;
       userInvoices.push({
         id: registrationDoc.id,
@@ -1342,22 +1486,19 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
     if (Number.isNaN(todayStart.getTime()) || Number.isNaN(todayEnd.getTime()) || todayStart > todayEnd) return;
     
     // جلب فواتير الكاشير ومدفوعات بوابة الطلاب المسددة بفودافون كاش.
-    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, vipRegistrationsSnapshot, usersSnapshot] = await Promise.all([
+    const [invoicesSnapshot, portalPaymentsSnapshot, portalRegistrationsSnapshot, usersSnapshot] = await Promise.all([
       getDocs(collection(db, 'invoices')),
       getDocs(collection(db, 'studentPortalPayments')),
       getDocs(collection(db, 'studentRegistrations')),
-      getDocs(collection(db, 'vipRegistrations')),
       getDocs(collection(db, 'users'))
     ]);
-    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(item => [item.id, item.data()]));
-    const userNames = new Map(usersSnapshot.docs.map(item => {
-      const user = item.data();
-      return [item.id, user.username || user.fullname || user.email || item.id];
-    }));
+    const portalRegistrations = new Map(portalRegistrationsSnapshot.docs.map(item => [item.id, { ...item.data(), id: item.id }]));
+    const userIdentity = createUserIdentityResolver(usersSnapshot.docs);
     const vodafoneInvoices = [];
     
     invoicesSnapshot.forEach(doc => {
       const data = doc.data();
+      if (isVipDailyInvoice(data)) return;
       
       // تصفية فواتير فودافون كاش فقط
       if (!data.isVodafone) return;
@@ -1382,6 +1523,7 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
     // إظهار الأقساط المحصلة بفودافون كاش كسجلات مستقلة بتاريخ القبض.
     invoicesSnapshot.forEach(doc => {
       const data = doc.data();
+      if (isVipDailyInvoice(data)) return;
       installmentPayments(data).forEach((payment, paymentIndex) => {
         if ((payment.method || payment.paymentMethod || payment.payment) !== 'فودافون كاش') return;
         const paymentDate = toDailyDate(payment.paidAt || payment.date);
@@ -1393,29 +1535,6 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
           subType: data.subType || 'قسط تقسيط',
           items: [{ name: 'دفعة قسط تقسيط', price: Number(payment.amount) || 0 }],
           recipient: payment.receivedBy || data.recipient || '-',
-          date: paymentDate,
-          isVodafone: true,
-          payment: 'فودافون كاش'
-        });
-      });
-    });
-
-    const linkedVipRegistrationIds = new Set(invoicesSnapshot.docs.map(invoiceDoc => invoiceDoc.data().vipRegistrationId).filter(Boolean));
-    vipRegistrationsSnapshot.forEach(registrationDoc => {
-      const registration = registrationDoc.data();
-      if (linkedVipRegistrationIds.has(registrationDoc.id)
-        || invoicesSnapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId)) return;
-      installmentPayments(registration).forEach((payment, paymentIndex) => {
-        if ((payment.method || payment.paymentMethod || payment.payment) !== 'فودافون كاش') return;
-        const paymentDate = toDailyDate(payment.paidAt || payment.date);
-        if (!paymentDate || paymentDate < todayStart || paymentDate > todayEnd) return;
-        vodafoneInvoices.push({
-          id: `${registrationDoc.id}-installment-${paymentIndex}`,
-          num: registration.invoiceNumber || `VIP-${registrationDoc.id.slice(-6)}`,
-          student: registration.studentName || registration.student || '-',
-          subType: (registration.selectedSubscriptions || []).map(item => item.type).filter(Boolean).join(' + ') || 'قسط تقسيط',
-          items: [{ name: 'دفعة قسط تقسيط', price: Number(payment.amount) || 0 }],
-          recipient: payment.receivedBy || registration.teacherName || registration.paidBy || '-',
           date: paymentDate,
           isVodafone: true,
           payment: 'فودافون كاش'
@@ -1436,6 +1555,11 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
       if (!registrationId || seenPortalRegistrations.has(registrationId)) return;
       const registration = portalRegistrations.get(registrationId);
       if (!registration) return;
+      const association = portalInvoiceAssociation(registration, payment, invoicesSnapshot.docs);
+      if (association?.duplicate) {
+        seenPortalRegistrations.add(registrationId);
+        return;
+      }
       seenPortalRegistrations.add(registrationId);
       let paymentDate = payment.paidAt;
       if (paymentDate?.toDate) paymentDate = paymentDate.toDate();
@@ -1448,7 +1572,7 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
         student: payment.studentName || registration.studentName || '-',
         subType: [...new Set(subscriptions.map(item => item.type).filter(Boolean))].join(' + ') || 'اشتراك من بوابة الطلاب',
          items: [{ name: 'تحصيل بوابة الطلاب', price: portalCollectedAmount(payment, registration) }],
-        recipient: userNames.get(payment.agentId) || payment.agentId || '-',
+        recipient: portalPaymentOwner(payment, registration, userIdentity, association?.invoiceDoc?.data()?.recipient),
         date: paymentDate,
         isVodafone: true,
         payment: payment.paymentMethod || payment.payment
@@ -1456,10 +1580,15 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
     });
 
     portalRegistrationsSnapshot.docs.forEach(registrationDoc => {
-      const registration = registrationDoc.data();
+      const registration = { ...registrationDoc.data(), id: registrationDoc.id };
       if (seenPortalRegistrations.has(registrationDoc.id)
         || registration.paymentStatus !== 'paid'
         || (registration.paymentMethod || registration.payment) !== 'فودافون كاش') return;
+      const association = portalInvoiceAssociation(registration, null, invoicesSnapshot.docs);
+      if (association?.duplicate) {
+        seenPortalRegistrations.add(registrationDoc.id);
+        return;
+      }
       let paymentDate = registration.paidAt || registration.registeredAt;
       if (paymentDate?.toDate) paymentDate = paymentDate.toDate();
       else if (paymentDate) paymentDate = new Date(paymentDate);
@@ -1472,7 +1601,7 @@ async function loadVodafoneInvoices(dateFrom = null, dateTo = dateFrom) {
         student: registration.studentName || '-',
         subType: [...new Set(subscriptions.map(item => item.type).filter(Boolean))].join(' + ') || 'اشتراك من بوابة الطلاب',
          items: [{ name: 'تحصيل بوابة الطلاب', price: portalCollectedAmount(null, registration) }],
-        recipient: userNames.get(registration.agentId) || registration.agentId || '-',
+        recipient: portalPaymentOwner(registration, null, userIdentity, association?.invoiceDoc?.data()?.recipient),
         date: paymentDate,
         isVodafone: true,
         payment: registration.paymentMethod || registration.payment

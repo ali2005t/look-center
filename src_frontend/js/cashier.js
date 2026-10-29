@@ -28,7 +28,7 @@ if (printBtn) {
 import { db } from './firebase.js';
 import { collection, getDocs, addDoc, Timestamp, doc, getDoc, updateDoc, query, where, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js';
+import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js?v=vip-payment-mode-v1';
 
 const isVipMode = new URLSearchParams(window.location.search).get('vip') === 'true';
 let selectedGrade = "";
@@ -346,7 +346,7 @@ function escapeStudentHtml(value) {
 }
 
 function studentRecordDate(record) {
-  const value = record.isPortalRegistration
+  const value = record.isPortalRegistration || record.isVipRegistration
     ? (record.data.registeredAt || record.data.createdAt || record.data.date)
     : (record.data.date || record.data.createdAt);
   const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
@@ -368,12 +368,25 @@ function normalizeProfileReference(value) {
   return normalizeStudentText(value);
 }
 
-function makeStudentRecord(docSnap, isPortalRegistration) {
-  const data = docSnap.data();
-  const items = isPortalRegistration
+function makeStudentRecord(docSnap, isPortalRegistration, isVipRegistration = false) {
+  const rawData = docSnap.data();
+  const paymentIsInstallment = rawData.payment === '\u062a\u0642\u0633\u064a\u0637' || rawData.paymentMethod === '\u062a\u0642\u0633\u064a\u0637';
+  const inferredVipPaymentMode = rawData.vipPaymentMode || rawData.teacherReportedPaymentMode
+    || (paymentIsInstallment || Number(rawData.installment?.remaining || 0) > 0 ? 'installment'
+      : rawData.payment === '\u0645\u062c\u0627\u0646\u064a' || rawData.paymentMethod === '\u0645\u062c\u0627\u0646\u064a' ? 'free'
+        : rawData.paymentStatus === 'paid' ? 'full' : '');
+  const data = { ...rawData };
+  if (isVipRegistration) {
+    data.isVip = true;
+    data.vipPaymentMode = inferredVipPaymentMode;
+  } else if (rawData.isVip && !rawData.vipPaymentMode) {
+    data.vipPaymentMode = inferredVipPaymentMode || 'full';
+  }
+  const isRegistration = isPortalRegistration || isVipRegistration;
+  const items = isRegistration
     ? (data.selectedSubscriptions || data.subscriptions || data.selectedItems || [])
     : (data.items || []);
-  const student = isPortalRegistration ? (data.studentName || data.student || '') : (data.student || data.studentName || '');
+  const student = isRegistration ? (data.studentName || data.student || '') : (data.student || data.studentName || '');
   const phone = data.phone || data.studentPhone || '';
   const itemTypes = new Set(items.map(item => String(item.type || item.subType || '').trim()));
   const hasBookletSubscription = [...itemTypes].some(type => type.includes('ملازم'));
@@ -384,22 +397,28 @@ function makeStudentRecord(docSnap, isPortalRegistration) {
       ? 'ملازم'
       : hasCourseSubscription
         ? 'كورسات'
-        : 'تسجيل من الموقع';
+        : (isVipRegistration ? 'VIP' : 'تسجيل من الموقع');
   return {
     id: docSnap.id,
-    collection: isPortalRegistration ? 'studentRegistrations' : 'invoices',
+    collection: isVipRegistration ? 'vipRegistrations' : isPortalRegistration ? 'studentRegistrations' : 'invoices',
     isPortalRegistration,
+    isVipRegistration,
     data,
     student: String(student).trim(),
     phone: String(phone).trim(),
     grade: String(data.grade || '').trim(),
-    subType: String(data.subType || (isPortalRegistration ? portalSubType : '')).trim(),
+    subType: String(data.subType || (isRegistration ? portalSubType : '')).trim(),
     items: Array.isArray(items) ? items : []
   };
 }
 
 function getStudentProfileInstallmentSummary(record) {
-  const invoice = { ...record.data, items: record.items, isPortalRegistration: record.isPortalRegistration };
+  const invoice = {
+    ...record.data,
+    items: record.items,
+    isPortalRegistration: record.isPortalRegistration,
+    isVip: record.isVipRegistration || record.data.isVip
+  };
   if (!isInstallmentInvoice(invoice)) return null;
   if (record.isPortalRegistration) {
     const installmentMethod = '\u062a\u0642\u0633\u064a\u0637';
@@ -416,15 +435,46 @@ function getStudentProfileInstallmentSummary(record) {
   return summary;
 }
 
+function isVipRegistrationLinkedToInvoice(registrationDoc, invoiceDocs) {
+  const registrationId = registrationDoc.id;
+  const invoiceId = String(registrationDoc.data().invoiceId || '');
+  return invoiceDocs.some(invoiceDoc => {
+    const invoice = invoiceDoc.data();
+    return String(invoice.vipRegistrationId || '') === registrationId
+      || (invoiceId && invoiceDoc.id === invoiceId)
+      || invoiceDoc.id === `vip_${registrationId}`;
+  });
+}
+
+function vipRegistrationHasInvoiceIdentity(registrationDoc, invoiceDocs) {
+  if (!isVipRegistrationLinkedToInvoice(registrationDoc, invoiceDocs)) return false;
+  const registration = registrationDoc.data();
+  const linkedInvoice = invoiceDocs.find(invoiceDoc => {
+    const invoice = invoiceDoc.data();
+    return String(invoice.vipRegistrationId || '') === registrationDoc.id
+      || (registration.invoiceId && invoiceDoc.id === String(registration.invoiceId))
+      || invoiceDoc.id === `vip_${registrationDoc.id}`;
+  });
+  const invoice = linkedInvoice?.data() || {};
+  return Boolean(invoice.student || invoice.studentName || invoice.phone || invoice.studentPhone);
+}
+
 async function loadStudentLookupRecords() {
   if (studentLookupRecordsCache) return studentLookupRecordsCache;
-  const [invoicesSnapshot, registrationsSnapshot] = await Promise.all([
+  const [invoicesSnapshot, registrationsSnapshot, vipRegistrationsSnapshot] = await Promise.all([
     getDocs(collection(db, 'invoices')),
-    getDocs(collection(db, 'studentRegistrations'))
+    getDocs(collection(db, 'studentRegistrations')),
+    getDocs(collection(db, 'vipRegistrations')).catch(error => {
+      console.warn('Could not load VIP student registrations for cashier search:', error);
+      return { docs: [] };
+    })
   ]);
   studentLookupRecordsCache = [
     ...invoicesSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, false)),
-    ...registrationsSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true))
+    ...registrationsSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true)),
+    ...vipRegistrationsSnapshot.docs
+      .filter(docSnap => !vipRegistrationHasInvoiceIdentity(docSnap, invoicesSnapshot.docs))
+      .map(docSnap => makeStudentRecord(docSnap, false, true))
   ].filter(record => record.student || record.phone);
   return studentLookupRecordsCache;
 }
@@ -511,7 +561,7 @@ function getStudentLinkedBooklets(invoiceRecord, subscriptionDocs) {
         || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' }));
   }
 
-  const parentItems = invoiceRecord.isPortalRegistration
+  const parentItems = invoiceRecord.isPortalRegistration || invoiceRecord.isVipRegistration
     ? invoiceRecord.items
     : (invoiceRecord.items.length ? invoiceRecord.items : (invoice.indivNotes || []));
   const parentReferences = new Set(parentItems.flatMap(item => [item.id, item.name])
@@ -552,9 +602,13 @@ async function openStudentProfile(studentKey) {
   studentProfileInvoiceTargets = new Map();
 
   try {
-    const [invoiceSnapshot, registrationSnapshot, subscriptionSnapshot, onlineCardsSnapshot, usersSnapshot] = await Promise.all([
+    const [invoiceSnapshot, registrationSnapshot, vipRegistrationSnapshot, subscriptionSnapshot, onlineCardsSnapshot, usersSnapshot] = await Promise.all([
       getDocs(collection(db, 'invoices')),
       getDocs(collection(db, 'studentRegistrations')),
+      getDocs(collection(db, 'vipRegistrations')).catch(error => {
+        console.warn('Could not load VIP registrations for student profile:', error);
+        return { docs: [] };
+      }),
       getDocs(collection(db, 'subscriptions')),
       getDocs(collection(db, 'onlineCards')),
       getDocs(collection(db, 'users'))
@@ -565,7 +619,10 @@ async function openStudentProfile(studentKey) {
     }));
     const records = [
       ...invoiceSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, false)),
-      ...registrationSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true))
+      ...registrationSnapshot.docs.map(docSnap => makeStudentRecord(docSnap, true)),
+      ...vipRegistrationSnapshot.docs
+        .filter(docSnap => !vipRegistrationHasInvoiceIdentity(docSnap, invoiceSnapshot.docs))
+        .map(docSnap => makeStudentRecord(docSnap, false, true))
     ].filter(record => studentGroupKey(record) === studentKey)
       .sort((first, second) => (studentRecordDate(second)?.getTime() || 0) - (studentRecordDate(first)?.getTime() || 0));
     if (!records.length) throw new Error('لم تعد هناك سجلات لهذا الطالب');
@@ -573,7 +630,7 @@ async function openStudentProfile(studentKey) {
     const newest = records[0];
     studentProfileModal.dataset.studentName = newest.student || '';
     studentProfileModal.dataset.studentPhone = newest.phone || '';
-    const subscriptionDatedRecords = records.filter(record => record.isPortalRegistration
+    const subscriptionDatedRecords = records.filter(record => record.isPortalRegistration || record.isVipRegistration
       ? record.items.length > 0
       : !['ملازم فردية', 'محاضرات فردية'].includes(record.subType));
     const datedRecords = subscriptionDatedRecords.map(record => studentRecordDate(record)).filter(Boolean);
@@ -582,9 +639,9 @@ async function openStudentProfile(studentKey) {
       : null;
     const grades = [...new Set(records.map(record => record.grade).filter(Boolean))];
     const subscriptionNames = [...new Set(records.flatMap(record => record.items
-      .filter(item => item.type || item.subType || record.isPortalRegistration)
+      .filter(item => item.type || item.subType || record.isPortalRegistration || record.isVipRegistration)
       .map(item => item.name || item.title || ''))
-      .concat(records.filter(record => !record.isPortalRegistration).map(record => record.subType))
+      .concat(records.filter(record => !record.isPortalRegistration && !record.isVipRegistration).map(record => record.subType))
       .filter(name => name && name !== 'تسجيل من الموقع'))];
     const outstanding = records.reduce((total, record) => {
       return total + (getStudentProfileInstallmentSummary(record)?.remaining || 0);
@@ -605,25 +662,30 @@ async function openStudentProfile(studentKey) {
       ].map(value => String(value || '').trim()).find(value => value && value !== '-') || 'غير مسجل';
       const itemNames = record.items.map(item => item.name || item.title).filter(Boolean).join('، ');
       const installmentSummary = getStudentProfileInstallmentSummary(record);
+      const isRegistration = record.isPortalRegistration || record.isVipRegistration;
       const isPaid = installmentSummary
         ? installmentSummary.remaining <= 0
-        : record.isPortalRegistration ? record.data.paymentStatus === 'paid' : true;
-      const payment = record.isPortalRegistration && !installmentSummary
-        ? (isPaid ? 'مدفوع' : 'غير مدفوع')
+        : isRegistration ? record.data.paymentStatus === 'paid' : true;
+      const payment = isRegistration && !installmentSummary
+        ? (isPaid
+          ? (record.data.paymentMethod || record.data.payment || 'مدفوع')
+          : record.data.paymentStatus === 'partial' ? 'مدفوع جزئيًا' : 'غير مدفوع')
         : (record.data.payment || 'غير محدد');
       const itemsAmount = record.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
       const amount = installmentSummary
         ? installmentSummary.total
         : record.isPortalRegistration
         ? Number(record.data.requestedAmount ?? record.data.paidAmount ?? itemsAmount) || 0
+        : record.isVipRegistration
+          ? Number(record.data.amountCollected ?? record.data.paidAmount ?? record.data.teacherReportedPaidAmount ?? 0) || 0
         : record.data.isVip
-          ? Number(record.data.vipFinalPrice ?? itemsAmount) || 0
+          ? Number(record.data.amountCollected ?? record.data.paidAmount ?? record.data.vipFinalPrice ?? itemsAmount) || 0
           : itemsAmount;
       const paidPercentage = installmentSummary?.total > 0
         ? Math.min(100, Math.round((installmentSummary.paid / installmentSummary.total) * 100))
         : 0;
       const invoiceKey = `${record.collection}:${record.id}`;
-      const linkedBooklets = record.isPortalRegistration
+      const linkedBooklets = isRegistration
         ? getStudentLinkedBooklets(record, subscriptionDocs)
         : [];
       const printableBooklets = linkedBooklets.length
@@ -635,6 +697,7 @@ async function openStudentProfile(studentKey) {
         _collection: record.collection,
         sourceCollection: record.collection,
         isPortalRegistration: record.isPortalRegistration,
+        isVipRegistration: record.isVipRegistration,
         student: record.student || '-',
         phone: record.phone || '',
         subType: record.subType,
@@ -648,14 +711,14 @@ async function openStudentProfile(studentKey) {
           paid: installmentSummary.paid,
           remaining: installmentSummary.remaining
         } : null),
-        date: record.isPortalRegistration
+        date: isRegistration
           ? (record.data.registeredAt || record.data.createdAt || record.data.date)
           : record.data.date,
         num: record.data.num || record.data.invoiceNumber || '-',
-        payment: record.isPortalRegistration
-          ? (record.data.paymentMethod || record.data.payment || 'نقدي')
+        payment: isRegistration
+          ? (record.data.paymentMethod || record.data.payment || (isPaid ? 'نقدي' : 'غير مدفوع'))
           : record.data.payment,
-        isVip: record.data.isVip === true,
+        isVip: record.isVipRegistration || record.data.isVip === true,
         isIndividualInvoice: ['ملازم فردية', 'محاضرات فردية'].includes(record.subType)
       });
       return `<article class="student-profile-invoice">
@@ -677,7 +740,7 @@ async function openStudentProfile(studentKey) {
           <div class="student-profile-installment-progress" role="progressbar" aria-label="نسبة سداد القسط" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${paidPercentage}"><span style="width:${paidPercentage}%"></span></div>
         </div>` : ''}
         <div class="student-profile-invoice-footer">
-          <div class="student-profile-invoice-total"><small>إجمالي الفاتورة</small><strong>${amount.toFixed(2)} ج</strong></div>
+          <div class="student-profile-invoice-total"><small>${record.data.isVip && !installmentSummary ? 'المبلغ المدفوع' : 'إجمالي الفاتورة'}</small><strong>${amount.toFixed(2)} ج</strong></div>
           ${installmentSummary?.remaining > 0 ? `<button type="button" class="student-profile-record-installment" data-record-installment="${escapeStudentHtml(invoiceKey)}"><i class="fas fa-money-bill-wave" aria-hidden="true"></i> تسجيل دفعة</button>` : ''}
           <button type="button" class="student-profile-print-invoice" data-print-invoice="${escapeStudentHtml(invoiceKey)}">
             <i class="fas fa-print" aria-hidden="true"></i> طباعة الفاتورة
@@ -855,7 +918,7 @@ async function updateStudentBookletDelivery(checkbox) {
         if (wasDelivered === checkbox.checked) return { changed: false, stock: null };
         const updatedNote = { noteId: target.noteId, name: target.noteName, delivered: checkbox.checked };
         if (noteIndex < 0) notes.push(updatedNote); else notes[noteIndex] = { ...notes[noteIndex], ...updatedNote };
-        const deferBookletStock = target.record.isPortalRegistration || data.bookletStockDeducted === false || data.vipStockDeducted === false;
+        const deferBookletStock = target.record.isPortalRegistration || target.record.isVipRegistration || data.bookletStockDeducted === false || data.vipStockDeducted === false;
         if (!deferBookletStock) {
           transaction.update(invoiceRef, { indivNotes: notes });
           return { changed: true, stock: null };
@@ -1975,7 +2038,33 @@ async function fetchNextInvoiceNumber() {
     ...portalRegistrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0),
     ...vipRegistrationsSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0)
   ];
-  nextInvoiceNumber = usedNumbers.reduce((highest, number) => Math.max(highest, number), 0) + 1;
+  if (isVipMode) {
+    const occupiedNumbers = new Set();
+    invoicesSnapshot.docs.forEach(invoiceDoc => {
+      const number = Number(invoiceDoc.data().num);
+      if (Number.isInteger(number) && number > 0) occupiedNumbers.add(number);
+    });
+    portalRegistrationsSnapshot.docs.forEach(registrationDoc => {
+      const number = Number(registrationDoc.data().invoiceNumber);
+      if (Number.isInteger(number) && number > 0) occupiedNumbers.add(number);
+    });
+    vipRegistrationsSnapshot.docs.forEach(registrationDoc => {
+      const registration = registrationDoc.data();
+      const invoiceId = String(registration.invoiceId || '');
+      const linkedInvoice = invoicesSnapshot.docs.find(invoiceDoc => invoiceDoc.id === invoiceId
+        || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id
+        || invoiceDoc.id === `vip_${registrationDoc.id}`);
+      if (invoiceId && !linkedInvoice) return;
+      const linkedNumber = Number(linkedInvoice?.data().num);
+      if (Number.isInteger(linkedNumber) && linkedNumber > 0) return;
+      const number = Number(registration.invoiceNumber);
+      if (Number.isInteger(number) && number > 0) occupiedNumbers.add(number);
+    });
+    nextInvoiceNumber = 1;
+    while (occupiedNumbers.has(nextInvoiceNumber)) nextInvoiceNumber += 1;
+  } else {
+    nextInvoiceNumber = usedNumbers.reduce((highest, number) => Math.max(highest, number), 0) + 1;
+  }
   updateInvoicePreview();
 }
 
@@ -2069,9 +2158,25 @@ async function printInvoice() {
   // حساب الإجمالي
   const itemsTotal = (inv.items || []).reduce((sum, x) => sum + (parseFloat(x.price) || 0), 0);
   const isCustomBookletSubscription = inv.isCustomBookletSubscription === true || hasGeneratedBookletNote(inv.notes);
+  const vipOriginalItems = Array.isArray(inv.selectedSubscriptions) && inv.selectedSubscriptions.length
+    ? inv.selectedSubscriptions : (inv.items || []);
+  const vipOriginalItemTotal = vipOriginalItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const vipOriginalTotals = [inv.vipOriginalPrice, inv.requestedAmount, vipOriginalItemTotal, inv.installment?.total]
+    .map(Number).filter(amount => Number.isFinite(amount) && amount > 0);
+  const vipOriginalTotal = vipOriginalTotals.length ? Math.max(...vipOriginalTotals)
+    : [inv.vipSubscriptionPrice, inv.subscriptionAmount, inv.vipFinalPrice, itemsTotal]
+      .map(Number).find(amount => Number.isFinite(amount) && amount > 0) ?? 0;
+  let assignedVipPrice = 0;
+  const printableItems = inv.isVip ? vipOriginalItems.map((item, index) => {
+    const price = index === vipOriginalItems.length - 1
+      ? Number((vipOriginalTotal - assignedVipPrice).toFixed(2))
+      : vipOriginalItemTotal > 0 ? Number((vipOriginalTotal * (Number(item.price) || 0) / vipOriginalItemTotal).toFixed(2)) : 0;
+    assignedVipPrice += price;
+    return { ...item, price };
+  }) : (inv.items || []);
   const total = isCustomBookletSubscription
     ? Number(inv.subscriptionAmount ?? itemsTotal)
-    : inv.isVip ? Number(inv.vipFinalPrice ?? itemsTotal) : itemsTotal;
+    : inv.isVip ? vipOriginalTotal : itemsTotal;
 
   const isIndividualInvoice = ['محاضرات فردية', 'ملازم فردية'].includes(String(inv.subType || '').trim());
   const isNotesSubscription = ['ملازم', 'اشتراك ملازم', 'ملازم وكورسات'].includes(String(inv.subType || '').trim());
@@ -2128,7 +2233,7 @@ async function printInvoice() {
       ` : ''}
       
       <table style='margin:1mm 0;'>
-        ${(inv.items || []).map((item, idx) => `
+        ${printableItems.map((item, idx) => `
         <tr ${idx % 2 === 0 ? "style='background:#f9f9f9;'" : ''}>
           <td>${item.name}</td>
           ${isCustomBookletSubscription ? '' : `<td style='color:#388e3c;font-weight:bold;'>${item.price} ج</td>`}

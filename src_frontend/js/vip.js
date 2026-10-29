@@ -27,6 +27,40 @@ const vipRegistrationMessages = {
   selectSubscription: '\u062d\u062f\u062f \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643'
 };
 
+function isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs) {
+  const registration = registrationDoc.data();
+  const invoiceId = String(registration.invoiceId || '');
+  if (!invoiceId) return false;
+  return !invoiceDocs.some(invoiceDoc => invoiceDoc.id === invoiceId
+    || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id);
+}
+
+function nextAvailableVipInvoiceNumber(invoiceDocs, vipRegistrationDocs, regularRegistrationDocs) {
+  const usedNumbers = new Set();
+  invoiceDocs.forEach(invoiceDoc => {
+    const number = Number(invoiceDoc.data().num);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  regularRegistrationDocs.forEach(registrationDoc => {
+    const number = Number(registrationDoc.data().invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  vipRegistrationDocs.forEach(registrationDoc => {
+    const registration = registrationDoc.data();
+    if (isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs)) return;
+    const linkedInvoice = invoiceDocs.find(invoiceDoc => invoiceDoc.id === String(registration.invoiceId || '')
+      || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id
+      || invoiceDoc.id === `vip_${registrationDoc.id}`);
+    const linkedInvoiceNumber = Number(linkedInvoice?.data().num);
+    if (Number.isInteger(linkedInvoiceNumber) && linkedInvoiceNumber > 0) return;
+    const number = Number(registration.invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  let nextNumber = 1;
+  while (usedNumbers.has(nextNumber)) nextNumber += 1;
+  return nextNumber;
+}
+
 function showVipNotification(message, type = 'info') {
   let container = document.getElementById('vip-notifications');
   if (!container) {
@@ -945,14 +979,16 @@ async function confirmPayment() {
     const registrationRef = doc(db, 'vipRegistrations', regId);
     let invoiceNumber = Number(registration.invoiceNumber) || 0;
     if (!invoiceNumber) {
-      const [invoiceSnapshot, normalRegistrationSnapshot] = await Promise.all([
+      const [invoiceSnapshot, normalRegistrationSnapshot, vipRegistrationSnapshot] = await Promise.all([
         getDocs(collection(db, 'invoices')),
-        getDocs(collection(db, 'studentRegistrations'))
+        getDocs(collection(db, 'studentRegistrations')),
+        getDocs(collection(db, 'vipRegistrations'))
       ]);
-      invoiceNumber = [
-        ...invoiceSnapshot.docs.map(item => Number(item.data().num) || 0),
-        ...normalRegistrationSnapshot.docs.map(item => Number(item.data().invoiceNumber) || 0)
-      ].reduce((highest, number) => Math.max(highest, number), 0) + 1;
+      invoiceNumber = nextAvailableVipInvoiceNumber(
+        invoiceSnapshot.docs,
+        vipRegistrationSnapshot.docs,
+        normalRegistrationSnapshot.docs
+      );
     }
     const operatorName = localStorage.getItem('currentUsername') || localStorage.getItem('currentUserName') || localStorage.getItem('currentUserId') || 'مدير';
     const requestedPrice = selectedSubscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
@@ -993,6 +1029,7 @@ async function confirmPayment() {
         const checkRecords = (snapshot, collectionName) => snapshot.docs.forEach(docSnapshot => {
           if ((collectionName === 'vipRegistrations' && docSnapshot.id === regId)
             || (collectionName === 'invoices' && docSnapshot.id === invoiceId)) return;
+          if (collectionName === 'vipRegistrations' && isDeletedVipInvoiceRegistration(docSnapshot, samePhoneInvoices.docs)) return;
           const existing = docSnapshot.data();
           const existingItems = existing.items || existing.selectedSubscriptions || existing.subscriptions || existing.selectedItems || [];
           existingItems.forEach(item => {

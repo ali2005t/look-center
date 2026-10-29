@@ -4,7 +4,7 @@ import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, setDoc, run
 import { collection as collection2, getDocs as getDocs2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc as doc2, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js?v=installment-paid-v2';
+import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js?v=vip-payment-mode-v1';
 
 const tableBody = document.querySelector("#invoices-table tbody");
 const modal = document.getElementById("invoice-details-modal");
@@ -52,9 +52,17 @@ function invoicePaymentLabel(invoice) {
   return '\u062a\u0642\u0633\u064a\u0637';
 }
 
+function isPortalInstallment(invoice) {
+  if (!invoice?.isPortalRegistration) return false;
+  if (invoice.payment === '\u062a\u0642\u0633\u064a\u0637' || invoice.paymentMethod === '\u062a\u0642\u0633\u064a\u0637'
+    || invoice.paymentStatus === 'partial') return true;
+  const { paid, remaining } = invoiceFinancialSummary(invoice);
+  return paid > 0 && remaining > 0;
+}
+
 function invoiceTypeLabel(invoice) {
   if (invoice.isPortalRegistration) {
-    return invoice.paymentStatus === 'partial' ? 'مدفوع جزئياً'
+    return isPortalInstallment(invoice) ? 'تقسيط'
       : invoice.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع';
   }
   if (isInstallmentInvoice(invoice)) return invoicePaymentLabel(invoice);
@@ -109,6 +117,28 @@ function portalCollectedAmount(registration) {
   return amounts[0] ?? 0;
 }
 
+function vipOriginalInvoiceDetails(invoice) {
+  const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  const selectedSubscriptions = Array.isArray(invoice?.selectedSubscriptions) ? invoice.selectedSubscriptions : [];
+  const sourceItems = selectedSubscriptions.length ? selectedSubscriptions : invoiceItems;
+  const sourceTotal = sourceItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const itemTotal = invoiceItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const originalTotals = [invoice?.vipOriginalPrice, invoice?.requestedAmount, sourceTotal, invoice?.installment?.total]
+    .map(Number).filter(amount => Number.isFinite(amount) && amount > 0);
+  const total = originalTotals.length ? Math.max(...originalTotals)
+    : [invoice?.vipSubscriptionPrice, invoice?.subscriptionAmount, invoice?.vipFinalPrice, itemTotal]
+      .map(Number).find(amount => Number.isFinite(amount) && amount > 0) ?? 0;
+  let assigned = 0;
+  const items = sourceItems.map((item, index) => {
+    const price = index === sourceItems.length - 1
+      ? Number((total - assigned).toFixed(2))
+      : sourceTotal > 0 ? Number((total * (Number(item.price) || 0) / sourceTotal).toFixed(2)) : 0;
+    assigned += price;
+    return { ...item, price };
+  });
+  return { items, total };
+}
+
 function invoiceFinancialSummary(invoice) {
   if (invoice?.isPortalRegistration) {
     const total = portalSubscriptionAmount(invoice) || Number(invoice.requestedAmount || 0);
@@ -121,6 +151,11 @@ function invoiceFinancialSummary(invoice) {
   const total = Number(invoice?.isCustomBookletSubscription
     ? (invoice.subscriptionAmount ?? itemTotal)
     : invoice?.isVip ? (invoice.vipFinalPrice ?? itemTotal) : itemTotal) || 0;
+  if (invoice?.isVip) {
+    let paid = Number(invoice.amountCollected ?? invoice.paidAmount ?? total);
+    if (!Number.isFinite(paid) || (paid === 0 && total > 0 && invoice.paymentStatus === 'paid' && !['full', 'free'].includes(invoice.vipPaymentMode))) paid = total;
+    return { total, paid, remaining: 0 };
+  }
   return { total, paid: total, remaining: 0 };
 }
 
@@ -284,9 +319,15 @@ async function loadInvoices() {
         : undefined),
       vipIsFree: inv.vipIsFree === true,
       vipFinalPrice: inv.vipFinalPrice,
+      vipPaymentMode: inv.vipPaymentMode || (inv.isVip
+        ? (inv.payment === '\u062a\u0642\u0633\u064a\u0637' || inv.paymentMethod === '\u062a\u0642\u0633\u064a\u0637' || Number(inv.installment?.remaining || 0) > 0 ? 'installment'
+          : inv.payment === '\u0645\u062c\u0627\u0646\u064a' || inv.paymentMethod === '\u0645\u062c\u0627\u0646\u064a' ? 'free'
+            : 'full')
+        : ''),
       vipRegistrationId: inv.vipRegistrationId || '',
       paidAmount: Number(inv.paidAmount ?? 0),
       amountCollected: Number(inv.amountCollected ?? inv.paidAmount ?? 0),
+      paymentStatus: inv.paymentStatus || '',
       student: inv.student || '-',
       phone: inv.phone || '',
       subType: type,
@@ -318,15 +359,21 @@ async function loadInvoices() {
   vipRegistrationsSnapshot.docs.forEach(docSnap => {
     const registration = docSnap.data();
     const hasLinkedInvoice = linkedVipRegistrationIds.has(docSnap.id)
-      || (registration.invoiceId && snapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId));
+      || (registration.invoiceId && snapshot.docs.some(invoiceDoc => invoiceDoc.id === String(registration.invoiceId)));
     if (hasLinkedInvoice) return;
+    if (registration.invoiceId) return;
     const subscriptions = Array.isArray(registration.selectedSubscriptions) ? registration.selectedSubscriptions : [];
     const totalSourcePrice = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
     const paymentSaysInstallment = registration.payment === '\u062a\u0642\u0633\u064a\u0637' || registration.paymentMethod === '\u062a\u0642\u0633\u064a\u0637';
+    const vipPaymentMode = registration.vipPaymentMode || registration.teacherReportedPaymentMode
+      || (paymentSaysInstallment || Number(registration.installment?.remaining || 0) > 0 ? 'installment'
+        : registration.payment === '\u0645\u062c\u0627\u0646\u064a' || registration.paymentMethod === '\u0645\u062c\u0627\u0646\u064a' ? 'free'
+          : registration.paymentStatus === 'paid' ? 'full' : '');
     const subscriptionAmount = Number(registration.installment?.total ?? registration.subscriptionAmount
       ?? registration.requestedAmount ?? (paymentSaysInstallment ? totalSourcePrice : registration.paidAmount) ?? 0);
     const installmentPaid = Number(registration.installment?.paid ?? registration.amountCollected ?? registration.paidAmount ?? 0);
-    const isInstallment = paymentSaysInstallment || Boolean(registration.installment && subscriptionAmount > Number(registration.installment.paid ?? registration.installment.paidAmount ?? 0));
+    const isInstallment = vipPaymentMode ? vipPaymentMode === 'installment'
+      : paymentSaysInstallment || Boolean(registration.installment && subscriptionAmount > Number(registration.installment.paid ?? registration.installment.paidAmount ?? 0));
     const hasOutstandingInstallment = isInstallment && subscriptionAmount - installmentPaid > 0;
     if (registration.paymentStatus !== 'paid' && !hasOutstandingInstallment) return;
     let allocated = 0;
@@ -342,7 +389,8 @@ async function loadInvoices() {
       sourceCollection: 'vipRegistrations',
       isVip: true,
       isVipRegistration: true,
-      vipIsFree: subscriptionAmount === 0,
+      vipIsFree: vipPaymentMode === 'free' || (!vipPaymentMode && subscriptionAmount === 0),
+      vipPaymentMode,
       vipFinalPrice: subscriptionAmount,
       subscriptionAmount,
       requestedAmount: subscriptionAmount,
@@ -352,7 +400,7 @@ async function loadInvoices() {
       subType: classifyPortalSubscriptions(subscriptions),
       items,
       selectedSubscriptions: subscriptions,
-      installment: registration.installment || (isInstallment ? { total: subscriptionAmount, paid: installmentPaid, remaining: Math.max(0, subscriptionAmount - installmentPaid) } : null),
+      installment: vipPaymentMode && vipPaymentMode !== 'installment' ? null : registration.installment || (isInstallment ? { total: subscriptionAmount, paid: installmentPaid, remaining: Math.max(0, subscriptionAmount - installmentPaid) } : null),
       payment: isInstallment ? '\u062a\u0642\u0633\u064a\u0637' : registration.paymentMethod || (installmentPaid === 0 ? '\u0645\u062c\u0627\u0646\u064a' : '\u0646\u0642\u062f\u064a'),
       paymentStatus: registration.paymentStatus || (hasOutstandingInstallment ? 'partial' : 'paid'),
       paidAmount: installmentPaid,
@@ -462,7 +510,7 @@ function renderInvoicesTable() {
     if (inv.isPortalRegistration) tr.className = 'portal-registration-row';
     let actions = `<button class='open-invoice-btn' data-id='${inv.id}' data-portal='${inv.isPortalRegistration ? 'true' : 'false'}' data-vip-registration='${inv.isVipRegistration ? 'true' : 'false'}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>فتح</button>`;
     if (inv.isPortalRegistration) {
-      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>مدفوع جزئياً</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
+      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>تقسيط</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
     }
     if ((isInstallmentInvoice(inv) || inv.isPortalRegistration) && invoiceFinancialSummary(inv).remaining > 0) {
       actions += `<button class='record-installment-payment-btn' data-id='${inv.id}' style='background:#087f72;color:#fff;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>تسجيل قسط</button>`;
@@ -516,7 +564,7 @@ function renderInvoicesTable() {
         ? inv.selectedSubscriptions.map(item => item.name).filter(Boolean).join('، ')
         : (inv.items || []).map(item => item.name || item.title).filter(Boolean).join('، ');
       const paymentLabel = inv.isPortalRegistration
-        ? (inv.paymentStatus === 'partial' ? 'مدفوع جزئياً' : inv.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع')
+        ? (isPortalInstallment(inv) ? 'تقسيط' : inv.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع')
         : invoicePaymentLabel(inv);
       const bookletSummary = inv.linkedNotes?.length
         ? `الملازم: ${inv.linkedNotes.filter(note => note.delivered).length} مستلمة من ${inv.linkedNotes.length}`
@@ -524,7 +572,7 @@ function renderInvoicesTable() {
       const id = escapeInvoiceHtml(inv.id);
       let actions = '';
       if (inv.isPortalRegistration) {
-        actions += `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${id}" data-previous="${escapeInvoiceHtml(inv.paymentStatus)}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>مدفوع جزئياً</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>`;
+        actions += `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${id}" data-previous="${escapeInvoiceHtml(inv.paymentStatus)}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>تقسيط</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>`;
       }
       if ((isInstallmentInvoice(inv) || inv.isPortalRegistration) && invoiceFinancialSummary(inv).remaining > 0) {
         actions += `<button class="invoice-card-action-button record-installment-payment-btn" data-id="${id}">تسجيل قسط</button>`;
@@ -775,6 +823,14 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
   const invDoc = await getDoc(doc(db, sourceCollection, id));
   if (!invDoc.exists()) return alert("لم يتم العثور على الفاتورة!");
   const inv = invDoc.data();
+  if (inv.isVip && !inv.vipPaymentMode) {
+    inv.vipPaymentMode = inv.payment === '\u062a\u0642\u0633\u064a\u0637' || inv.paymentMethod === '\u062a\u0642\u0633\u064a\u0637' || Number(inv.installment?.remaining || 0) > 0
+      ? 'installment'
+      : inv.payment === '\u0645\u062c\u0627\u0646\u064a' || inv.paymentMethod === '\u0645\u062c\u0627\u0646\u064a'
+        ? 'free'
+        : 'full';
+  }
+  if (inv.isVip && inv.vipPaymentMode === 'free') inv.vipIsFree = true;
   if (hasGeneratedBookletNote(inv.notes)) {
     inv.isCustomBookletSubscription = true;
     inv.subscriptionAmount = inv.subscriptionAmount ?? (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
@@ -817,14 +873,13 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
     const subscriptions = Array.isArray(inv.selectedSubscriptions) ? inv.selectedSubscriptions : [];
     inv.student = inv.studentName || "-";
     inv.subType = classifyPortalSubscriptions(subscriptions);
-    const displayTotal = Number(inv.installment?.total ?? inv.subscriptionAmount ?? inv.requestedAmount ?? inv.paidAmount ?? 0);
-    const sourceTotal = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
-    let assigned = 0;
-    inv.items = subscriptions.map((item, index) => {
-      const price = index === subscriptions.length - 1 ? Number((displayTotal - assigned).toFixed(2)) : sourceTotal > 0 ? Number((displayTotal * Number(item.price || 0) / sourceTotal).toFixed(2)) : 0;
-      assigned += price;
-      return { ...item, price };
-    });
+    const originalDetails = vipOriginalInvoiceDetails(inv);
+    const displayTotal = originalDetails.total;
+    inv.items = originalDetails.items;
+    inv.vipPaymentMode = inv.vipPaymentMode || inv.teacherReportedPaymentMode
+      || (inv.payment === '\u062a\u0642\u0633\u064a\u0637' || inv.paymentMethod === '\u062a\u0642\u0633\u064a\u0637' ? 'installment'
+        : inv.payment === '\u0645\u062c\u0627\u0646\u064a' || inv.paymentMethod === '\u0645\u062c\u0627\u0646\u064a' ? 'free'
+          : inv.paymentStatus === 'paid' ? 'full' : '');
     const isInstallmentPayment = isInstallmentInvoice(inv);
     inv.payment = isInstallmentPayment ? '\u062a\u0642\u0633\u064a\u0637' : (inv.paymentMethod || (Number(inv.amountCollected ?? inv.paidAmount ?? 0) === 0 ? 'VIP free' : 'VIP paid'));
     inv.subscriptionAmount = displayTotal;
@@ -832,7 +887,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
     inv.date = inv.paidAt || inv.registeredAt || "-";
     inv.recipient = inv.teacherName || "-";
     inv.isVip = true;
-    inv.vipIsFree = displayTotal === 0;
+    inv.vipIsFree = inv.vipPaymentMode === 'free' || (displayTotal === 0 && inv.paymentStatus !== 'paid');
   }
   const isNotesSubscription = inv.subType && (inv.subType === 'اشتراك ملازم' || inv.subType === 'ملازم' || inv.subType === 'ملازم وكورسات');
 
@@ -850,11 +905,12 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
       } catch (e) { console.warn('Could not save indivNotes:', e); }
     }
   }
-  const invoiceDisplayItems = inv.items || [];
-  const invoiceItemsTotal = (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-  const invoiceTotal = inv.isCustomBookletSubscription
-    ? Number(inv.subscriptionAmount ?? invoiceItemsTotal)
-    : invoiceItemsTotal;
+  const vipOriginalDetails = inv.isVip ? vipOriginalInvoiceDetails(inv) : null;
+  const invoiceDisplayItems = vipOriginalDetails?.items || inv.items || [];
+  const invoiceItemsTotal = invoiceDisplayItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const invoiceTotal = inv.isVip
+    ? vipOriginalDetails.total
+    : inv.isCustomBookletSubscription ? Number(inv.subscriptionAmount ?? invoiceItemsTotal) : invoiceItemsTotal;
   // مربعات استلام الملازم في اشتراك ملازم
   let notesDeliveryBoxes = '';
   // استخدم allNotesList مباشرة للعداد والعرض
@@ -1036,6 +1092,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
           <div style='font-size:13px;color:#2e7d32;margin-bottom:4px;font-weight:bold;'>طريقة الدفع: <span id='invoice-payment-method-label'>${isInstallmentInvoice(inv) ? (inv.installment?.lastPaymentMethod || 'يتم اختيارها عند تسجيل الدفعة') : (inv.payment || 'نقدي')}</span></div>
           ${isInstallmentInvoice(inv) ? `<small>اختر طريقة الدفع لكل قسط عند تسجيله.</small>` : `<button id='invoice-payment-method-trigger' type='button' style='padding:7px 14px;border:0;border-radius:6px;background:#388e3c;color:#fff;font-weight:bold;cursor:pointer;'>تغيير طريقة الدفع</button>`}
         </div>
+        ${inv.isVip ? `<div style='margin:0 0 12px;padding:8px;background:#eef7f0;border-radius:6px;color:#246b36;font-weight:bold;'>حالة الدفع: ${invoiceTypeLabel(inv)}</div>` : ''}
         
         <div style='margin-bottom:12px;'>
           <div style='font-weight:bold;color:#1976d2;margin-bottom:8px;text-align:right;padding-bottom:6px;border-bottom:2px solid #1565c0;'>📋 العناصر</div>
@@ -1056,6 +1113,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
           <div style='font-size:12px;color:#2e7d32;margin-bottom:4px;'>الإجمالي</div>
           <div style='font-size:18px;font-weight:bold;color:#1b5e20;'>${invoiceTotal} ج</div>
         </div>
+        ${inv.isVip && invoiceFinancialSummary(inv).paid > invoiceTotal ? `<div style='margin:0 0 12px;padding:10px;background:#eef7f0;border-radius:6px;color:#246b36;font-weight:bold;'>المبلغ المستلم: ${formatInvoiceMoney(invoiceFinancialSummary(inv).paid)} ج</div>` : ''}
         
         ${isInstallmentInvoice(inv) && inv.installment ? `
         <div style='margin:12px 0;padding:12px;background:#fff8e1;border:2px solid #fbc02d;border-radius:6px;'>

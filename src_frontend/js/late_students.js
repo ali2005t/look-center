@@ -1,7 +1,7 @@
 import { db } from "./firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { utils, writeFile } from 'https://cdn.sheetjs.com/xlsx-0.19.2/package/xlsx.mjs';
-import { getInstallmentSummary, showInstallmentPaymentDialog } from './installment-payments.js';
+import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js?v=vip-payment-mode-v1';
 
 let allInvoices = [];
 let lateInvoices = [];
@@ -16,9 +16,10 @@ function showLoadingIndicator() {
 async function loadLateStudents() {
   try {
     showLoadingIndicator();
-    const [snapshot, vipSnapshot] = await Promise.all([
+    const [snapshot, vipSnapshot, portalSnapshot] = await Promise.all([
       getDocs(collection(db, 'invoices')),
-      getDocs(collection(db, 'vipRegistrations'))
+      getDocs(collection(db, 'vipRegistrations')),
+      getDocs(collection(db, 'studentRegistrations'))
     ]);
     allInvoices = [];
     snapshot.forEach(docSnap => {
@@ -43,6 +44,46 @@ async function loadLateStudents() {
         subType: registration.subType || (registration.selectedSubscriptions || []).map(item => item.type).filter(Boolean).join(' + ') || 'VIP',
         payment: registration.payment === '\u062a\u0642\u0633\u064a\u0637' || registration.paymentMethod === '\u062a\u0642\u0633\u064a\u0637'
           || Number(registration.installment?.remaining ?? 0) > 0 ? '\u062a\u0642\u0633\u064a\u0637' : (registration.payment || registration.paymentMethod || '')
+      });
+    });
+
+    const linkedPortalRegistrationIds = new Set(snapshot.docs.flatMap(docSnap => {
+      const invoice = docSnap.data();
+      return [invoice.portalRegistrationId, invoice.registrationId].filter(Boolean);
+    }));
+    portalSnapshot.forEach(docSnap => {
+      if (linkedPortalRegistrationIds.has(docSnap.id)) return;
+      const registration = docSnap.data();
+      const rawSubscriptions = registration.selectedSubscriptions || registration.subscriptions || registration.selectedItems || [];
+      const subscriptions = Array.isArray(rawSubscriptions) ? rawSubscriptions : [];
+      const selectedAmount = Array.isArray(subscriptions)
+        ? subscriptions.reduce((sum, item) => sum + (Number(item?.price) || 0), 0)
+        : 0;
+      const total = [registration.installment?.total, registration.installment?.amount,
+        registration.requestedAmount, registration.subscriptionAmount, selectedAmount]
+        .map(Number).find(amount => Number.isFinite(amount) && amount > 0) || 0;
+      const paid = [registration.installment?.paid, registration.installment?.paidAmount,
+        registration.amountCollected, registration.paidAmount]
+        .map(Number).find(amount => Number.isFinite(amount) && amount > 0) || 0;
+      const remaining = Math.max(0, total - paid);
+      if (!paid || !remaining) return;
+
+      allInvoices.push({
+        ...registration,
+        _id: docSnap.id,
+        _collection: 'studentRegistrations',
+        isPortalRegistration: true,
+        student: registration.studentName || registration.student || '-',
+        phone: registration.phone || registration.studentPhone || '-',
+        subType: [...new Set(subscriptions.map(item => item?.type).filter(Boolean))].join(' + ') || 'اشتراك من الموقع',
+        payment: 'تقسيط',
+        paymentMethod: registration.paymentMethod || registration.payment || '',
+        paymentStatus: 'partial',
+        requestedAmount: total,
+        subscriptionAmount: total,
+        paidAmount: paid,
+        amountCollected: paid,
+        installment: { ...(registration.installment || {}), total, paid, remaining }
       });
     });
     renderLateStudentsTable();
@@ -89,7 +130,7 @@ function renderLateStudentsTable() {
   const lateTableBody = document.querySelector('#late-students-table-box tbody');
   if (!lateTableBody) return;
 
-  lateInvoices = allInvoices.filter(inv => (inv.payment === '\u062a\u0642\u0633\u064a\u0637' || Boolean(inv.installment)) && getInstallmentSummary(inv).remaining > 0);
+  lateInvoices = allInvoices.filter(inv => isInstallmentInvoice(inv) && getInstallmentSummary(inv).remaining > 0);
   lateInvoices.sort((a, b) => getInstallmentSummary(b).remaining - getInstallmentSummary(a).remaining);
 
   const totals = lateInvoices.reduce((summary, invoice) => {
@@ -110,7 +151,8 @@ function renderLateStudentsTable() {
   lateTableBody.innerHTML = lateInvoices.map((invoice, index) => {
     const { total, paid, remaining } = getInstallmentSummary(invoice);
     const level = remaining > total * 0.7 ? 'high' : remaining > total * 0.35 ? 'medium' : 'low';
-    const lastMethod = invoice.installment?.payments?.at?.(-1)?.method || invoice.installment?.lastPaymentMethod || '\u0644\u0645 \u062a\u0633\u062c\u0644 \u0628\u0639\u062f';
+    const lastMethod = invoice.installment?.payments?.at?.(-1)?.method || invoice.installment?.lastPaymentMethod
+      || invoice.paymentMethod || invoice.payment || '\u0644\u0645 \u062a\u0633\u062c\u0644 \u0628\u0639\u062f';
     return `
       <tr class="installment-row--${level}" data-index="${index}" data-id="${escapeLateHtml(invoice._id)}">
         <td data-label="\u0631\u0642\u0645" class="installment-number">${index + 1}</td>
@@ -232,7 +274,7 @@ function showInvoiceModal(inv) {
 
         <div class="installment-last-payment">
           <span><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> طريقة آخر دفعة</span>
-          <strong>${inv.installment?.payments?.at?.(-1)?.method || inv.installment?.lastPaymentMethod || 'لم تسجل دفعات بعد'}</strong>
+          <strong>${inv.installment?.payments?.at?.(-1)?.method || inv.installment?.lastPaymentMethod || inv.paymentMethod || inv.payment || 'لم تسجل دفعات بعد'}</strong>
         </div>
       </div>
       <footer class="installment-modal-actions">

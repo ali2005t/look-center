@@ -28,6 +28,40 @@ function safeText(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
 }
 
+function isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs) {
+  const registration = registrationDoc.data();
+  const invoiceId = String(registration.invoiceId || '');
+  if (!invoiceId) return false;
+  return !invoiceDocs.some(invoiceDoc => invoiceDoc.id === invoiceId
+    || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id);
+}
+
+function nextAvailableVipInvoiceNumber(invoiceDocs, vipRegistrationDocs, regularRegistrationDocs) {
+  const usedNumbers = new Set();
+  invoiceDocs.forEach(invoiceDoc => {
+    const number = Number(invoiceDoc.data().num);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  regularRegistrationDocs.forEach(registrationDoc => {
+    const number = Number(registrationDoc.data().invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  vipRegistrationDocs.forEach(registrationDoc => {
+    const registration = registrationDoc.data();
+    if (isDeletedVipInvoiceRegistration(registrationDoc, invoiceDocs)) return;
+    const linkedInvoice = invoiceDocs.find(invoiceDoc => invoiceDoc.id === String(registration.invoiceId || '')
+      || String(invoiceDoc.data().vipRegistrationId || '') === registrationDoc.id
+      || invoiceDoc.id === `vip_${registrationDoc.id}`);
+    const linkedInvoiceNumber = Number(linkedInvoice?.data().num);
+    if (Number.isInteger(linkedInvoiceNumber) && linkedInvoiceNumber > 0) return;
+    const number = Number(registration.invoiceNumber);
+    if (Number.isInteger(number) && number > 0) usedNumbers.add(number);
+  });
+  let nextNumber = 1;
+  while (usedNumbers.has(nextNumber)) nextNumber += 1;
+  return nextNumber;
+}
+
 function renderRegistrationLink() {
   const button = byId("show-vip-qr");
   if (!button || !teacher) return;
@@ -50,30 +84,23 @@ byId("close-teacher-qr").addEventListener("click", () => { byId("teacher-qr-over
 byId("teacher-qr-overlay").addEventListener("click", event => { if (event.target.id === "teacher-qr-overlay") event.currentTarget.style.display = "none"; });
 function formatMoney(value) { return Number(value || 0).toLocaleString('ar-EG') + ' \u062c'; }
 function selectedMode(item, invoiceAmount, paidNow) {
-  if (item.paymentStatus === 'paid') return item.installment?.remaining > 0 ? 'installment' : (Number(item.subscriptionAmount ?? invoiceAmount) === 0 ? 'free' : 'full');
+  if (item.paymentStatus === 'paid') {
+    const savedMode = item.teacherReportedPaymentMode || item.vipPaymentMode;
+    if (['full', 'installment', 'free'].includes(savedMode)) return savedMode;
+    if (item.payment === '\u062a\u0642\u0633\u064a\u0637' || item.paymentMethod === '\u062a\u0642\u0633\u064a\u0637' || item.installment?.remaining > 0) return 'installment';
+    if (item.payment === '\u0645\u062c\u0627\u0646\u064a' || item.paymentMethod === '\u0645\u062c\u0627\u0646\u064a') return 'free';
+    return Number(invoiceAmount) === 0 && Number(paidNow || 0) === 0 ? 'free' : 'full';
+  }
   if (Number(invoiceAmount) <= 0) return 'free';
   if (['full', 'installment', 'free'].includes(item.teacherReportedPaymentMode)) return item.teacherReportedPaymentMode;
-  if (paidNow > 0) return paidNow < invoiceAmount ? 'installment' : 'full';
+  if (paidNow > 0) return 'full';
   return 'full';
 }
 function applyChargeMode(row, mode) {
-  const invoiceInput = row.querySelector('.invoice-amount');
   const paidInput = row.querySelector('.paid-now');
   if (mode === 'free') {
-    invoiceInput.value = '0';
     paidInput.value = '0';
-  } else {
-    const total = Number(invoiceInput.value) > 0 ? Number(invoiceInput.value) : Number(invoiceInput.dataset.requestedAmount || 0);
-    const paid = Number(paidInput.value);
-    if (total <= 0) {
-      row.querySelector('.charge-mode[value="free"]').checked = true;
-      invoiceInput.value = '0'; paidInput.value = '0';
-    } else {
-      invoiceInput.value = String(total);
-      if (mode === 'full') paidInput.value = String(total);
-      else if (paid <= 0 || paid >= total) paidInput.value = '';
-    }
-  }
+  } else if (mode === 'full') paidInput.value = row.querySelector('.invoice-amount').value;
   updateRemaining(row);
 }
 async function loadRequests() {
@@ -93,15 +120,16 @@ async function loadRequests() {
     body.innerHTML = registrations.length ? registrations.map(item => {
       const items = Array.isArray(item.selectedSubscriptions) ? item.selectedSubscriptions : [];
       const isPaid = item.paymentStatus === 'paid';
-      const invoiceAmount = Number(item.teacherReportedAmount ?? item.subscriptionAmount ?? item.requestedAmount ?? 0);
-      const requestedAmount = Number(item.requestedAmount) > 0 ? Number(item.requestedAmount) : invoiceAmount;
+      const selectedAmount = items.reduce((sum, sub) => sum + Number(sub.price || 0), 0);
+      const requestedAmount = Number(item.requestedAmount) > 0 ? Number(item.requestedAmount) : selectedAmount;
+      const invoiceAmount = requestedAmount;
       const hasRecordedPaid = item.teacherReportedPaidAmount !== undefined
         || item.amountCollected !== undefined
         || item.paidAmount !== undefined;
       const recordedPaid = Number(item.teacherReportedPaidAmount ?? item.amountCollected ?? item.paidAmount ?? (isPaid ? invoiceAmount : 0));
       const mode = selectedMode(item, invoiceAmount, recordedPaid);
-      const paidNow = mode === 'free' ? 0 : mode === 'full' ? invoiceAmount : recordedPaid;
-      const remaining = mode === 'free' ? 0 : Number(item.installment?.remaining ?? Math.max(0, invoiceAmount - paidNow));
+      const paidNow = mode === 'free' ? 0 : hasRecordedPaid ? recordedPaid : (mode === 'installment' ? 0 : invoiceAmount);
+      const remaining = mode === 'installment' ? Number(item.installment?.remaining ?? Math.max(0, invoiceAmount - paidNow)) : 0;
       const date = item.registeredAt?.toDate ? item.registeredAt.toDate().toLocaleString('ar-EG') : '\u2014';
       let state = '\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c';
       if (isPaid && mode === 'free') state = '\u0645\u062c\u0627\u0646\u064a \u00b7 \u0645\u0639\u062a\u0645\u062f';
@@ -117,27 +145,24 @@ async function loadRequests() {
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="full" ' + (mode === 'full' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062f\u0641\u0639 \u0643\u0627\u0645\u0644</span></label>' +
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="installment" ' + (mode === 'installment' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062a\u0642\u0633\u064a\u0637</span></label>' +
         '<label class="mode-option free"><input class="charge-mode" type="radio" name="' + radioName + '" value="free" ' + (mode === 'free' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u0645\u062c\u0627\u0646\u064a</span></label></div>' +
-        '<div class="amount-grid"><label class="amount-field">\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 (\u062a\u0644\u0642\u0627\u0626\u064a)<input class="invoice-amount" type="number" min="0" step="0.01" data-requested-amount="' + safeText(requestedAmount) + '" value="' + safeText(mode === 'free' ? 0 : invoiceAmount) + '" readonly ' + (isPaid ? 'disabled' : '') + '></label>' +
+        '<div class="amount-grid"><label class="amount-field">\u0633\u0639\u0631 \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643 \u0627\u0644\u0623\u0633\u0627\u0633\u064a<input class="invoice-amount" type="number" min="0" step="0.01" data-requested-amount="' + safeText(requestedAmount) + '" value="' + safeText(invoiceAmount) + '" readonly ' + (isPaid ? 'disabled' : '') + '></label>' +
         '<label class="amount-field">\u0627\u0644\u0645\u062f\u0641\u0648\u0639 \u0627\u0644\u0622\u0646<input class="paid-now" type="number" min="0" step="0.01" placeholder="\u0627\u0643\u062a\u0628 \u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0641\u0639\u0629" value="' + safeText(mode === 'free' ? 0 : (mode === 'installment' && !hasRecordedPaid ? '' : paidNow)) + '" ' + (isPaid ? 'disabled' : '') + '></label>' +
         '<label class="amount-field">\u0627\u0644\u0645\u062a\u0628\u0642\u064a<output class="remaining-amount">' + formatMoney(remaining) + '</output></label></div>' +
-        '<div class="request-actions"><button class="save-amount secondary" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u062d\u0641\u0638 \u0627\u0644\u0645\u0628\u0627\u0644\u063a</button><button class="approve-payment" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062f\u0641\u0639 \u0648\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629</button></div></div></article>';
+        '<div class="request-actions">' +
+        (isPaid ? '<button class="edit-approved secondary" ' + (!items.length ? 'disabled' : '') + '>\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629</button>' : '') +
+        '<button class="save-amount secondary" ' + (isPaid ? 'hidden disabled' : !items.length ? 'disabled' : '') + '>\u062d\u0641\u0638 \u0627\u0644\u0645\u0628\u0627\u0644\u063a</button>' +
+        '<button class="approve-payment" ' + (isPaid ? 'hidden disabled' : !items.length ? 'disabled' : '') + '>\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062f\u0641\u0639 \u0648\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629</button></div></div></article>';
     }).join('') : '<p class="card empty-state">\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u0645\u0631\u062a\u0628\u0637\u0629 \u0628\u062d\u0633\u0627\u0628\u0643.</p>';
     body.querySelectorAll('.charge-mode').forEach(input => input.addEventListener('change', () => applyChargeMode(input.closest('.request-card'), input.value)));
-    body.querySelectorAll('.invoice-amount').forEach(input => input.addEventListener('input', () => {
-      const row = input.closest('.request-card'); const mode = row.querySelector('.charge-mode:checked')?.value;
-      if (input.value === '') { updateRemaining(row); return; }
-      if (mode === 'free' || Number(input.value) === 0) { row.querySelector('.charge-mode[value="free"]').checked = true; row.querySelector('.invoice-amount').value = '0'; row.querySelector('.paid-now').value = '0'; }
-      else if (mode === 'full') row.querySelector('.paid-now').value = input.value;
-      updateRemaining(row);
-    }));
     body.querySelectorAll('.paid-now').forEach(input => input.addEventListener('input', () => {
-      const row = input.closest('.request-card'); const total = Number(row.querySelector('.invoice-amount').value); const paid = Number(input.value);
-      if (input.value === '') { updateRemaining(row); return; }
-      if (paid === 0) { row.querySelector('.charge-mode[value="free"]').checked = true; row.querySelector('.invoice-amount').value = '0'; input.value = '0'; }
-      else row.querySelector('.charge-mode[value="' + (paid < total ? 'installment' : 'full') + '"]').checked = true;
+      const row = input.closest('.request-card');
+      if (row.querySelector('.charge-mode:checked')?.value === 'free' && Number(input.value) > 0) {
+        row.querySelector('.charge-mode[value="full"]').checked = true;
+      }
       updateRemaining(row);
     }));
     body.querySelectorAll('.save-amount').forEach(button => button.addEventListener('click', () => saveAmount(button)));
+    body.querySelectorAll('.edit-approved').forEach(button => button.addEventListener('click', () => editApprovedInvoice(button)));
     body.querySelectorAll('.approve-payment').forEach(button => button.addEventListener('click', () => approvePayment(button)));
     renderReports();
   } catch (err) {
@@ -151,10 +176,41 @@ function updateRemaining(row) {
   const total = Number(totalRaw);
   const paid = Number(paidRaw);
   const output = row.querySelector('.remaining-amount');
-  if (totalRaw === '' || paidRaw === '' || !Number.isFinite(total) || !Number.isFinite(paid)) { output.textContent = '\u0623\u062f\u062e\u0644 \u0627\u0644\u0645\u0628\u0627\u0644\u063a'; return; }
   const mode = row.querySelector('.charge-mode:checked')?.value;
-  output.textContent = formatMoney(mode === 'free' ? 0 : total - paid);
-  output.style.color = paid > total ? '#b42318' : '#18304b';
+  if (mode !== 'installment') { output.textContent = formatMoney(0); output.style.color = '#18304b'; return; }
+  if (totalRaw === '' || paidRaw === '' || !Number.isFinite(total) || !Number.isFinite(paid)) { output.textContent = '\u0623\u062f\u062e\u0644 \u0627\u0644\u0645\u0628\u0627\u0644\u063a'; return; }
+  output.textContent = formatMoney(Math.max(0, total - paid));
+  output.style.color = '#18304b';
+}
+function allocateInvoiceItems(subscriptions, total) {
+  const sourceTotal = subscriptions.reduce((sum, sub) => sum + Number(sub.price || 0), 0);
+  let assigned = 0;
+  return subscriptions.map((sub, index) => {
+    const price = index === subscriptions.length - 1
+      ? Number((total - assigned).toFixed(2))
+      : sourceTotal > 0 ? Number((total * Number(sub.price || 0) / sourceTotal).toFixed(2)) : 0;
+    assigned += price;
+    return { ...sub, price };
+  });
+}
+function editApprovedInvoice(button) {
+  const row = button.closest('.request-card');
+  if (button.dataset.editing === 'true') {
+    loadRequests();
+    return;
+  }
+  button.dataset.editing = 'true';
+  button.textContent = '\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0639\u062f\u064a\u0644';
+  row.dataset.editingApproved = 'true';
+  row.querySelectorAll('.charge-mode').forEach(input => { input.disabled = false; });
+  const invoiceInput = row.querySelector('.invoice-amount');
+  invoiceInput.disabled = false;
+  invoiceInput.readOnly = true;
+  row.querySelector('.paid-now').disabled = false;
+  const saveButton = row.querySelector('.save-amount');
+  saveButton.hidden = false;
+  saveButton.disabled = false;
+  saveButton.textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644';
 }
 async function saveAmount(button) {
   const row = button.closest('.request-card');
@@ -162,14 +218,64 @@ async function saveAmount(button) {
   const mode = row.querySelector('.charge-mode:checked')?.value;
   const rawTotal = row.querySelector('.invoice-amount').value;
   const rawPaid = row.querySelector('.paid-now').value;
-  const invoiceAmount = mode === 'free' ? 0 : rawTotal === '' ? NaN : Number(rawTotal);
+  const invoiceAmount = rawTotal === '' ? NaN : Number(rawTotal);
   const paidNow = mode === 'free' ? 0 : rawPaid === '' ? NaN : Number(rawPaid);
-  const valid = mode === 'free' ? true : mode === 'full' ? Number.isFinite(invoiceAmount) && invoiceAmount >= 0 && paidNow === invoiceAmount : mode === 'installment' && Number.isFinite(invoiceAmount) && invoiceAmount > 0 && Number.isFinite(paidNow) && paidNow > 0 && paidNow < invoiceAmount;
-  if (!item || !valid) { alert('\u0631\u0627\u062c\u0639 \u0646\u0648\u0639 \u0627\u0644\u062f\u0641\u0639 \u0648\u0627\u0644\u0645\u0628\u0627\u0644\u063a: \u0627\u0644\u0645\u062c\u0627\u0646\u064a \u0635\u0641\u0631\u060c \u0648\u0627\u0644\u062a\u0642\u0633\u064a\u0637 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0623\u0642\u0644 \u0645\u0646 \u0642\u064a\u0645\u0629 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629.'); return; }
+  const validAmounts = Number.isFinite(invoiceAmount) && invoiceAmount >= 0 && Number.isFinite(paidNow) && paidNow >= 0;
+  const valid = validAmounts && (mode === 'free' ? paidNow === 0 : mode === 'full' || mode === 'installment');
+  if (!item || !valid) { alert('\u0623\u062f\u062e\u0644 \u0645\u0628\u0644\u063a\u064b\u0627 \u0635\u0627\u0644\u062d\u064b\u0627 \u0644\u0644\u0645\u062f\u0641\u0648\u0639.'); return; }
   if (!teacher.isManager && item.teacherId !== teacher.id && String(item.teacherName || '').trim().toLocaleLowerCase() !== teacher.name.toLocaleLowerCase()) throw new Error('\u0627\u0644\u0637\u0644\u0628 \u0644\u0627 \u064a\u062a\u0628\u0639 \u0627\u0644\u0623\u0633\u062a\u0627\u0630.');
+  if (item.paymentStatus === 'paid' && row.dataset.editingApproved !== 'true') return;
   button.disabled = true;
   try {
-    const remaining = mode === 'installment' ? Number((invoiceAmount - paidNow).toFixed(2)) : 0;
+    const remaining = mode === 'installment' ? Number(Math.max(0, invoiceAmount - paidNow).toFixed(2)) : 0;
+    if (item.paymentStatus === 'paid') {
+      const registrationRef = doc(db, 'vipRegistrations', item.id);
+      const invoiceRef = doc(db, 'invoices', item.invoiceId || 'vip_' + item.id);
+      const selectedSubscriptions = Array.isArray(item.selectedSubscriptions) ? item.selectedSubscriptions : [];
+      const paymentMethod = mode === 'free' ? '\u0645\u062c\u0627\u0646\u064a' : 'VIP - ' + teacher.name;
+      const payment = mode === 'installment' ? '\u062a\u0642\u0633\u064a\u0637' : paymentMethod;
+      const invoiceItems = allocateInvoiceItems(selectedSubscriptions, invoiceAmount);
+      const installment = mode === 'installment' ? { total: invoiceAmount, paid: paidNow, remaining } : null;
+      const registrationUpdates = {
+        subscriptionAmount: invoiceAmount, paidAmount: paidNow, amountCollected: paidNow,
+        installment, payment, paymentMethod, paidBy: teacher.name, paidAt: new Date(), paymentStatus: 'paid',
+        vipPaymentMode: mode, vipFinalPrice: invoiceAmount,
+        vipDiscountAmount: mode === 'installment' ? 0 : Math.max(0, invoiceAmount - paidNow),
+        teacherReportedAmount: invoiceAmount, teacherReportedPaidAmount: paidNow,
+        teacherReportedRemainingAmount: remaining, teacherReportedPaymentMode: mode,
+        teacherReportedBy: teacher.id, teacherReportedAt: new Date()
+      };
+      const invoiceUpdates = {
+        student: item.studentName || '-', phone: item.phone || '', grade: item.grade || '-', studyType: item.studyType || '-',
+        subType: [...new Set(invoiceItems.map(sub => sub.type).filter(Boolean))].join(' / ') || 'VIP',
+        items: invoiceItems, selectedSubscriptions, payment, paymentMethod,
+        paymentStatus: 'paid', paidAmount: paidNow, amountCollected: paidNow, installment,
+        isVip: true, vipFinalPrice: invoiceAmount, vipSubscriptionPrice: invoiceAmount,
+        vipOriginalPrice: Number(item.requestedAmount || 0),
+        vipDiscountAmount: mode === 'installment' ? 0 : Math.max(0, invoiceAmount - paidNow),
+        vipRegistrationId: item.id, vipIsFree: mode === 'free', vipPaymentMode: mode, lastModified: new Date()
+      };
+      await runTransaction(db, async transaction => {
+        const [registrationSnapshot, invoiceSnapshot] = await Promise.all([
+          transaction.get(registrationRef), transaction.get(invoiceRef)
+        ]);
+        if (!registrationSnapshot.exists() || registrationSnapshot.data().paymentStatus !== 'paid') {
+          throw new Error('لا يمكن تعديل طلب غير معتمد. حدّث الصفحة وحاول مرة أخرى.');
+        }
+        const current = registrationSnapshot.data();
+        const belongsToTeacher = current.teacherId === teacher.id || String(current.teacherName || '').trim().toLocaleLowerCase() === teacher.name.toLocaleLowerCase();
+        if (!teacher.isManager && !belongsToTeacher) throw new Error('هذا الطلب لا يتبع حسابك.');
+        if (invoiceSnapshot.exists() && invoiceSnapshot.data().vipRegistrationId !== item.id) {
+          throw new Error('الفاتورة مرتبطة بطلب VIP آخر.');
+        }
+        transaction.update(registrationRef, registrationUpdates);
+        if (invoiceSnapshot.exists()) transaction.update(invoiceRef, invoiceUpdates);
+      });
+      Object.assign(item, registrationUpdates);
+      await loadRequests();
+      alert('\u062a\u0645 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629.');
+      return;
+    }
     await updateDoc(doc(db, 'vipRegistrations', item.id), { teacherReportedAmount: invoiceAmount, teacherReportedPaidAmount: paidNow, teacherReportedRemainingAmount: remaining, teacherReportedPaymentMode: mode, teacherReportedBy: teacher.id, teacherReportedAt: new Date() });
     Object.assign(item, { teacherReportedAmount: invoiceAmount, teacherReportedPaidAmount: paidNow, teacherReportedRemainingAmount: remaining, teacherReportedPaymentMode: mode });
     button.textContent = '\u062a\u0645 \u0627\u0644\u062d\u0641\u0638';
@@ -186,11 +292,10 @@ async function approvePayment(button) {
   const mode = row.querySelector('.charge-mode:checked')?.value;
   const rawTotal = row.querySelector('.invoice-amount').value;
   const rawPaid = row.querySelector('.paid-now').value;
-  const invoicePrice = mode === 'free' ? 0 : rawTotal === '' ? NaN : Number(rawTotal);
+  const invoicePrice = rawTotal === '' ? NaN : Number(rawTotal);
   const amount = mode === 'free' ? 0 : rawPaid === '' ? NaN : Number(rawPaid);
-  const valid = mode === 'free' ? true : mode === 'full'
-    ? Number.isFinite(invoicePrice) && invoicePrice > 0 && amount === invoicePrice
-    : mode === 'installment' && Number.isFinite(invoicePrice) && invoicePrice > 0 && Number.isFinite(amount) && amount > 0 && amount < invoicePrice;
+  const validAmounts = Number.isFinite(invoicePrice) && invoicePrice >= 0 && Number.isFinite(amount) && amount >= 0;
+  const valid = validAmounts && (mode === 'free' ? amount === 0 : mode === 'full' || mode === 'installment');
   if (!valid) { alert('\u0631\u0627\u062c\u0639 \u062d\u0627\u0644\u0629 \u0627\u0644\u062f\u0641\u0639 \u0648\u0627\u0644\u0645\u0628\u0627\u0644\u063a \u0642\u0628\u0644 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f.'); return; }
   const selectedSubscriptions = Array.isArray(item.selectedSubscriptions) ? item.selectedSubscriptions : [];
   if (!selectedSubscriptions.length || selectedSubscriptions.some(sub => !sub.id)) { alert('\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0627\u0634\u062a\u0631\u0627\u0643\u0627\u062a \u0646\u0627\u0642\u0635\u0629\u060c \u0644\u0627 \u064a\u0645\u0643\u0646 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629.'); return; }
@@ -203,8 +308,12 @@ async function approvePayment(button) {
     const registrationRef = doc(db, 'vipRegistrations', item.id);
     let invoiceNumber = Number(item.invoiceNumber) || 0;
     if (!invoiceNumber) {
-      const [invoiceSnapshot, regularSnapshot] = await Promise.all([getDocs(collection(db, 'invoices')), getDocs(collection(db, 'studentRegistrations'))]);
-      invoiceNumber = [...invoiceSnapshot.docs.map(snap => Number(snap.data().num) || 0), ...regularSnapshot.docs.map(snap => Number(snap.data().invoiceNumber) || 0)].reduce((max, value) => Math.max(max, value), 0) + 1;
+      const [invoiceSnapshot, regularSnapshot, vipRegistrationSnapshot] = await Promise.all([
+        getDocs(collection(db, 'invoices')),
+        getDocs(collection(db, 'studentRegistrations')),
+        getDocs(collection(db, 'vipRegistrations'))
+      ]);
+      invoiceNumber = nextAvailableVipInvoiceNumber(invoiceSnapshot.docs, vipRegistrationSnapshot.docs, regularSnapshot.docs);
     }
     const requestedPrice = selectedSubscriptions.reduce((sum, sub) => sum + Number(sub.price || 0), 0);
     let assignedPrice = 0;
@@ -213,7 +322,7 @@ async function approvePayment(button) {
       assignedPrice += price;
       return { id: sub.id, subscriptionId: sub.id, name: sub.name || '', type: sub.type || '', price, quantity: 1 };
     });
-    const remaining = mode === 'installment' ? Number((invoicePrice - amount).toFixed(2)) : 0;
+    const remaining = mode === 'installment' ? Number(Math.max(0, invoicePrice - amount).toFixed(2)) : 0;
     const paymentMethod = mode === 'free' ? '\u0645\u062c\u0627\u0646\u064a' : 'VIP - ' + teacher.name;
     const invoiceData = {
       num: invoiceNumber, student: item.studentName || '-', phone: item.phone || '', grade: item.grade || '-', studyType: item.studyType || '-',
@@ -221,8 +330,8 @@ async function approvePayment(button) {
       items: invoiceItems, selectedSubscriptions, payment: mode === 'installment' ? '\u062a\u0642\u0633\u064a\u0637' : paymentMethod, paymentMethod,
       paymentStatus: 'paid', paidAmount: amount, amountCollected: amount,
       installment: mode === 'installment' ? { total: invoicePrice, paid: amount, remaining } : null,
-      vipStockDeducted: false, isVip: true, vipFinalPrice: invoicePrice, vipSubscriptionPrice: invoicePrice,
-      vipOriginalPrice: Number(item.requestedAmount || 0), vipDiscountAmount: Math.max(0, Number(item.requestedAmount || 0) - invoicePrice),
+      vipStockDeducted: false, isVip: true, vipIsFree: mode === 'free', vipPaymentMode: mode, vipFinalPrice: invoicePrice, vipSubscriptionPrice: invoicePrice,
+      vipOriginalPrice: Number(item.requestedAmount || invoicePrice), vipDiscountAmount: mode === 'installment' ? 0 : Math.max(0, invoicePrice - amount),
       date: new Date(), createdBy: teacher.name, vipCreatedBy: teacher.name, vipConfirmedBy: teacher.name,
       vipAssignedTeacher: item.teacherName || teacher.name, vipTeacherId: item.teacherId || teacher.id, vipRegistrationId: item.id,
       recipient: item.teacherName || teacher.name, notes: item.notes || 'VIP QR'
@@ -239,6 +348,7 @@ async function approvePayment(button) {
         const checkRecords = (snapshot, collectionName) => snapshot.docs.forEach(docSnapshot => {
           if ((collectionName === 'invoices' && docSnapshot.id === invoiceId)
             || (collectionName === 'vipRegistrations' && docSnapshot.id === item.id)) return;
+          if (collectionName === 'vipRegistrations' && isDeletedVipInvoiceRegistration(docSnapshot, samePhoneInvoices.docs)) return;
           const existing = docSnapshot.data();
           const existingItems = existing.items || existing.selectedSubscriptions || existing.subscriptions || existing.selectedItems || [];
           existingItems.forEach(sub => {
@@ -262,7 +372,7 @@ async function approvePayment(button) {
       if (invoiceSnapshot.exists()) {
         const existing = invoiceSnapshot.data();
         if (existing.vipRegistrationId !== item.id) throw new Error('Invoice id is already linked to another request.');
-        if (current.paymentStatus !== 'paid') transaction.update(registrationRef, { paymentStatus: 'paid', invoiceId, invoiceNumber: existing.num, subscriptionAmount: existing.vipFinalPrice ?? invoicePrice, amountCollected: existing.amountCollected ?? existing.paidAmount ?? 0, paidAmount: existing.paidAmount ?? 0, paymentMethod: existing.paymentMethod || existing.payment, installment: existing.installment || null, paidBy: existing.vipConfirmedBy || teacher.name, paidAt: existing.date || new Date() });
+        if (current.paymentStatus !== 'paid') transaction.update(registrationRef, { paymentStatus: 'paid', invoiceId, invoiceNumber: existing.num, subscriptionAmount: existing.vipFinalPrice ?? invoicePrice, amountCollected: existing.amountCollected ?? existing.paidAmount ?? 0, paidAmount: existing.paidAmount ?? 0, payment: existing.payment || existing.paymentMethod, paymentMethod: existing.paymentMethod || existing.payment, installment: existing.installment || null, vipPaymentMode: existing.vipPaymentMode || '', teacherReportedPaymentMode: existing.vipPaymentMode || '', paidBy: existing.vipConfirmedBy || teacher.name, paidAt: existing.date || new Date() });
         return;
       }
       if (current.paymentStatus === 'paid') throw new Error('Request is marked paid but has no linked invoice.');
@@ -272,9 +382,10 @@ async function approvePayment(button) {
       transaction.set(invoiceRef, invoiceData);
       transaction.update(registrationRef, {
         paymentStatus: 'paid', subscriptionAmount: invoicePrice, paidAmount: amount, amountCollected: amount,
-        installment: invoiceData.installment, paymentMethod, paidBy: teacher.name, paidAt: new Date(), invoiceId, invoiceNumber,
+        installment: invoiceData.installment, payment: invoiceData.payment, paymentMethod, paidBy: teacher.name, paidAt: new Date(), invoiceId, invoiceNumber,
         teacherReportedAmount: invoicePrice, teacherReportedPaidAmount: amount, teacherReportedRemainingAmount: remaining,
-        teacherReportedPaymentMode: mode, teacherReportedBy: teacher.id, teacherReportedAt: new Date()
+        teacherReportedPaymentMode: mode, vipPaymentMode: mode, vipFinalPrice: invoicePrice,
+        vipDiscountAmount: invoiceData.vipDiscountAmount, teacherReportedBy: teacher.id, teacherReportedAt: new Date()
       });
     });
     await loadRequests();

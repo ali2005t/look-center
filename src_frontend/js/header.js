@@ -155,7 +155,7 @@ const navigationPageDetails = {
   daily_closing: { label: 'التقفيل اليومي', icon: 'fa-calendar-check', color: '#ff9800' },
   invoices: { label: 'الطلاب المشتركين', icon: 'fa-file-invoice', color: '#fbc02d' },
   unsubscribed: { label: 'فواتير فردية', icon: 'fa-user-minus', color: '#e53935' },
-  late_students: { label: 'الطلاب المتأخرين', icon: 'fa-clock', color: '#8e24aa' },
+  late_students: { label: 'طلاب التقسيط', icon: 'fa-clock', color: '#8e24aa' },
   subscriptions: { label: 'الاشتراكات والأسعار', icon: 'fa-credit-card', color: '#00897b' },
   users: { label: 'إدارة المستخدمين', icon: 'fa-users', color: '#f57c00' },
   reports: { label: 'التقارير', icon: 'fa-chart-bar', color: '#0288d1' },
@@ -466,7 +466,7 @@ function initializeBreadcrumb() {
     'expenses': 'المصروفات',
     'settings': 'الإعدادات',
     'help': 'المساعدة',
-    'late_students': 'الطلاب المتأخرين'
+    'late_students': 'طلاب التقسيط'
   };
 
   let breadcrumbContainer = document.getElementById('breadcrumb-container');

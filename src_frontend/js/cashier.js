@@ -28,6 +28,7 @@ if (printBtn) {
 import { db } from './firebase.js';
 import { collection, getDocs, addDoc, Timestamp, doc, getDoc, updateDoc, query, where, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js';
 
 const isVipMode = new URLSearchParams(window.location.search).get('vip') === 'true';
 let selectedGrade = "";
@@ -35,8 +36,77 @@ let selectedSubType = "";
 let selectedItems = [];
 // متغير جديد لتخزين العناصر حسب نوع الاشتراك
 let itemsBySubType = {};
+const bookletSubscriptionType = 'اشتراك ملازم';
+let bookletSelectionMode = false;
 let vipOriginalPriceCustomized = false;
 let vipFinalPriceCustomized = false;
+
+function isBookletSubscriptionSelection(subType) {
+  return subType === bookletSubscriptionType && bookletSelectionMode;
+}
+
+function hasCustomBookletSubscriptionSelection() {
+  return isBookletSubscriptionSelection(bookletSubscriptionType)
+    && (itemsBySubType[bookletSubscriptionType] || []).length > 0;
+}
+
+function shouldHideCustomBookletItemPrice(item) {
+  return isBookletSubscriptionSelection(bookletSubscriptionType)
+    && item?.subType === bookletSubscriptionType;
+}
+
+function getCurrentItemSourceType() {
+  return isBookletSubscriptionSelection(selectedSubType) ? 'ملازم فردية' : selectedSubType;
+}
+
+function getInvoiceItemsForSubType(subType, sourceItems = itemsBySubType[subType] || []) {
+  const items = Array.isArray(sourceItems) ? sourceItems : [];
+  if (!isBookletSubscriptionSelection(subType) || !items.length) return items.map(item => ({ ...item }));
+
+  const priceInput = document.getElementById('booklet-subscription-price');
+  const rawPrice = String(priceInput?.value ?? '').trim();
+  const totalPrice = Number(rawPrice);
+  if (!rawPrice || !Number.isFinite(totalPrice) || totalPrice < 0) return items.map(item => ({ ...item }));
+
+  const totalCents = Math.round(totalPrice * 100);
+  const basePrices = items.map(item => Math.max(0, Number(item.price) || 0));
+  const baseTotal = basePrices.reduce((sum, price) => sum + price, 0);
+  let assignedCents = 0;
+
+  return items.map((item, index) => {
+    const lineCents = index === items.length - 1
+      ? totalCents - assignedCents
+      : baseTotal > 0
+        ? Math.floor(totalCents * basePrices[index] / baseTotal)
+        : Math.floor(totalCents / items.length);
+    assignedCents += lineCents;
+    return { ...item, price: lineCents / 100 };
+  });
+}
+
+function updateBookletSubscriptionControls() {
+  const tools = document.getElementById('booklet-subscription-tools');
+  const toggle = document.getElementById('booklet-subscription-toggle');
+  const priceWrap = document.getElementById('booklet-subscription-price-wrap');
+  const priceInput = document.getElementById('booklet-subscription-price');
+  const isVisible = selectedSubType === bookletSubscriptionType;
+  const isCustomMode = isBookletSubscriptionSelection(bookletSubscriptionType);
+
+  if (tools) tools.hidden = !isVisible;
+  if (toggle) {
+    toggle.textContent = isCustomMode ? 'الرجوع لاختيار باقة الملازم' : 'التبديل لاختيار ملازم منفردة';
+    toggle.setAttribute('aria-pressed', String(isCustomMode));
+  }
+  if (priceWrap) priceWrap.hidden = !isVisible || !isCustomMode;
+  if (priceInput) priceInput.required = isCustomMode && hasCustomBookletSubscriptionSelection();
+}
+
+function resetBookletSubscriptionMode() {
+  bookletSelectionMode = false;
+  const priceInput = document.getElementById('booklet-subscription-price');
+  if (priceInput) priceInput.value = '';
+  updateBookletSubscriptionControls();
+}
 
 // تعريف متغير printModal بشكل عام ليكون متاحاً في جميع أنحاء الملف
 let printModal = null;
@@ -253,6 +323,22 @@ function normalizeStudentText(value) {
     .replace(/\s+/g, ' ');
 }
 
+function normalizeStudentGrade(value) {
+  return normalizeStudentText(value)
+    .replace(/^الفرقه\s*/, '')
+    .replace(/^ال/, '');
+}
+
+function cleanGeneratedBookletNote(value) {
+  return String(value || '').split(/\r?\n/)
+    .filter(line => !/^عامل اشتراك على مواد(?:\s|$)/u.test(line.trim()))
+    .join('\n').trim();
+}
+
+function hasGeneratedBookletNote(value) {
+  return String(value || '').split(/\r?\n/).some(line => /^عامل اشتراك على مواد(?:\s|$)/u.test(line.trim()));
+}
+
 function escapeStudentHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -310,6 +396,24 @@ function makeStudentRecord(docSnap, isPortalRegistration) {
     subType: String(data.subType || (isPortalRegistration ? portalSubType : '')).trim(),
     items: Array.isArray(items) ? items : []
   };
+}
+
+function getStudentProfileInstallmentSummary(record) {
+  const invoice = { ...record.data, items: record.items, isPortalRegistration: record.isPortalRegistration };
+  if (!isInstallmentInvoice(invoice)) return null;
+  if (record.isPortalRegistration) {
+    const installmentMethod = '\u062a\u0642\u0633\u064a\u0637';
+    const hasInstallmentData = invoice.installment?.total != null || invoice.installment?.amount != null;
+    if (invoice.payment !== installmentMethod
+      && invoice.paymentMethod !== installmentMethod
+      && invoice.paymentStatus !== 'partial'
+      && !hasInstallmentData) return null;
+  }
+  const summary = getInstallmentSummary(invoice);
+  if (record.isPortalRegistration && invoice.paymentStatus === 'paid' && summary.remaining > 0) {
+    return { ...summary, paid: summary.total, remaining: 0 };
+  }
+  return summary;
 }
 
 async function loadStudentLookupRecords() {
@@ -378,12 +482,41 @@ function renderStudentLookupResults(queryText) {
 
 function getStudentLinkedBooklets(invoiceRecord, subscriptionDocs) {
   const invoice = invoiceRecord.data;
+  const isCustomBookletSubscription = invoice.isCustomBookletSubscription === true
+    || hasGeneratedBookletNote(invoice.notes);
+  if (isCustomBookletSubscription) {
+    const selectedItems = invoiceRecord.items.length
+      ? invoiceRecord.items
+      : (Array.isArray(invoice.indivNotes) ? invoice.indivNotes : []);
+    const previousDelivery = new Map((invoice.indivNotes || []).map(note => [
+      note.noteId || note.id || note.name,
+      note.delivered === true
+    ]));
+    return selectedItems
+      .map((item, itemIndex) => ({ item, itemIndex }))
+      .filter(({ item }) => item && item.name && !item.isOnlineCard)
+      .map(({ item, itemIndex }) => {
+        const id = item.id || item.noteId || item.subscriptionId;
+        return {
+          id,
+          itemIndex,
+          name: item.name || 'ملزمة',
+          delivered: item.delivered === true
+            || previousDelivery.get(id) === true
+            || previousDelivery.get(item.name) === true,
+          sortOrder: Number(item.sortOrder) || Number.MAX_SAFE_INTEGER
+        };
+      })
+      .sort((first, second) => first.sortOrder - second.sortOrder
+        || String(first.name || '').localeCompare(String(second.name || ''), 'ar', { numeric: true, sensitivity: 'base' }));
+  }
+
   const parentItems = invoiceRecord.isPortalRegistration
     ? invoiceRecord.items
     : (invoiceRecord.items.length ? invoiceRecord.items : (invoice.indivNotes || []));
   const parentReferences = new Set(parentItems.flatMap(item => [item.id, item.name])
     .map(normalizeProfileReference).filter(Boolean));
-  const invoiceGrade = normalizeStudentText(invoiceRecord.grade);
+  const invoiceGrade = normalizeStudentGrade(invoiceRecord.grade);
   const previousDelivery = new Map((invoice.indivNotes || []).map(note => [
     note.noteId || note.name,
     note.delivered === true
@@ -391,7 +524,7 @@ function getStudentLinkedBooklets(invoiceRecord, subscriptionDocs) {
 
   return subscriptionDocs.filter(subscriptionDoc => {
     const note = subscriptionDoc.data();
-    const noteGrade = normalizeStudentText(note.grade);
+    const noteGrade = normalizeStudentGrade(note.grade);
     const noteLinkedSubs = Array.isArray(note.linkedSubscriptions) && note.linkedSubscriptions.length
       ? note.linkedSubscriptions
       : String(note.linkedSubscription || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -454,8 +587,7 @@ async function openStudentProfile(studentKey) {
       .concat(records.filter(record => !record.isPortalRegistration).map(record => record.subType))
       .filter(name => name && name !== 'تسجيل من الموقع'))];
     const outstanding = records.reduce((total, record) => {
-      const remaining = Number(record.data.installment?.remaining);
-      return total + (Number.isFinite(remaining) && remaining > 0 ? remaining : 0);
+      return total + (getStudentProfileInstallmentSummary(record)?.remaining || 0);
     }, 0);
     const subscriptionDocs = subscriptionSnapshot.docs;
     const onlineCardRecords = onlineCardsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -472,25 +604,50 @@ async function openStudentProfile(studentKey) {
         record.data.agentId
       ].map(value => String(value || '').trim()).find(value => value && value !== '-') || 'غير مسجل';
       const itemNames = record.items.map(item => item.name || item.title).filter(Boolean).join('، ');
-      const isPaid = record.isPortalRegistration
-        ? record.data.paymentStatus === 'paid'
-        : record.data.payment !== 'تقسيط' || Number(record.data.installment?.remaining || 0) <= 0;
-      const payment = record.isPortalRegistration
+      const installmentSummary = getStudentProfileInstallmentSummary(record);
+      const isPaid = installmentSummary
+        ? installmentSummary.remaining <= 0
+        : record.isPortalRegistration ? record.data.paymentStatus === 'paid' : true;
+      const payment = record.isPortalRegistration && !installmentSummary
         ? (isPaid ? 'مدفوع' : 'غير مدفوع')
         : (record.data.payment || 'غير محدد');
       const itemsAmount = record.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-      const amount = record.isPortalRegistration
+      const amount = installmentSummary
+        ? installmentSummary.total
+        : record.isPortalRegistration
         ? Number(record.data.requestedAmount ?? record.data.paidAmount ?? itemsAmount) || 0
         : record.data.isVip
           ? Number(record.data.vipFinalPrice ?? itemsAmount) || 0
           : itemsAmount;
+      const paidPercentage = installmentSummary?.total > 0
+        ? Math.min(100, Math.round((installmentSummary.paid / installmentSummary.total) * 100))
+        : 0;
       const invoiceKey = `${record.collection}:${record.id}`;
+      const linkedBooklets = record.isPortalRegistration
+        ? getStudentLinkedBooklets(record, subscriptionDocs)
+        : [];
+      const printableBooklets = linkedBooklets.length
+        ? linkedBooklets
+        : (Array.isArray(record.data.indivNotes) ? record.data.indivNotes : []);
       studentProfileInvoiceTargets.set(invoiceKey, {
         ...record.data,
+        _id: record.id,
+        _collection: record.collection,
+        sourceCollection: record.collection,
+        isPortalRegistration: record.isPortalRegistration,
         student: record.student || '-',
         phone: record.phone || '',
         subType: record.subType,
         items: record.items,
+        indivNotes: printableBooklets,
+        notes: cleanGeneratedBookletNote(record.data.notes),
+        isCustomBookletSubscription: record.data.isCustomBookletSubscription === true || hasGeneratedBookletNote(record.data.notes),
+        subscriptionAmount: record.data.subscriptionAmount ?? (hasGeneratedBookletNote(record.data.notes) ? itemsAmount : undefined),
+        installment: record.data.installment || (installmentSummary ? {
+          total: installmentSummary.total,
+          paid: installmentSummary.paid,
+          remaining: installmentSummary.remaining
+        } : null),
         date: record.isPortalRegistration
           ? (record.data.registeredAt || record.data.createdAt || record.data.date)
           : record.data.date,
@@ -514,8 +671,14 @@ async function openStudentProfile(studentKey) {
           <span class="student-payment-badge ${isPaid ? 'is-paid' : 'is-unpaid'}">${escapeStudentHtml(payment)}</span>
         </div>
         <p class="student-profile-invoice-items"><i class="fas fa-book-open" aria-hidden="true"></i> ${escapeStudentHtml(itemNames || record.data.subscriptionFallback || 'لا توجد تفاصيل عناصر')}</p>
+        ${installmentSummary ? `<div class="student-profile-installment-summary">
+          <div class="student-profile-installment-metric is-paid"><small>المدفوع</small><strong>${installmentSummary.paid.toFixed(2)} ج</strong></div>
+          <div class="student-profile-installment-metric is-remaining"><small>المتبقي</small><strong>${installmentSummary.remaining.toFixed(2)} ج</strong></div>
+          <div class="student-profile-installment-progress" role="progressbar" aria-label="نسبة سداد القسط" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${paidPercentage}"><span style="width:${paidPercentage}%"></span></div>
+        </div>` : ''}
         <div class="student-profile-invoice-footer">
-          <strong>${amount.toFixed(2)} ج</strong>
+          <div class="student-profile-invoice-total"><small>إجمالي الفاتورة</small><strong>${amount.toFixed(2)} ج</strong></div>
+          ${installmentSummary?.remaining > 0 ? `<button type="button" class="student-profile-record-installment" data-record-installment="${escapeStudentHtml(invoiceKey)}"><i class="fas fa-money-bill-wave" aria-hidden="true"></i> تسجيل دفعة</button>` : ''}
           <button type="button" class="student-profile-print-invoice" data-print-invoice="${escapeStudentHtml(invoiceKey)}">
             <i class="fas fa-print" aria-hidden="true"></i> طباعة الفاتورة
           </button>
@@ -532,8 +695,14 @@ async function openStudentProfile(studentKey) {
       if (isNotesSubscription) {
         getStudentLinkedBooklets(record, subscriptionDocs).forEach(note => {
           if (note.delivered) deliveredBookletsCount += 1;
-          const targetKey = `${sourceRef}:linked:${note.id}`;
-          studentProfileDeliveryTargets.set(targetKey, { record, kind: 'linked', noteId: note.id, noteName: note.name });
+          const targetKey = `${sourceRef}:linked:${note.id || note.itemIndex}`;
+          studentProfileDeliveryTargets.set(targetKey, {
+            record,
+            kind: note.id ? 'linked' : 'selected',
+            noteId: note.id,
+            itemIndex: note.itemIndex,
+            noteName: note.name
+          });
           bookletDeliveryCards.push(`<div class="student-booklet-delivery-card">
             <label><input type="checkbox" data-delivery-key="${escapeStudentHtml(targetKey)}" ${note.delivered ? 'checked' : ''}>
               <span>${escapeStudentHtml(note.name)}</span></label>
@@ -669,7 +838,16 @@ async function updateStudentBookletDelivery(checkbox) {
       const snapshot = await transaction.get(invoiceRef);
       if (!snapshot.exists()) throw new Error('سجل الفاتورة غير موجود');
       const data = snapshot.data();
-      if (target.kind === 'linked') {
+      if (target.kind === 'selected') {
+        const notes = Array.isArray(data.indivNotes) ? [...data.indivNotes] : [];
+        const noteIndex = notes.findIndex(note => note.name === target.noteName);
+        const wasDelivered = noteIndex >= 0 && notes[noteIndex].delivered === true;
+        if (wasDelivered === checkbox.checked) return { changed: false, stock: null };
+        const updatedNote = { name: target.noteName, delivered: checkbox.checked };
+        if (noteIndex < 0) notes.push(updatedNote); else notes[noteIndex] = { ...notes[noteIndex], ...updatedNote };
+        transaction.update(invoiceRef, { indivNotes: notes });
+        return { changed: true, stock: null };
+      } else if (target.kind === 'linked') {
         if (!target.noteId) throw new Error('Missing booklet subscription id.');
         const notes = Array.isArray(data.indivNotes) ? [...data.indivNotes] : [];
         const noteIndex = notes.findIndex(note => (note.noteId || note.name) === target.noteId || note.name === target.noteName);
@@ -677,7 +855,7 @@ async function updateStudentBookletDelivery(checkbox) {
         if (wasDelivered === checkbox.checked) return { changed: false, stock: null };
         const updatedNote = { noteId: target.noteId, name: target.noteName, delivered: checkbox.checked };
         if (noteIndex < 0) notes.push(updatedNote); else notes[noteIndex] = { ...notes[noteIndex], ...updatedNote };
-        const deferBookletStock = data.bookletStockDeducted === false || data.vipStockDeducted === false;
+        const deferBookletStock = target.record.isPortalRegistration || data.bookletStockDeducted === false || data.vipStockDeducted === false;
         if (!deferBookletStock) {
           transaction.update(invoiceRef, { indivNotes: notes });
           return { changed: true, stock: null };
@@ -807,6 +985,26 @@ document.addEventListener('keydown', event => {
 });
 
 studentProfileContent?.addEventListener('click', event => {
+  const paymentButton = event.target.closest('[data-record-installment]');
+  if (paymentButton) {
+    const invoice = studentProfileInvoiceTargets.get(paymentButton.dataset.recordInstallment);
+    if (!invoice) {
+      showNotification('تعذر فتح بيانات القسط. أعد تحميل ملف الطالب وحاول مرة أخرى.', 'error');
+      return;
+    }
+    showInstallmentPaymentDialog(invoice, {
+      invoiceId: invoice._id,
+      collectionName: invoice._collection,
+      receivedBy: localStorage.getItem('currentUsername') || localStorage.getItem('currentUserName') || '-',
+      onSuccess: async result => {
+        studentLookupRecordsCache = null;
+        showNotification(`تم تسجيل ${result.paymentEntry.amount.toFixed(2)} ج بنجاح`, 'success');
+        await openStudentProfile(studentGroupKey(invoice));
+      }
+    });
+    return;
+  }
+
   const printButton = event.target.closest('[data-print-invoice]');
   if (printButton) {
     const invoice = studentProfileInvoiceTargets.get(printButton.dataset.printInvoice);
@@ -851,6 +1049,7 @@ studentProfileContent?.addEventListener('click', event => {
 
 document.querySelectorAll('.grade-btn').forEach(btn => {
   if (btn) btn.addEventListener('click', () => {
+    resetBookletSubscriptionMode();
     selectedGrade = btn.dataset.grade;
     document.getElementById('grade').value = selectedGrade;
     // إظهار قسم الأنواع عند اختيار فرقة
@@ -858,18 +1057,10 @@ document.querySelectorAll('.grade-btn').forEach(btn => {
     // إعادة تعيين اختيار النوع والعناصر عند تغيير الفرقة
     selectedSubType = '';
     document.getElementById('sub-type').value = '';
+    updateBookletSubscriptionControls();
     selectedItems = [];
     document.getElementById('items-container').innerHTML = '';
     updateInvoicePreview();
-  });
-});
-
-document.querySelectorAll('.sub-btn').forEach(btn => {
-  if (btn) btn.addEventListener('click', async () => {
-    selectedSubType = btn.dataset.type;
-    document.getElementById('sub-type').value = selectedSubType;
-    const items = await getItemsForSubType(selectedSubType, selectedGrade);
-    showSelectableItems(items, selectedSubType);
   });
 });
 
@@ -882,7 +1073,7 @@ function mapSubTypeToDbType(subType) {
 }
 
 // جلب العناصر من فايربيس حسب النوع والفرقة (يدعم اختيار ملازم فردية أو محاضرات فردية من كل الاشتراكات)
-async function getItemsForSubType(subType, grade) {
+async function getItemsForSubType(subType, grade, includeOnlineCards = true) {
   if (!subType || !grade) return [];
 
   if (subType === "كروت فردية") {
@@ -914,21 +1105,23 @@ async function getItemsForSubType(subType, grade) {
         });
       }
     });
-    const cardsSnapshot = await getDocs(collection(db, 'onlineCards'));
-    cardsSnapshot.forEach(docSnap => {
-      const card = docSnap.data();
-      if (card.type !== 'فردي') return;
-      const targetTypes = Array.isArray(card.individualSubTypes) ? card.individualSubTypes : ['محاضرات فردية', 'ملازم فردية'];
-      if (targetTypes.includes(subType)) {
-        items.push({
-          id: docSnap.id,
-          name: card.name,
-          price: Number(card.price) || 0,
-          stock: Number(card.stock) || 0,
-          isOnlineCard: true
-        });
-      }
-    });
+    if (includeOnlineCards) {
+      const cardsSnapshot = await getDocs(collection(db, 'onlineCards'));
+      cardsSnapshot.forEach(docSnap => {
+        const card = docSnap.data();
+        if (card.type !== 'فردي') return;
+        const targetTypes = Array.isArray(card.individualSubTypes) ? card.individualSubTypes : ['محاضرات فردية', 'ملازم فردية'];
+        if (targetTypes.includes(subType)) {
+          items.push({
+            id: docSnap.id,
+            name: card.name,
+            price: Number(card.price) || 0,
+            stock: Number(card.stock) || 0,
+            isOnlineCard: true
+          });
+        }
+      });
+    }
     items.sort((first, second) =>
       Number(Boolean(first.isOnlineCard)) - Number(Boolean(second.isOnlineCard))
       || String(first.linkedSubscription || '').localeCompare(String(second.linkedSubscription || ''), 'ar', { numeric: true, sensitivity: 'base' })
@@ -992,15 +1185,30 @@ function updateInvoicePreview() {
   }
 
   // حساب مجموع العناصر
-  const totalAmount = items.reduce((sum, x) => sum + (+x.price || 0), 0);
+  const selectedBookletsForCustomSubscription = hasCustomBookletSubscriptionSelection();
+  const customBookletPriceText = String(document.getElementById('booklet-subscription-price')?.value ?? '').trim();
+  const customBookletPrice = Number(customBookletPriceText);
+  const hasValidCustomBookletPrice = customBookletPriceText !== ''
+    && Number.isFinite(customBookletPrice)
+    && customBookletPrice >= 0;
+  const manualBookletPricePending = selectedBookletsForCustomSubscription && !hasValidCustomBookletPrice;
+  const listedItemsTotal = items.reduce((sum, x) => sum + (+x.price || 0), 0);
+  const totalAmount = selectedBookletsForCustomSubscription && hasValidCustomBookletPrice
+    ? customBookletPrice
+    : listedItemsTotal;
   const vipSaleAmount = Number(document.getElementById('vip-final-price')?.value ?? totalAmount);
-  const displayedAmount = isVipMode ? vipSaleAmount : totalAmount;
+  const displayedAmount = manualBookletPricePending
+    ? 'اكتب سعر الاشتراك'
+    : isVipMode ? vipSaleAmount : totalAmount;
 
   // تحديث حقل الإجمالي في التقسيط تلقائياً
   if (payment === 'تقسيط') {
     const installmentTotalField = document.getElementById('installment-total');
-    if (installmentTotalField && (!installmentTotalField.value || installmentTotalField.value === '')) {
+    if (installmentTotalField && !manualBookletPricePending && (!installmentTotalField.value || installmentTotalField.value === '')) {
       installmentTotalField.value = totalAmount;
+      const installmentPaid = Number(document.getElementById('installment-paid')?.value || 0);
+      const installmentRemainingField = document.getElementById('installment-remaining');
+      if (installmentRemainingField) installmentRemainingField.value = Math.max(0, Number((totalAmount - installmentPaid).toFixed(2)));
     }
   }
 
@@ -1024,12 +1232,12 @@ function updateInvoicePreview() {
         <span>انتظام/انتساب:</span><span>${studyType || '-'}</span>
       </div>
       <div class='invoice-preview-items-box'>
-          ${items.length ? `<ul class='invoice-preview-items-list'>${items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span> <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span></li>`).join('')}</ul>` : '<div>لا يوجد عناصر</div>'}
+          ${items.length ? `<ul class='invoice-preview-items-list'>${items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span>${shouldHideCustomBookletItemPrice(x) ? '' : ` <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span>`}</li>`).join('')}</ul>` : '<div>لا يوجد عناصر</div>'}
         <div class='invoice-preview-total'><b>${isVipMode ? 'سعر البيع VIP:' : 'المجموع:'}</b> <span>${displayedAmount} ج</span></div>
       </div>
       <div class='invoice-preview-grid'>
         <span>طريقة الدفع:</span><span>${payment || '-'}</span>
-        <span>ملاحظات:</span><span>${notes || '-'}</span>
+        <span>ملاحظات:</span><span>${escapeStudentHtml(notes || '-')}</span>
       </div>
       ${payment === 'تقسيط' ? `
       <div style='background:#fff8e1;border:2px solid #fbc02d;border-radius:6px;padding:10px;margin:10px 0;'>
@@ -1054,13 +1262,13 @@ function updateInvoicePreview() {
       <div class='invoice-preview-items-box'>
         <b>العناصر:</b>
         <ul class='invoice-preview-items-list'>
-          ${items.length ? items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span> <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span></li>`).join('') : '<li>لا يوجد عناصر</li>'}
+          ${items.length ? items.map(x => `<li><span class='preview-item-name' style='font-weight:500;'>${x.name}</span>${shouldHideCustomBookletItemPrice(x) ? '' : ` <span class='preview-item-price' style='color:#388e3c;font-weight:bold;'>${x.price} ج</span>`}</li>`).join('') : '<li>لا يوجد عناصر</li>'}
         </ul>
         <div class='invoice-preview-total'><b>${isVipMode ? 'سعر البيع VIP:' : 'المبلغ المدفوع:'}</b> <span>${displayedAmount} ج</span></div>
       </div>
       <div class='invoice-preview-grid'>
         <span>طريقة الدفع:</span><span>${payment || '-'}</span>
-        <span>ملاحظات:</span><span>${notes || '-'}</span>
+        <span>ملاحظات:</span><span>${escapeStudentHtml(notes || '-')}</span>
       </div>
       ${payment === 'تقسيط' ? `
       <div style='background:#fff8e1;border:2px solid #fbc02d;border-radius:6px;padding:10px;margin:10px 0;'>
@@ -1195,11 +1403,11 @@ if (invoiceForm) {
     const vipOwner = isVipMode ? await loadVipAssignedTeacher() : '';
     await fetchCurrentRecipient();
     const recipient = currentRecipient || '-';
-    const installment = {
+    const installment = payment === '\u062a\u0642\u0633\u064a\u0637' ? {
       total: document.getElementById('installment-total')?.value || '',
       paid: document.getElementById('installment-paid')?.value || '',
       remaining: document.getElementById('installment-remaining')?.value || ''
-    };
+    } : null;
 
     const isIndividual = subTypesSelected.some(st => st === 'محاضرات فردية' || st === 'ملازم فردية');
     student = document.getElementById('student-name')?.value?.trim() || '';
@@ -1230,8 +1438,12 @@ if (invoiceForm) {
       }));
 
       const invoicesToCreate = subTypesSelected.map((subType, index) => {
-        const itemsForSubType = itemsBySubType[subType] || [];
+        const itemsForSubType = getInvoiceItemsForSubType(subType, itemsBySubType[subType] || []);
         const dbSubType = mapSubTypeToDbType(subType);
+        const isCustomBookletSubscription = isBookletSubscriptionSelection(subType);
+        const customSubscriptionAmount = isCustomBookletSubscription
+          ? Number(document.getElementById('booklet-subscription-price')?.value || 0)
+          : null;
         const onlineCardsDelivery = deliverySelections.flatMap(card => {
           if (card.cardType !== 'للاشتراكات') return [];
           const matchedItems = itemsForSubType.filter(item =>
@@ -1269,6 +1481,8 @@ if (invoiceForm) {
           date: Timestamp.now(),
           recipient: recipient,
           installment: installment,
+          isCustomBookletSubscription,
+          ...(isCustomBookletSubscription ? { subscriptionAmount: customSubscriptionAmount } : {}),
           num: nextInvoiceNumber + (subTypesSelected.indexOf(subType)),
           centerInfo: { name: centerName, address: centerAddress, phone1: centerPhone1, phone2: centerPhone2, phone3: centerPhone3, logo: logoSrc },
           isVodafone: payment === 'فودافون كاش',
@@ -1378,9 +1592,12 @@ if (invoiceForm) {
 
       // 5. إعادة تعيين وإنهاء
       document.getElementById('invoice-form').reset();
+      resetBookletSubscriptionMode({ restoreNotes: false });
+      selectedSubType = '';
       vipOriginalPriceCustomized = false;
       vipFinalPriceCustomized = false;
       selectedItems = []; window.selectedItems = []; itemsBySubType = {};
+      updateBookletSubscriptionControls();
       document.getElementById('items-container').innerHTML = '';
       updateInvoicePreview();
       updateSelectedItemsBox();
@@ -1444,14 +1661,14 @@ function updateSelectedItemsBox() {
   let allSelectedItems = [];
   Object.keys(itemsBySubType).forEach(subType => {
     if (itemsBySubType[subType] && Array.isArray(itemsBySubType[subType])) {
-      allSelectedItems = allSelectedItems.concat(itemsBySubType[subType]);
+      allSelectedItems = allSelectedItems.concat(getInvoiceItemsForSubType(subType, itemsBySubType[subType]));
     }
   });
 
   if (allSelectedItems.length === 0) {
     list.textContent = 'لا يوجد عناصر مختارة.';
   } else {
-    list.innerHTML = allSelectedItems.map(i => `<div>${i.name} (${i.price}ج) - <small style="color:blue;">${i.subType}</small></div>`).join('');
+    list.innerHTML = allSelectedItems.map(i => `<div>${i.name}${shouldHideCustomBookletItemPrice(i) ? '' : ` (${i.price}ج)`} - <small style="color:blue;">${i.subType}</small></div>`).join('');
   }
   // تحديث العناصر المختارة في نموذج المحاكاة
   window.selectedItems = allSelectedItems;
@@ -1482,6 +1699,7 @@ function syncVipPriceFromItems(items) {
 function showSelectableItems(items, subType = selectedSubType) {
   const container = document.getElementById('items-container');
   let table = document.getElementById('items-table');
+  const hideIndividualBookletPrices = isBookletSubscriptionSelection(subType);
   // إذا لم يوجد الجدول، أنشئه ديناميكياً
   if (!table) {
     table = document.createElement('table');
@@ -1499,10 +1717,12 @@ function showSelectableItems(items, subType = selectedSubType) {
     `;
     container.appendChild(table);
   }
+  const priceHeader = table.querySelector('thead th:nth-child(2)');
+  if (priceHeader) priceHeader.style.display = hideIndividualBookletPrices ? 'none' : '';
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = '';
   if (items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:#888;">لا توجد عناصر متاحة لهذا النوع والفرقة.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${hideIndividualBookletPrices ? 2 : 3}" style="color:#888;">لا توجد عناصر متاحة لهذا النوع والفرقة.</td></tr>`;
     table.style.display = '';
     container.innerHTML = '';
     container.appendChild(table);
@@ -1523,7 +1743,7 @@ function showSelectableItems(items, subType = selectedSubType) {
 
     tr.innerHTML = `
       <td style="${isOutOfStock ? 'color:#777;' : ''}">${item.name} ${item.stock !== undefined ? `<small style="color:${item.stock < 0 ? '#c62828' : '#666'};display:block;">(${item.stock < 0 ? 'عجز' : 'المتوفر'}: ${item.stock})</small>` : ''}</td>
-      <td style="${isOutOfStock ? 'color:#888;' : ''}">${item.price} ج</td>
+      <td style="${hideIndividualBookletPrices ? 'display:none!important;' : `${isOutOfStock ? 'color:#888;' : ''}`}">${item.price} ج</td>
       <td>
         <button class="${isSelected ? 'remove' : ''}">${isSelected ? 'إزالة' : 'إضافة'}</button>
       </td>
@@ -1554,14 +1774,41 @@ function showSelectableItems(items, subType = selectedSubType) {
 }
 
 // عند اختيار نوع الاشتراك
+const bookletSubscriptionToggle = document.getElementById('booklet-subscription-toggle');
+bookletSubscriptionToggle?.addEventListener('click', async () => {
+  if (selectedSubType !== bookletSubscriptionType) return;
+  document.querySelectorAll('#installment-fields input').forEach(input => { input.value = ''; });
+
+  if (bookletSelectionMode) {
+    resetBookletSubscriptionMode();
+    delete itemsBySubType[bookletSubscriptionType];
+  } else {
+    bookletSelectionMode = true;
+    const priceInput = document.getElementById('booklet-subscription-price');
+    if (priceInput) priceInput.value = '';
+    delete itemsBySubType[bookletSubscriptionType];
+  }
+
+  updateBookletSubscriptionControls();
+  updateSelectedItemsBox();
+  const items = await getItemsForSubType(getCurrentItemSourceType(), selectedGrade, !isBookletSubscriptionSelection(selectedSubType));
+  showSelectableItems(items, selectedSubType);
+});
+
+const bookletSubscriptionPriceInput = document.getElementById('booklet-subscription-price');
+bookletSubscriptionPriceInput?.addEventListener('input', () => {
+  updateSelectedItemsBox();
+});
+
 [...document.querySelectorAll('.sub-btn')].forEach(btn => {
   btn.addEventListener('click', async () => {
     selectedSubType = btn.dataset.type;
     document.getElementById('sub-type').value = selectedSubType;
+    updateBookletSubscriptionControls();
     updateFormFields();
     await fetchNextInvoiceNumber(); // تحديث رقم الفاتورة حسب النوع
-    const items = await getItemsForSubType(selectedSubType, selectedGrade);
-    showSelectableItems(items);
+    const items = await getItemsForSubType(getCurrentItemSourceType(), selectedGrade, !isBookletSubscriptionSelection(selectedSubType));
+    showSelectableItems(items, selectedSubType);
     updateInvoicePreview(); // تأكيد تحديث المعاينة
   });
 });
@@ -1579,7 +1826,8 @@ function showSelectableItems(items, subType = selectedSubType) {
     updateSelectedItemsBox();
     // إعادة تحميل العناصر المتاحة للنوع الحالي (إن وجد)
     if (selectedSubType) {
-      getItemsForSubType(selectedSubType, selectedGrade).then(showSelectableItems);
+      getItemsForSubType(getCurrentItemSourceType(), selectedGrade, !isBookletSubscriptionSelection(selectedSubType))
+        .then(items => showSelectableItems(items, selectedSubType));
     }
   });
 });
@@ -1626,6 +1874,17 @@ function validateForm() {
   if (!studyType || (studyType !== 'انتظام' && studyType !== 'انتساب')) {
     showNotification('يرجى اختيار انتظام أو انتساب', 'error', 3500);
     return false;
+  }
+
+  if (hasCustomBookletSubscriptionSelection()) {
+    const priceInput = document.getElementById('booklet-subscription-price');
+    const rawPrice = String(priceInput?.value ?? '').trim();
+    const price = Number(rawPrice);
+    if (!rawPrice || !Number.isFinite(price) || price < 0) {
+      showNotification('يرجى إدخال سعر صحيح لاشتراك الملازم', 'error', 3500);
+      priceInput?.focus();
+      return false;
+    }
   }
 
   return true;
@@ -1809,7 +2068,10 @@ async function printInvoice() {
 
   // حساب الإجمالي
   const itemsTotal = (inv.items || []).reduce((sum, x) => sum + (parseFloat(x.price) || 0), 0);
-  const total = inv.isVip ? Number(inv.vipFinalPrice ?? itemsTotal) : itemsTotal;
+  const isCustomBookletSubscription = inv.isCustomBookletSubscription === true || hasGeneratedBookletNote(inv.notes);
+  const total = isCustomBookletSubscription
+    ? Number(inv.subscriptionAmount ?? itemsTotal)
+    : inv.isVip ? Number(inv.vipFinalPrice ?? itemsTotal) : itemsTotal;
 
   const isIndividualInvoice = ['محاضرات فردية', 'ملازم فردية'].includes(String(inv.subType || '').trim());
   const isNotesSubscription = ['ملازم', 'اشتراك ملازم', 'ملازم وكورسات'].includes(String(inv.subType || '').trim());
@@ -1869,7 +2131,7 @@ async function printInvoice() {
         ${(inv.items || []).map((item, idx) => `
         <tr ${idx % 2 === 0 ? "style='background:#f9f9f9;'" : ''}>
           <td>${item.name}</td>
-          <td style='color:#388e3c;font-weight:bold;'>${item.price} ج</td>
+          ${isCustomBookletSubscription ? '' : `<td style='color:#388e3c;font-weight:bold;'>${item.price} ج</td>`}
         </tr>
         `).join('')}
       </table>
@@ -1892,7 +2154,7 @@ async function printInvoice() {
         <tr style='background:#fff9c4;'><td>المدفوع:</td><td>${inv.installment.paid || 0} ج</td></tr>
         <tr style='background:#fff59d;'><td>المتبقي:</td><td>${inv.installment.remaining || 0} ج</td></tr>
         ` : ''}
-        ${inv.notes ? `<tr><td>ملاحظات:</td><td>${inv.notes}</td></tr>` : ''}
+        ${cleanGeneratedBookletNote(inv.notes) ? `<tr><td>ملاحظات:</td><td>${escapeStudentHtml(cleanGeneratedBookletNote(inv.notes))}</td></tr>` : ''}
       </table>
       
       <div class='footer'>

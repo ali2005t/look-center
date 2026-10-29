@@ -1,301 +1,483 @@
-/* late_students.css - تصميم خاص بصفحة الطلاب المتأخرين في الدفع */
-
+/* Installment students page */
 .late-students-content {
-  margin-right: 220px;
-  padding: 40px 30px 30px 30px;
-  min-height: 100vh;
-  margin-top: 92px !important;
-  background: #f7fbff;
+  min-height: calc(100vh - 92px);
+  margin: 92px 220px 0 0;
+  padding: 34px clamp(18px, 3vw, 42px) 48px;
+  background: #f4f7fb;
+  color: #18344a;
 }
+
+.installment-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 24px;
+}
+.installment-page-header h1 {
+  margin: 8px 0 7px;
+  color: #153e59;
+  font-size: clamp(1.65rem, 2.5vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+.installment-page-header p,
+.installment-report-heading p {
+  margin: 0;
+  color: #718596;
+  font-size: .95rem;
+  line-height: 1.7;
+}
+.installment-page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #178177;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.installment-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 17px;
+  border: 1px solid #d7e8e7;
+  border-radius: 11px;
+  background: #fff;
+  color: #14786f;
+  box-shadow: 0 4px 14px rgba(25, 76, 93, .06);
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.installment-export-btn:hover {
+  transform: translateY(-1px);
+  background: #f4fbfa;
+  box-shadow: 0 8px 20px rgba(25, 76, 93, .11);
+}
+
+.installment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.installment-stat-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 100px;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid #e5edf2;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(28, 61, 84, .045);
+}
+.installment-stat-icon {
+  display: grid;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 13px;
+  background: #e9f5f4;
+  color: #158177;
+  font-size: 1.1rem;
+}
+.installment-stat-card.is-paid .installment-stat-icon { background: #eaf7ef; color: #29814a; }
+.installment-stat-card.is-due .installment-stat-icon { background: #fff4e5; color: #c67b18; }
+.installment-stat-card.is-count .installment-stat-icon { background: #eef2ff; color: #526ac2; }
+.installment-stat-copy { min-width: 0; }
+.installment-stat-label { display: block; margin-bottom: 6px; color: #718596; font-size: .78rem; font-weight: 650; }
+.installment-stat-value { display: block; color: #173b54; font-size: 1.28rem; font-weight: 850; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.installment-stat-unit { margin-right: 4px; color: #718596; font-size: .78rem; font-weight: 700; }
 
 .late-students-report {
+  padding: 23px;
+  border: 1px solid #e3ebf0;
+  border-radius: 17px;
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(229, 57, 53, 0.1);
-  padding: 32px 24px;
-  margin-bottom: 32px;
-  border: 1px solid #ffebee;
+  box-shadow: 0 8px 26px rgba(28, 61, 84, .055);
 }
-
-.late-students-report h2, .late-students-report h3 {
-  color: #e53935;
-  font-weight: bold;
+.installment-report-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
   margin-bottom: 18px;
 }
-
-#late-students-table-box {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 10px;
+.installment-report-heading h2 {
+  margin: 0 0 5px;
+  color: #173e58;
+  font-size: 1.12rem;
+  font-weight: 800;
 }
-
-#late-students-table-box table {
-  background: #fff;
+.installment-report-heading p { font-size: .82rem; }
+.installment-report-icon {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.12);
-  direction: rtl;
-  table-layout: auto;
-  max-width: unset;
-  padding-right: 0;
-  margin: 30px 0 0 0;
-  border: 1px solid #e3f2fd;
-  width: 100%;
+  background: #eef7f7;
+  color: #168078;
 }
-
+.installment-table-wrap {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #e8eef2;
+  border-radius: 13px;
+  -webkit-overflow-scrolling: touch;
+}
+.late-students-table {
+  width: 100%;
+  min-width: 990px;
+  margin: 0;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  direction: rtl;
+  background: #fff;
+}
 .late-students-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: linear-gradient(135deg, #0a1836 60%, #101c2c 100%);
-  color: #fff;
-  font-weight: bold;
-  border-bottom: 2px solid #00eaff44;
-  font-size: 15px;
+  padding: 14px 13px;
+  border: 0;
+  border-bottom: 1px solid #e7edf1;
+  background: #f6f9fb;
+  color: #647b8b;
   text-align: right;
-  padding: 16px 12px;
-  text-shadow: 0 1px 2px #003f6b44;
-  letter-spacing: 0.3px;
+  white-space: nowrap;
+  font-size: .76rem;
+  font-weight: 800;
 }
-
 .late-students-table tbody td {
+  padding: 14px 13px;
+  border: 0;
+  border-bottom: 1px solid #edf1f4;
   background: #fff;
-  color: #222;
-  font-size: 15px;
-  border-bottom: 1px solid #e8f0f8;
+  color: #334d60;
   text-align: right;
-  padding: 14px 12px;
-  font-weight: 500;
+  vertical-align: middle;
+  font-size: .86rem;
 }
-
-#late-students-table-box td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #e8f0f8;
-  text-align: right;
-  font-size: 15px;
-  word-break: break-word;
-  background: #fff;
-  color: #222;
-  font-weight: 500;
+.late-students-table tbody tr[data-index] { cursor: pointer; transition: background .16s ease; }
+.late-students-table tbody tr[data-index]:hover td { background: #f6fbfb; }
+.late-students-table tbody tr:last-child td { border-bottom: 0; }
+.late-students-table tbody tr.installment-row--high td:first-child { box-shadow: inset -3px 0 #d8893b; }
+.late-students-table tbody tr.installment-row--medium td:first-child { box-shadow: inset -3px 0 #e6b852; }
+.late-students-table tbody tr.installment-row--low td:first-child { box-shadow: inset -3px 0 #58a77a; }
+.installment-number { color: #8a9ba7 !important; font-size: .78rem !important; font-weight: 700 !important; }
+.installment-student-name { color: #173e58 !important; font-weight: 800 !important; }
+.installment-phone { direction: ltr; text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.installment-subscription-chip,
+.installment-method-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 230px;
+  padding: 5px 9px;
+  overflow: hidden;
+  border: 1px solid #e2eeee;
+  border-radius: 8px;
+  background: #f3f9f8;
+  color: #28766f;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .75rem;
+  font-weight: 700;
 }
-
-#late-students-table-box tr:last-child td {
-  border-bottom: none;
+.installment-method-chip { border-color: #e9edf1; background: #f7f8fa; color: #647786; }
+.installment-money { font-variant-numeric: tabular-nums; font-weight: 750 !important; white-space: nowrap; }
+.installment-money--paid { color: #2c8550 !important; }
+.installment-money--remaining { color: #c36b25 !important; }
+.record-installment-payment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #147b70;
+  color: #fff;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .16s ease, transform .16s ease;
 }
-
-.late-students-table tbody tr:nth-child(even) td {
-  background: #f9fbff;
+.record-installment-payment:hover { transform: translateY(-1px); background: #0e655c; }
+.installment-total-row td {
+  border-top: 1px solid #dce7eb !important;
+  background: #f1f6f8 !important;
+  color: #173e58 !important;
+  font-weight: 850 !important;
 }
-
-.late-students-table tbody tr:hover td {
-  background: #e3f2fd;
-  box-shadow: inset 0 0 8px rgba(25, 118, 210, 0.1);
+.installment-empty-cell {
+  height: 150px;
+  color: #8194a1 !important;
+  text-align: center !important;
+  font-size: .92rem !important;
 }
+.installment-empty-cell i { display: block; margin-bottom: 10px; color: #4caa88; font-size: 1.5rem; }
+.installment-loading-cell { height: 110px; color: #718596 !important; text-align: center !important; }
+.installment-loading-spinner {
+  display: inline-block;
+  width: 23px;
+  height: 23px;
+  margin-left: 8px;
+  border: 2px solid #dce9e9;
+  border-top-color: #168078;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: installment-spin .8s linear infinite;
+}
+@keyframes installment-spin { to { transform: rotate(360deg); } }
 
 .modal-bg {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.25);
+  inset: 0;
+  background: rgba(15, 37, 52, .48);
+  backdrop-filter: blur(3px);
   z-index: 1000;
 }
-
 .modal-box {
   position: fixed;
-  top: 50%; right: 50%;
-  transform: translate(50%,-50%);
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 32px #1976d244;
-  padding: 32px 24px 18px 24px;
-  min-width: 320px;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
   z-index: 1001;
-  color: #222;
-  max-width: 90vw;
 }
-
-.modal-box h3 {
-  color: #1976d2;
-  margin-bottom: 18px;
-  font-size: 1.3em;
+.installment-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(470px, calc(100vw - 28px));
+  max-height: min(88vh, 760px);
+  overflow: hidden;
+  border: 1px solid #dfe9ef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(13, 43, 62, .25);
+  color: #233d50;
 }
-
-.modal-box button {
-  background: #1976d2;
+.installment-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 20px;
+  background: linear-gradient(120deg, #164b70, #1d6a91);
   color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 24px;
-  font-size: 15px;
-  font-weight: bold;
+}
+.installment-modal-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.installment-modal-icon {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 12px;
+  background: rgba(255,255,255,.13);
+  color: #d9f4f0;
+  font-size: 1.05rem;
+}
+.installment-modal-heading h3 { margin: 0 0 3px; color: #fff; font-size: 1.08rem; font-weight: 850; }
+.installment-modal-heading p { margin: 0; color: rgba(255,255,255,.76); font-size: .76rem; }
+.installment-modal-close {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: 1rem;
   cursor: pointer;
-  margin-top: 18px;
+  transition: background .16s ease, transform .16s ease;
 }
-
-.modal-box button:hover {
-  background: #0a1836;
+.installment-modal-close:hover { transform: translateY(-1px); background: rgba(255,255,255,.22); }
+.installment-modal-body { display: grid; gap: 12px; overflow-y: auto; padding: 17px 20px; }
+.installment-student-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
+.installment-profile-item { min-width: 0; padding: 10px 12px; border: 1px solid #e8eef2; border-radius: 11px; background: #f8fafc; }
+.installment-profile-student { grid-column: 1 / -1; }
+.installment-field-label { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; color: #748795; font-size: .72rem; font-weight: 700; }
+.installment-field-label i { color: #528097; font-size: .75rem; }
+.installment-profile-item strong { display: block; overflow-wrap: anywhere; color: #173e58; font-size: .91rem; font-weight: 800; }
+.installment-profile-phone { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.installment-profile-item .installment-subscription-value { display: inline-flex; max-width: 100%; padding: 4px 9px; border-radius: 7px; background: #eaf3f7; color: #28627c; font-size: .78rem; }
+.installment-amount-card { padding: 14px; border: 1px solid #e6edf1; border-radius: 13px; background: #f7f9fb; }
+.installment-amount-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 13px; }
+.installment-amount-item { display: grid; gap: 5px; text-align: center; }
+.installment-amount-item span { color: #748795; font-size: .72rem; font-weight: 700; }
+.installment-amount-item span i { margin-inline-end: 4px; color: #5f8294; }
+.installment-amount-item strong { color: #1b6da2; font-size: 1.18rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.installment-amount-item.is-paid strong { color: #24834d; }
+.installment-progress-track { height: 8px; overflow: hidden; border-radius: 99px; background: #e1e8ed; direction: rtl; }
+.installment-progress-track span { display: block; width: var(--paid-progress, 0%); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #32a56e, #56bd79); transition: width .3s ease; }
+.installment-progress-caption { display: flex; justify-content: space-between; margin-top: 7px; color: #758793; font-size: .71rem; }
+.installment-progress-caption strong { color: #456171; font-variant-numeric: tabular-nums; }
+.installment-remaining-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; border: 1px solid #f3dfbd; border-inline-start: 4px solid #e6a13a; border-radius: 11px; background: #fff8ec; }
+.installment-remaining-label { display: flex; align-items: center; gap: 8px; color: #86622e; font-size: .78rem; font-weight: 750; }
+.installment-remaining-label i { color: #d28a24; }
+.installment-remaining-card > strong { color: #b86e13; font-size: 1.28rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.installment-last-payment { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px 12px; padding: 2px 1px; color: #718392; font-size: .75rem; }
+.installment-last-payment span { display: inline-flex; align-items: center; gap: 6px; }
+.installment-last-payment span i { color: #5c8598; }
+.installment-last-payment strong { color: #35556a; font-weight: 800; }
+.installment-modal-actions { display: flex; justify-content: flex-start; gap: 9px; padding: 13px 20px 17px; border-top: 1px solid #edf1f4; background: #fff; }
+.installment-modal-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 41px; padding: 0 17px; border-radius: 10px; font: inherit; font-size: .82rem; font-weight: 800; cursor: pointer; transition: transform .16s ease, background .16s ease, box-shadow .16s ease; }
+.installment-modal-actions button:hover { transform: translateY(-1px); }
+.installment-modal-pay { border: 1px solid #147b70; background: #147b70; color: #fff; box-shadow: 0 4px 10px rgba(20,123,112,.16); }
+.installment-modal-pay:hover { background: #0e655c; }
+.installment-modal-dismiss { border: 1px solid #dce5ea; background: #fff; color: #526c7d; }
+.installment-modal-dismiss:hover { background: #f5f8fa; }
 
 .sidebar ul li,
 .sidebar ul li a,
-.sidebar ul li .sidebar-icon {
-  font-size: 17px !important;
-  font-weight: 500 !important;
-}
+.sidebar ul li .sidebar-icon { font-size: 17px !important; font-weight: 500 !important; }
 
+@media (max-width: 1100px) {
+  .installment-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .late-students-content { padding-right: 22px; padding-left: 22px; }
+}
 @media (max-width: 900px) {
   .late-students-content {
-    margin-right: 0 !important;
-    padding: 12px 8px 70px 8px !important;
-    background: #f5f8fc !important;
+    min-height: calc(100vh - 72px);
+    margin: 76px 0 0 !important;
+    padding: 20px 14px 80px !important;
+    background: #f4f7fb;
   }
-  
-  .late-students-report {
-    padding: 16px 12px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    overflow: hidden;
-  }
-  
-  .late-students-report h2 {
-    font-size: 1.2rem;
-    margin-bottom: 16px;
-  }
-  
-  #late-students-table-box {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 10px;
-    background: #fff;
-    width: 100%;
-    border: 1px solid #e3f2fd;
-  }
-  
-  #late-students-table-box table {
-    width: 100%;
-    min-width: 800px !important;
-    border-collapse: collapse;
-    border: none;
-    background: #fff;
-  }
-  
-  #late-students-table-box thead {
-    display: table-header-group;
-  }
-  
-  #late-students-table-box thead tr {
-    display: table-row;
-  }
-  
-  #late-students-table-box thead th {
-    background: linear-gradient(135deg, #0a1836 60%, #101c2c 100%) !important;
-    color: #fff !important;
-    padding: 12px 10px !important;
-    font-size: 13px !important;
-    white-space: nowrap !important;
-    font-weight: bold !important;
-    border-bottom: 2px solid #00eaff44 !important;
-    text-align: right !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 10 !important;
-    display: table-cell !important;
-  }
-  
-  #late-students-table-box tbody {
-    display: table-row-group;
-  }
-  
-  #late-students-table-box tbody tr {
-    display: table-row;
-  }
-  
-  #late-students-table-box tbody td,
-  #late-students-table-box td {
-    padding: 12px 10px !important;
-    font-size: 13px !important;
-    border-bottom: 1px solid #e8f0f8 !important;
-    text-align: right !important;
-    display: table-cell !important;
-    white-space: normal;
-  }
-  
-  #late-students-table-box tbody tr {
-    background: #fff !important;
-  }
-  
-  #late-students-table-box tbody tr:nth-child(odd) {
-    background: #f9fbff !important;
-  }
-  
-  #late-students-table-box tbody tr:hover {
-    background: #e3f2fd !important;
-  }
-  
-  #late-students-table-box tbody tr:last-child td {
-    border-bottom: none !important;
-  }
-  
-  /* إزالة الألوان المخصصة من الـ inline styles */
-  #late-students-table-box tbody tr[style*="background"] {
-    background: #fff !important;
-  }
-  
-  /* تنسيق الأزرار والـ select */
-  #late-students-table-box select {
-    width: 100%;
-    padding: 6px 8px !important;
-    font-size: 12px !important;
-    border: 1px solid #ddd !important;
-    border-radius: 4px !important;
-  }
+  .installment-page-header { align-items: flex-start; margin-bottom: 18px; }
+  .installment-page-header p { max-width: 520px; font-size: .85rem; }
+  .installment-export-btn { min-height: 40px; padding: 0 12px; font-size: .8rem; }
+  .installment-summary-grid { gap: 10px; margin-bottom: 16px; }
+  .installment-stat-card { min-height: 84px; gap: 10px; padding: 13px; border-radius: 12px; }
+  .installment-stat-icon { flex-basis: 38px; width: 38px; height: 38px; border-radius: 11px; font-size: .95rem; }
+  .installment-stat-value { font-size: 1.08rem; }
+  .installment-stat-label { font-size: .72rem; }
+  .late-students-report { padding: 16px 13px; border-radius: 14px; }
+  .installment-table-wrap { border-radius: 10px; }
+  .late-students-table { min-width: 940px; }
+  .late-students-table thead th { padding: 12px 10px; font-size: .72rem; }
+  .late-students-table tbody td { padding: 12px 10px; font-size: .8rem; }
+}
+@media (max-width: 520px) {
+  .late-students-content { padding-right: 11px !important; padding-left: 11px !important; }
+  .installment-page-header { gap: 10px; }
+  .installment-page-header h1 { font-size: 1.55rem; }
+  .installment-page-header p { max-width: 245px; font-size: .78rem; }
+  .installment-export-btn { width: 42px; min-width: 42px; padding: 0; }
+  .installment-export-btn span { display: none; }
+  .installment-summary-grid { gap: 8px; }
+  .installment-stat-card { min-height: 76px; padding: 10px; }
+  .installment-stat-icon { flex-basis: 32px; width: 32px; height: 32px; font-size: .8rem; }
+  .installment-stat-label { margin-bottom: 4px; font-size: .65rem; }
+  .installment-stat-value { font-size: .96rem; }
+  .installment-report-heading { margin-bottom: 13px; }
+  .installment-report-heading h2 { font-size: 1rem; }
+  .installment-report-heading p { font-size: .73rem; }
+  .installment-modal { width: calc(100vw - 22px); max-height: 90vh; border-radius: 15px; }
+  .installment-modal-header { padding: 14px 15px; }
+  .installment-modal-icon { flex-basis: 37px; width: 37px; height: 37px; }
+  .installment-modal-body { gap: 10px; padding: 13px 14px; }
+  .installment-profile-item { padding: 9px 10px; }
+  .installment-amount-card { padding: 12px; }
+  .installment-modal-actions { padding: 11px 14px 14px; }
 }
 
-@media (max-width: 600px) {
-  .late-students-content {
-    padding: 10px 6px 70px 6px !important;
+@media (max-width: 640px) {
+  .installment-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
   }
-  
-  .late-students-report {
-    padding: 12px 8px;
+  .late-students-table,
+  .late-students-table tbody { display: block; }
+  .late-students-table { min-width: 0; }
+  .late-students-table thead { display: none; }
+  .late-students-table tbody tr:not([data-index]):not(.installment-total-row) { display: block; }
+  .late-students-table .installment-empty-cell,
+  .late-students-table .installment-loading-cell { display: block; height: auto; min-height: 110px; }
+  .late-students-table tbody tr[data-index] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 14px;
+    margin-bottom: 10px;
+    padding: 8px 13px;
+    border: 1px solid #e6edf1;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(28, 61, 84, .045);
   }
-  
-  #late-students-table-box table {
-    min-width: 750px !important;
+  .late-students-table tbody tr[data-index] td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+    padding: 8px 0;
+    border: 0;
+    background: transparent !important;
+    text-align: right;
   }
-  
-  #late-students-table-box thead th {
-    padding: 10px 8px !important;
-    font-size: 12px !important;
+  .late-students-table tbody tr[data-index] td::before {
+    content: attr(data-label);
+    color: #8193a0;
+    font-size: .67rem;
+    font-weight: 750;
   }
-  
-  #late-students-table-box tbody td,
-  #late-students-table-box td {
-    padding: 10px 8px !important;
-    font-size: 12px !important;
+  .late-students-table tbody tr[data-index] td:first-child { display: none; }
+  .late-students-table tbody tr[data-index] td:nth-child(2),
+  .late-students-table tbody tr[data-index] td:nth-child(4),
+  .late-students-table tbody tr[data-index] td:last-child { grid-column: 1 / -1; }
+  .late-students-table tbody tr[data-index] td:nth-child(2) { padding-top: 4px; }
+  .late-students-table tbody tr[data-index] td:last-child { padding-top: 4px; }
+  .late-students-table tbody tr[data-index] .record-installment-payment { width: 100%; }
+  .installment-subscription-chip,
+  .installment-method-chip { max-width: 100%; }
+  .late-students-table tbody tr.installment-total-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 14px;
+    padding: 8px 13px;
+    border: 1px solid #dce7eb;
+    border-radius: 12px;
+    background: #f1f6f8;
   }
-  
-  #late-students-table-box select {
-    font-size: 11px !important;
+  .late-students-table tbody tr.installment-total-row td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 0;
+    border: 0 !important;
+    background: transparent !important;
+    font-size: .78rem !important;
   }
-}
-
-@media (max-width: 400px) {
-  .late-students-content {
-    padding: 8px 4px 70px 4px !important;
-  }
-  
-  #late-students-table-box table {
-    min-width: 700px !important;
-  }
-  
-  #late-students-table-box thead th {
-    padding: 8px 6px !important;
-    font-size: 11px !important;
-  }
-  
-  #late-students-table-box tbody td,
-  #late-students-table-box td {
-    padding: 8px 6px !important;
-    font-size: 11px !important;
+  .late-students-table tbody tr.installment-total-row td:first-child { grid-column: 1 / -1; }
+  .late-students-table tbody tr.installment-total-row td:first-child::before { content: none; }
+  .late-students-table tbody tr.installment-total-row td:last-child { display: none; }
+  .late-students-table tbody tr.installment-total-row td::before {
+    content: attr(data-label);
+    color: #718596;
+    font-size: .66rem;
   }
 }

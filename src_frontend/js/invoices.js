@@ -4,9 +4,11 @@ import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, setDoc, run
 import { collection as collection2, getDocs as getDocs2 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { doc as doc2, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getInstallmentSummary, isInstallmentInvoice, showInstallmentPaymentDialog } from './installment-payments.js?v=installment-paid-v2';
 
 const tableBody = document.querySelector("#invoices-table tbody");
 const modal = document.getElementById("invoice-details-modal");
+const invoiceCardsContainer = document.getElementById('invoice-cards');
 
 // متغيرات لتخزين الفواتير الكل والفواتير المصفاة
 let allInvoices = [];
@@ -16,6 +18,13 @@ let loadRequestId = 0;
 // متغير عالمي لاسم المستلم
 let currentRecipient = '-';
 let realtimeStarted = false;
+let invoiceViewMode = localStorage.getItem('invoicesViewMode') === 'cards' ? 'cards' : 'table';
+
+function escapeInvoiceHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
 
 function normalizePortalSubscriptions(registration) {
   const raw = registration.selectedSubscriptions || registration.subscriptions || registration.selectedItems || [];
@@ -26,6 +35,37 @@ function normalizePortalSubscriptions(registration) {
     type: item.type || item.subType || '',
     price: Number(item.price || 0)
   })).filter(item => item.type === 'ملازم' || item.type === 'كورسات' || item.type === 'اشتراك ملازم' || item.type === 'اشتراك كورسات');
+}
+
+function cleanGeneratedBookletNote(value) {
+  return String(value || '').split(/\r?\n/)
+    .filter(line => !/^عامل اشتراك على مواد(?:\s|$)/u.test(line.trim()))
+    .join('\n').trim();
+}
+
+function hasGeneratedBookletNote(value) {
+  return String(value || '').split(/\r?\n/).some(line => /^عامل اشتراك على مواد(?:\s|$)/u.test(line.trim()));
+}
+
+function invoicePaymentLabel(invoice) {
+  if (!isInstallmentInvoice(invoice)) return invoice.payment || invoice.paymentMethod || '-';
+  return '\u062a\u0642\u0633\u064a\u0637';
+}
+
+function invoiceTypeLabel(invoice) {
+  if (invoice.isPortalRegistration) {
+    return invoice.paymentStatus === 'partial' ? 'مدفوع جزئياً'
+      : invoice.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع';
+  }
+  if (isInstallmentInvoice(invoice)) return invoicePaymentLabel(invoice);
+  if (invoice.isVip) {
+    return invoice.vipIsFree ? '\u0645\u062c\u0627\u0646\u064a - \u0645\u0643\u062a\u0645\u0644' : '\u0645\u062f\u0641\u0648\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644';
+  }
+  return invoice.payment || invoice.paymentMethod || '-';
+}
+
+function invoiceTypeMarkup(invoice) {
+  return `<strong class="invoice-payment-label">${escapeInvoiceHtml(invoiceTypeLabel(invoice))}</strong>`;
 }
 
 function classifyPortalSubscriptions(subscriptions) {
@@ -42,6 +82,60 @@ function portalSubscriptionFallback(registration) {
   return registration.selectedSubscriptions?.length || registration.subscriptions?.length || registration.selectedItems?.length
     ? ''
     : 'بيانات الاشتراك غير محفوظة';
+}
+
+function portalSubscriptionAmount(registration) {
+  const subscriptions = registration?.selectedSubscriptions || registration?.subscriptions || registration?.selectedItems || [];
+  const selectedAmount = Array.isArray(subscriptions)
+    ? subscriptions.reduce((sum, item) => sum + (Number(item?.price) || 0), 0)
+    : 0;
+  const amounts = [registration?.requestedAmount, registration?.subscriptionAmount, selectedAmount, registration?.installment?.total]
+    .map(Number)
+    .filter(amount => Number.isFinite(amount) && amount > 0);
+  return amounts[0] || 0;
+}
+
+function portalCollectedAmount(registration) {
+  const amounts = [registration?.installment?.paid, registration?.installment?.paidAmount,
+    registration?.amountCollected, registration?.paidAmount]
+    .map(Number)
+    .filter(Number.isFinite);
+  const collectedAmount = amounts.find(amount => amount > 0);
+  if (collectedAmount !== undefined) return collectedAmount;
+  if (registration?.paymentStatus === 'paid') {
+    const subscriptionAmount = portalSubscriptionAmount(registration);
+    if (subscriptionAmount > 0) return subscriptionAmount;
+  }
+  return amounts[0] ?? 0;
+}
+
+function invoiceFinancialSummary(invoice) {
+  if (invoice?.isPortalRegistration) {
+    const total = portalSubscriptionAmount(invoice) || Number(invoice.requestedAmount || 0);
+    const paid = portalCollectedAmount(invoice);
+    return { total, paid, remaining: Math.max(0, total - paid) };
+  }
+  if (isInstallmentInvoice(invoice)) return getInstallmentSummary(invoice);
+
+  const itemTotal = (invoice?.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const total = Number(invoice?.isCustomBookletSubscription
+    ? (invoice.subscriptionAmount ?? itemTotal)
+    : invoice?.isVip ? (invoice.vipFinalPrice ?? itemTotal) : itemTotal) || 0;
+  return { total, paid: total, remaining: 0 };
+}
+
+function formatInvoiceMoney(amount) {
+  return (Number(amount) || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 });
+}
+
+function invoicePaidAmountMarkup(invoice) {
+  const { paid } = invoiceFinancialSummary(invoice);
+  return `<strong>${formatInvoiceMoney(paid)} ج</strong>`;
+}
+
+function invoiceRemainingAmountMarkup(invoice) {
+  const { remaining } = invoiceFinancialSummary(invoice);
+  return `<strong>${formatInvoiceMoney(remaining)} ج</strong>`;
 }
 
 function normalizeSubscriptionReference(value) {
@@ -181,8 +275,13 @@ async function loadInvoices() {
     if (Number.isFinite(storedNumber)) highestInvoiceNumber = Math.max(highestInvoiceNumber, storedNumber);
     allInvoices.push({
       id: docSnap.id,
+      sourceCollection: 'invoices',
       num: inv.num ?? num,
       isVip: inv.isVip === true,
+      isCustomBookletSubscription: inv.isCustomBookletSubscription === true || hasGeneratedBookletNote(inv.notes),
+      subscriptionAmount: inv.subscriptionAmount ?? (hasGeneratedBookletNote(inv.notes)
+        ? (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0)
+        : undefined),
       vipIsFree: inv.vipIsFree === true,
       vipFinalPrice: inv.vipFinalPrice,
       vipRegistrationId: inv.vipRegistrationId || '',
@@ -199,7 +298,7 @@ async function loadInvoices() {
       date: inv.date ? (inv.date.toDate ? inv.date.toDate().toLocaleDateString('ar-EG') : inv.date) : '-',
       status: inv.status || 'تم الحفظ',
       recipient: inv.recipient || '-',
-      notes: inv.notes || 'لا توجد',
+      notes: cleanGeneratedBookletNote(inv.notes) || 'لا توجد',
       linkedSubTypes: inv.linkedSubTypes || [],
       indivNotes: inv.indivNotes || [],   // للملازم: قائمة الملازم المرتبطة وحالة تسليمها
       linkedNotes: getLinkedNotesForInvoice({ ...inv, grade: inv.grade || '-' }, subscriptionDocs),
@@ -220,10 +319,16 @@ async function loadInvoices() {
     const registration = docSnap.data();
     const hasLinkedInvoice = linkedVipRegistrationIds.has(docSnap.id)
       || (registration.invoiceId && snapshot.docs.some(invoiceDoc => invoiceDoc.id === registration.invoiceId));
-    if (registration.paymentStatus !== 'paid' || hasLinkedInvoice) return;
+    if (hasLinkedInvoice) return;
     const subscriptions = Array.isArray(registration.selectedSubscriptions) ? registration.selectedSubscriptions : [];
     const totalSourcePrice = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
-    const subscriptionAmount = Number(registration.subscriptionAmount ?? registration.requestedAmount ?? registration.paidAmount ?? 0);
+    const paymentSaysInstallment = registration.payment === '\u062a\u0642\u0633\u064a\u0637' || registration.paymentMethod === '\u062a\u0642\u0633\u064a\u0637';
+    const subscriptionAmount = Number(registration.installment?.total ?? registration.subscriptionAmount
+      ?? registration.requestedAmount ?? (paymentSaysInstallment ? totalSourcePrice : registration.paidAmount) ?? 0);
+    const installmentPaid = Number(registration.installment?.paid ?? registration.amountCollected ?? registration.paidAmount ?? 0);
+    const isInstallment = paymentSaysInstallment || Boolean(registration.installment && subscriptionAmount > Number(registration.installment.paid ?? registration.installment.paidAmount ?? 0));
+    const hasOutstandingInstallment = isInstallment && subscriptionAmount - installmentPaid > 0;
+    if (registration.paymentStatus !== 'paid' && !hasOutstandingInstallment) return;
     let allocated = 0;
     const items = subscriptions.map((item, index) => {
       const price = index === subscriptions.length - 1
@@ -234,20 +339,24 @@ async function loadInvoices() {
     });
     allInvoices.push({
       id: docSnap.id,
+      sourceCollection: 'vipRegistrations',
       isVip: true,
       isVipRegistration: true,
       vipIsFree: subscriptionAmount === 0,
       vipFinalPrice: subscriptionAmount,
+      subscriptionAmount,
+      requestedAmount: subscriptionAmount,
       num: registration.invoiceNumber || `VIP-${docSnap.id.slice(-6)}`,
       student: registration.studentName || '-',
       phone: registration.phone || '',
       subType: classifyPortalSubscriptions(subscriptions),
       items,
       selectedSubscriptions: subscriptions,
-      payment: registration.paymentMethod || (Number(registration.amountCollected ?? registration.paidAmount ?? 0) === 0 ? 'Ù…Ø¬Ø§Ù†ÙŠ' : 'Ù†Ù‚Ø¯ÙŠ'),
-      paymentStatus: 'paid',
-      paidAmount: Number(registration.amountCollected ?? registration.paidAmount ?? 0),
-      amountCollected: Number(registration.amountCollected ?? registration.paidAmount ?? 0),
+      installment: registration.installment || (isInstallment ? { total: subscriptionAmount, paid: installmentPaid, remaining: Math.max(0, subscriptionAmount - installmentPaid) } : null),
+      payment: isInstallment ? '\u062a\u0642\u0633\u064a\u0637' : registration.paymentMethod || (installmentPaid === 0 ? '\u0645\u062c\u0627\u0646\u064a' : '\u0646\u0642\u062f\u064a'),
+      paymentStatus: registration.paymentStatus || (hasOutstandingInstallment ? 'partial' : 'paid'),
+      paidAmount: installmentPaid,
+      amountCollected: installmentPaid,
       studyType: registration.studyType || '-',
       grade: registration.grade || '-',
       date: (registration.paidAt || registration.registeredAt)?.toDate
@@ -255,7 +364,7 @@ async function loadInvoices() {
         : (registration.paidAt || registration.registeredAt || '-'),
       status: 'VIP',
       recipient: registration.teacherName || '-',
-      notes: registration.notes || 'VIP QR',
+      notes: cleanGeneratedBookletNote(registration.notes) || 'VIP QR',
       linkedSubTypes: [],
       indivNotes: registration.indivNotes || [],
       linkedNotes: [],
@@ -266,23 +375,32 @@ async function loadInvoices() {
   portalSnapshot.forEach(docSnap => {
     const registration = docSnap.data();
     const visibleSubscriptions = normalizePortalSubscriptions(registration);
+    const requestedAmount = portalSubscriptionAmount(registration);
+    const paidAmount = portalCollectedAmount(registration);
+    const paymentStatus = requestedAmount > paidAmount && paidAmount > 0
+      ? 'partial'
+      : registration.paymentStatus || (paidAmount > 0 ? 'paid' : 'unpaid');
     const invoiceNumber = Number(registration.invoiceNumber) || nextPortalInvoiceNumber++;
     if (!registration.invoiceNumber) {
       updateDoc(doc(db, 'studentRegistrations', docSnap.id), { invoiceNumber }).catch(error => console.warn('Could not save portal invoice number', error));
     }
     allInvoices.push({
       id: docSnap.id,
+      sourceCollection: 'studentRegistrations',
       isPortalRegistration: true,
       num: invoiceNumber,
       student: registration.studentName || '-',
       phone: registration.phone || '-',
       subType: classifyPortalSubscriptions(visibleSubscriptions),
       items: [],
-      payment: registration.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع',
+      payment: registration.payment === '\u062a\u0642\u0633\u064a\u0637' || registration.paymentMethod === '\u062a\u0642\u0633\u064a\u0637'
+        ? '\u062a\u0642\u0633\u064a\u0637' : registration.paymentMethod || registration.payment || 'نقدي',
       paymentMethod: registration.paymentMethod || registration.payment || 'نقدي',
-      paymentStatus: registration.paymentStatus || 'unpaid',
-      paidAmount: Number(registration.paidAmount || 0),
-      requestedAmount: Number(registration.requestedAmount || 0),
+      paymentStatus,
+      paidAmount,
+      amountCollected: paidAmount,
+      requestedAmount,
+      installment: registration.installment || null,
       selectedSubscriptions: visibleSubscriptions,
       subscriptionFallback: portalSubscriptionFallback(registration),
       studyType: registration.studyType || '-',
@@ -291,7 +409,7 @@ async function loadInvoices() {
       status: 'تسجيل طالب',
       agentId: registration.agentId || '-',
       recipient: userNames.get(registration.agentId) || registration.agentId || '-',
-      notes: registration.notes || registration.note || registration.remark || 'تسجيل من الموقع',
+      notes: cleanGeneratedBookletNote(registration.notes || registration.note || registration.remark) || 'تسجيل من الموقع',
       linkedSubTypes: [],
       indivNotes: registration.indivNotes || [],
       linkedNotes: getLinkedNotesForInvoice({ ...registration, isPortalRegistration: true, selectedSubscriptions: visibleSubscriptions }, subscriptionDocs),
@@ -306,9 +424,19 @@ async function loadInvoices() {
 
 // عرض الفواتير في الجدول
 function renderInvoicesTable() {
+  const invoicesTable = document.getElementById('invoices-table');
+  const cardsMode = invoiceViewMode === 'cards';
+  if (invoicesTable) invoicesTable.hidden = cardsMode;
+  if (invoiceCardsContainer) invoiceCardsContainer.hidden = !cardsMode;
+  document.querySelectorAll('[data-invoice-view]').forEach(button => {
+    const active = button.dataset.invoiceView === invoiceViewMode;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
   tableBody.innerHTML = '';
   if (filteredInvoices.length === 0) {
     tableBody.innerHTML = "<tr><td colspan='12'>لا توجد نتائج مطابقة.</td></tr>";
+    if (invoiceCardsContainer) invoiceCardsContainer.innerHTML = '<div class="invoice-card-empty">لا توجد نتائج مطابقة.</div>';
     return;
   }
   // جلب صلاحيات المستخدم من localStorage
@@ -334,7 +462,10 @@ function renderInvoicesTable() {
     if (inv.isPortalRegistration) tr.className = 'portal-registration-row';
     let actions = `<button class='open-invoice-btn' data-id='${inv.id}' data-portal='${inv.isPortalRegistration ? 'true' : 'false'}' data-vip-registration='${inv.isVipRegistration ? 'true' : 'false'}' style='background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>فتح</button>`;
     if (inv.isPortalRegistration) {
-      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus !== 'paid' ? 'selected' : ''} ${inv.paymentStatus === 'paid' ? 'disabled' : ''}>لم يدفع</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
+      actions = `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${inv.id}" data-previous="${inv.paymentStatus}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>مدفوع جزئياً</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>${actions}`;
+    }
+    if ((isInstallmentInvoice(inv) || inv.isPortalRegistration) && invoiceFinancialSummary(inv).remaining > 0) {
+      actions += `<button class='record-installment-payment-btn' data-id='${inv.id}' style='background:#087f72;color:#fff;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>تسجيل قسط</button>`;
     }
     if (canDeleteInvoice) {
       actions += `<button class='delete-invoice-btn' data-id='${inv.id}' style='background:#f44336;color:#fff;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;'>حذف</button>`;
@@ -364,8 +495,9 @@ function renderInvoicesTable() {
       <td class="items-cell">${portalItemsText || inv.subscriptionFallback || '-'}</td>
       <td class="type-cell">${inv.subType}</td>
       <td>${inv.grade}</td>
-      <td class="amount-cell">${inv.isPortalRegistration ? `${inv.paymentStatus === 'paid' ? inv.paidAmount : inv.requestedAmount} ج` : `${inv.isVip ? (inv.vipFinalPrice ?? (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)) : (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0)} ج`}</td>
-      <td>${inv.isPortalRegistration ? `<strong class="portal-status ${inv.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${inv.payment}</strong>` : inv.isVip ? `<strong class="portal-status paid">${inv.vipIsFree ? '\u0645\u062c\u0627\u0646\u064a - \u0645\u0643\u062a\u0645\u0644' : inv.payment === '\u062a\u0642\u0633\u064a\u0637' ? '\u062a\u0642\u0633\u064a\u0637 - \u0627\u0644\u0645\u062a\u0628\u0642\u064a ' + Number(inv.installment?.remaining || 0).toLocaleString('ar-EG') + ' \u062c' : '\u0645\u062f\u0641\u0648\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644'}</strong>` : inv.payment}</td>
+      <td class="amount-cell">${invoicePaidAmountMarkup(inv)}</td>
+      <td class="amount-cell remaining-cell">${invoiceRemainingAmountMarkup(inv)}</td>
+      <td class="invoice-payment-cell">${invoiceTypeMarkup(inv)}</td>
       <td>${inv.studyType}</td>
       <td>${inv.date}</td>
       <td>${inv.isPortalRegistration ? (inv.notes && String(inv.notes).trim() ? `${inv.notes} — من الموقع` : 'تسجيل من الموقع') : (inv.notes || 'لا توجد')}</td>
@@ -376,11 +508,71 @@ function renderInvoicesTable() {
     `;
     tableBody.appendChild(tr);
   });
+
+  if (invoiceCardsContainer) {
+    invoiceCardsContainer.innerHTML = filteredInvoices.map(inv => {
+      const financialSummary = invoiceFinancialSummary(inv);
+      const itemsText = inv.isPortalRegistration && inv.selectedSubscriptions?.length
+        ? inv.selectedSubscriptions.map(item => item.name).filter(Boolean).join('، ')
+        : (inv.items || []).map(item => item.name || item.title).filter(Boolean).join('، ');
+      const paymentLabel = inv.isPortalRegistration
+        ? (inv.paymentStatus === 'partial' ? 'مدفوع جزئياً' : inv.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع')
+        : invoicePaymentLabel(inv);
+      const bookletSummary = inv.linkedNotes?.length
+        ? `الملازم: ${inv.linkedNotes.filter(note => note.delivered).length} مستلمة من ${inv.linkedNotes.length}`
+        : '';
+      const id = escapeInvoiceHtml(inv.id);
+      let actions = '';
+      if (inv.isPortalRegistration) {
+        actions += `<label class="portal-payment-control"><span>حالة الدفع</span><select class="portal-payment-status" aria-label="تغيير حالة الدفع" data-id="${id}" data-previous="${escapeInvoiceHtml(inv.paymentStatus)}"><option value="unpaid" ${inv.paymentStatus === 'unpaid' ? 'selected' : ''}>لم يدفع</option><option value="partial" ${inv.paymentStatus === 'partial' ? 'selected' : ''} disabled>مدفوع جزئياً</option><option value="paid" ${inv.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select></label>`;
+      }
+      if ((isInstallmentInvoice(inv) || inv.isPortalRegistration) && invoiceFinancialSummary(inv).remaining > 0) {
+        actions += `<button class="invoice-card-action-button record-installment-payment-btn" data-id="${id}">تسجيل قسط</button>`;
+      }
+      actions += `<button class="invoice-card-action-button open-invoice-btn" data-id="${id}" data-portal="${inv.isPortalRegistration ? 'true' : 'false'}" data-vip-registration="${inv.isVipRegistration ? 'true' : 'false'}">فتح</button>`;
+      if (canDeleteInvoice) actions += `<button class="invoice-card-action-button delete delete-invoice-btn" data-id="${id}">حذف</button>`;
+
+      return `<article class="invoice-card">
+        <div class="invoice-card-head"><span>فاتورة #${escapeInvoiceHtml(inv.num)}</span><span>${escapeInvoiceHtml(inv.subType || 'فاتورة')}</span></div>
+        <div class="invoice-card-body">
+          <h3>${escapeInvoiceHtml(inv.student || '-')}</h3>
+          <p class="invoice-card-items">${escapeInvoiceHtml(itemsText || inv.subscriptionFallback || 'لا توجد تفاصيل عناصر')}</p>
+          <div class="invoice-card-meta">
+            <div><small>الفرقة</small><strong>${escapeInvoiceHtml(inv.grade || '-')}</strong></div>
+            <div><small>النظام</small><strong>${escapeInvoiceHtml(inv.studyType || '-')}</strong></div>
+            <div><small>التاريخ</small><strong>${escapeInvoiceHtml(inv.date || '-')}</strong></div>
+            <div><small>حالة الدفع</small><strong>${escapeInvoiceHtml(paymentLabel)}</strong></div>
+            <div><small>المستلم</small><strong>${escapeInvoiceHtml(inv.recipient || '-')}</strong></div>
+            <div><small>المبلغ المدفوع</small><strong class="invoice-card-amount">${formatInvoiceMoney(financialSummary.paid)} ج</strong></div>
+            <div><small>المتبقي</small><strong class="invoice-card-remaining">${formatInvoiceMoney(financialSummary.remaining)} ج</strong></div>
+          </div>
+          ${bookletSummary ? `<p class="invoice-card-items">${escapeInvoiceHtml(bookletSummary)}</p>` : ''}
+        </div>
+        <div class="invoice-card-footer"><div class="invoice-card-actions">${actions}</div></div>
+      </article>`;
+    }).join('');
+  }
+
   // إعادة ربط الأحداث
   document.querySelectorAll('.open-invoice-btn').forEach(btn => {
     btn.onclick = () => {
       showInvoiceModal(btn.getAttribute('data-id'), btn.dataset.portal === 'true', btn.dataset.vipRegistration === 'true');
       showNotification('تم فتح تفاصيل الفاتورة', 'info');
+    };
+  });
+  document.querySelectorAll('.record-installment-payment-btn').forEach(btn => {
+    btn.onclick = () => {
+      const invoice = allInvoices.find(item => item.id === btn.dataset.id);
+      if (!invoice) return;
+      showInstallmentPaymentDialog(invoice, {
+        invoiceId: invoice.id,
+        collectionName: invoice.sourceCollection || 'invoices',
+        receivedBy: currentRecipient,
+        onSuccess: async result => {
+          showNotification(`تم تسجيل ${result.paymentEntry.amount.toFixed(2)} ج بطريقة ${result.paymentEntry.method}`, 'success');
+          await loadInvoices();
+        }
+      });
     };
   });
   document.querySelectorAll('.delete-invoice-btn').forEach(btn => {
@@ -441,47 +633,59 @@ function renderInvoicesTable() {
         select.value = select.dataset.previous;
         return;
       }
-      const amount = status === 'paid'
-        ? Number(registration?.requestedAmount || registration?.paidAmount || 0)
-        : 0;
-      if (status === 'paid' && amount <= 0) {
+      const paymentMethod = await choosePaymentMethod(registration?.paymentMethod || 'نقدي');
+      if (!paymentMethod) {
         select.value = select.dataset.previous;
-        window.showNotification('لا يوجد مبلغ محفوظ لهذا الاشتراك', 'error');
         return;
-      }
-      let paymentMethod = registration?.paymentMethod || 'نقدي';
-      if (status === 'paid') {
-        paymentMethod = await choosePaymentMethod(paymentMethod);
-        if (!paymentMethod) {
-          select.value = select.dataset.previous;
-          return;
-        }
       }
       try {
         select.disabled = true;
         const registrationRef = doc(db, 'studentRegistrations', select.dataset.id);
-        const paymentRef = doc(db, 'studentPortalPayments', select.dataset.id);
+        const paymentRef = doc(collection(db, 'studentPortalPayments'));
         const paidAt = Timestamp.now();
+        const currentUser = getAuth().currentUser;
+        const recordedBy = currentUser?.uid || currentUser?.email || currentRecipient || '-';
+        let amount = 0;
         await runTransaction(db, async transaction => {
           const currentSnapshot = await transaction.get(registrationRef);
           if (!currentSnapshot.exists()) throw new Error('التسجيل لم يعد موجودًا. حدّث الصفحة وحاول مرة أخرى.');
           const current = currentSnapshot.data();
-          if (current.paymentStatus === 'paid') throw new Error('تم اعتماد هذا التسجيل كمدفوع بالفعل.');
+          const totalAmount = portalSubscriptionAmount(current);
+          const collectedAmount = portalCollectedAmount(current);
+          amount = Math.max(0, totalAmount - collectedAmount);
+          if (amount <= 0) throw new Error('لا يوجد مبلغ محفوظ لهذا الاشتراك');
+          const totalCollected = collectedAmount + amount;
+          const paymentEntry = { amount, method: paymentMethod, paidAt, receivedBy: recordedBy };
+          const installment = current.installment ? {
+            ...current.installment,
+            total: totalAmount,
+            paid: totalCollected,
+            remaining: Math.max(0, totalAmount - totalCollected),
+            paidAll: totalCollected >= totalAmount,
+            paymentStatus: totalCollected >= totalAmount ? 'paid' : 'partial',
+            lastPaymentMethod: paymentMethod,
+            payments: [...(Array.isArray(current.installment.payments) ? current.installment.payments : []), paymentEntry]
+          } : null;
           transaction.update(registrationRef, {
             paymentStatus: 'paid',
-            paidAmount: amount,
+            paidAmount: totalCollected,
+            amountCollected: totalCollected,
+            recordedBy,
+            paidBy: currentRecipient,
             payment: paymentMethod,
             paymentMethod,
+            ...(installment ? { installment } : {}),
             paidAt
           });
           transaction.set(paymentRef, {
             registrationId: select.dataset.id,
-            invoiceNumber: registration?.num || null,
-            agentId: registration?.agentId || registration?.recipient || '-',
-            studentName: registration?.student || '-',
+            invoiceNumber: current.invoiceNumber || registration?.num || null,
+            agentId: current.agentId || registration?.agentId || registration?.recipient || '-',
+            studentName: current.studentName || registration?.student || '-',
             amount,
             payment: paymentMethod,
             paymentMethod,
+            recordedBy,
             paidAt,
             source: 'invoices-page'
           });
@@ -491,7 +695,7 @@ function renderInvoicesTable() {
       } catch (error) {
         console.error(error);
         select.value = select.dataset.previous;
-        window.showNotification('تعذر تحديث حالة الدفع', 'error');
+        window.showNotification(error.message || 'تعذر تحديث حالة الدفع', 'error');
       }
     });
   });
@@ -571,6 +775,10 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
   const invDoc = await getDoc(doc(db, sourceCollection, id));
   if (!invDoc.exists()) return alert("لم يتم العثور على الفاتورة!");
   const inv = invDoc.data();
+  if (hasGeneratedBookletNote(inv.notes)) {
+    inv.isCustomBookletSubscription = true;
+    inv.subscriptionAmount = inv.subscriptionAmount ?? (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  }
   if (isPortalRegistration) {
     const subscriptions = normalizePortalSubscriptions(inv);
     inv.selectedSubscriptions = subscriptions;
@@ -578,13 +786,19 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
     inv.phone = inv.phone || '-';
     inv.subType = classifyPortalSubscriptions(subscriptions);
     inv.items = subscriptions.map(item => ({ name: item.name, price: item.price }));
-    inv.payment = inv.paymentStatus === 'paid' ? 'تم الدفع' : 'لم يدفع';
-    inv.payment = inv.paymentMethod || (inv.paymentStatus === 'paid' ? 'نقدي' : 'نقدي');
+    inv.payment = isInstallmentInvoice(inv) ? '\u062a\u0642\u0633\u064a\u0637' : inv.paymentMethod || inv.payment || 'نقدي';
+    inv.requestedAmount = portalSubscriptionAmount(inv) || inv.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    inv.paidAmount = portalCollectedAmount(inv);
+    inv.amountCollected = inv.paidAmount;
+    if (!inv.installment && isInstallmentInvoice(inv)) {
+      const summary = getInstallmentSummary({ ...inv, requestedAmount: inv.requestedAmount, paidAmount: inv.paidAmount });
+      inv.installment = { total: summary.total, paid: summary.paid, remaining: summary.remaining };
+    }
     inv.num = inv.invoiceNumber || '-';
     inv.grade = inv.grade || '-';
     inv.studyType = inv.studyType || '-';
     inv.date = inv.registeredAt || '-';
-    inv.notes = inv.notes || inv.note || inv.remark || '';
+    inv.notes = cleanGeneratedBookletNote(inv.notes || inv.note || inv.remark);
     if (inv.agentId) {
       try {
         const agentDoc = await getDoc(doc(db, 'users', inv.agentId));
@@ -603,7 +817,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
     const subscriptions = Array.isArray(inv.selectedSubscriptions) ? inv.selectedSubscriptions : [];
     inv.student = inv.studentName || "-";
     inv.subType = classifyPortalSubscriptions(subscriptions);
-    const displayTotal = Number(inv.subscriptionAmount ?? inv.requestedAmount ?? inv.paidAmount ?? 0);
+    const displayTotal = Number(inv.installment?.total ?? inv.subscriptionAmount ?? inv.requestedAmount ?? inv.paidAmount ?? 0);
     const sourceTotal = subscriptions.reduce((sum, item) => sum + Number(item.price || 0), 0);
     let assigned = 0;
     inv.items = subscriptions.map((item, index) => {
@@ -611,7 +825,9 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
       assigned += price;
       return { ...item, price };
     });
-    inv.payment = inv.payment === '\u062a\u0642\u0633\u064a\u0637' ? '\u062a\u0642\u0633\u064a\u0637' : (inv.paymentMethod || (Number(inv.amountCollected ?? inv.paidAmount ?? 0) === 0 ? "VIP free" : "VIP paid"));
+    const isInstallmentPayment = isInstallmentInvoice(inv);
+    inv.payment = isInstallmentPayment ? '\u062a\u0642\u0633\u064a\u0637' : (inv.paymentMethod || (Number(inv.amountCollected ?? inv.paidAmount ?? 0) === 0 ? 'VIP free' : 'VIP paid'));
+    inv.subscriptionAmount = displayTotal;
     inv.num = inv.invoiceNumber || "-";
     inv.date = inv.paidAt || inv.registeredAt || "-";
     inv.recipient = inv.teacherName || "-";
@@ -635,7 +851,10 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
     }
   }
   const invoiceDisplayItems = inv.items || [];
-  const invoiceTotal = (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const invoiceItemsTotal = (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+  const invoiceTotal = inv.isCustomBookletSubscription
+    ? Number(inv.subscriptionAmount ?? invoiceItemsTotal)
+    : invoiceItemsTotal;
   // مربعات استلام الملازم في اشتراك ملازم
   let notesDeliveryBoxes = '';
   // استخدم allNotesList مباشرة للعداد والعرض
@@ -814,8 +1033,8 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
         ${inv.subType === 'كورسات' && inv.linkedSubTypes && inv.linkedSubTypes.includes('ملازم') ? `<div style='margin:12px 0;padding:12px;background:#fff3e0;border-left:4px solid #ff9800;border-radius:4px;text-align:right;font-size:14px;font-weight:bold;color:#e65100;'>ⓘ كود اشتراك الملازم: <span style='color:#ff6f00;font-size:16px;'>${(typeof inv.num !== 'undefined' && inv.num !== null) ? inv.num + 1 : '-'}</span></div>` : ''}
         
         <div style='margin-top:12px;margin-bottom:12px;padding:10px;background:#e8f5e9;border:2px solid #388e3c;border-radius:6px;'>
-          <div style='font-size:13px;color:#2e7d32;margin-bottom:4px;font-weight:bold;'>طريقة الدفع: <span id='invoice-payment-method-label'>${inv.payment || 'نقدي'}</span></div>
-          <button id='invoice-payment-method-trigger' type='button' style='padding:7px 14px;border:0;border-radius:6px;background:#388e3c;color:#fff;font-weight:bold;cursor:pointer;'>تغيير طريقة الدفع</button>
+          <div style='font-size:13px;color:#2e7d32;margin-bottom:4px;font-weight:bold;'>طريقة الدفع: <span id='invoice-payment-method-label'>${isInstallmentInvoice(inv) ? (inv.installment?.lastPaymentMethod || 'يتم اختيارها عند تسجيل الدفعة') : (inv.payment || 'نقدي')}</span></div>
+          ${isInstallmentInvoice(inv) ? `<small>اختر طريقة الدفع لكل قسط عند تسجيله.</small>` : `<button id='invoice-payment-method-trigger' type='button' style='padding:7px 14px;border:0;border-radius:6px;background:#388e3c;color:#fff;font-weight:bold;cursor:pointer;'>تغيير طريقة الدفع</button>`}
         </div>
         
         <div style='margin-bottom:12px;'>
@@ -824,7 +1043,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
             ${invoiceDisplayItems.map((x, idx) => `
             <tr style='${idx % 2 === 0 ? "background:#f9f9f9;" : ""}'>
               <td style='padding:10px;text-align:right;border-bottom:1px solid #e0e0e0;'>${x.name}</td>
-              <td style='padding:10px;text-align:left;border-bottom:1px solid #e0e0e0;color:#388e3c;font-weight:bold;'>${x.price} ج</td>
+              ${inv.isCustomBookletSubscription ? '' : `<td style='padding:10px;text-align:left;border-bottom:1px solid #e0e0e0;color:#388e3c;font-weight:bold;'>${x.price} ج</td>`}
             </tr>
             `).join('')}
           </table>
@@ -838,7 +1057,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
           <div style='font-size:18px;font-weight:bold;color:#1b5e20;'>${invoiceTotal} ج</div>
         </div>
         
-        ${inv.payment === 'تقسيط' && inv.installment ? `
+        ${isInstallmentInvoice(inv) && inv.installment ? `
         <div style='margin:12px 0;padding:12px;background:#fff8e1;border:2px solid #fbc02d;border-radius:6px;'>
           <div style='color:#f57f17;font-weight:bold;margin-bottom:10px;text-align:center;'>📊 بيانات التقسيط</div>
           <table style='width:100%;border-collapse:collapse;font-size:14px;'>
@@ -874,7 +1093,7 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
       <div style='display:flex;gap:10px;justify-content:center;margin-bottom:8px;margin-top:18px;flex-wrap:wrap;'>
         <button id='print-invoice-btn' style='background:#388e3c;color:#fff;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #388e3c22;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-print'></i> طباعة</button>
         <button id='download-invoice-btn' style='background:#2196f3;color:#fff;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #2196f322;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-download'></i> حفظ صورة</button>
-        ${inv.payment === 'تقسيط' ? `<button id='confirm-payment-btn' style='background:#ff9800;color:#fff;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-check'></i> تأكيد الدفع</button>` : ''}
+        ${isInstallmentInvoice(inv) && getInstallmentSummary(inv).remaining > 0 ? `<button id='confirm-payment-btn' style='background:#087f72;color:#fff;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #087f7222;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-money-bill-wave'></i> تسجيل قسط</button>` : ''}
         <button id='edit-invoice-btn' style='background:#ff9800;color:#fff;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #ff980022;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-edit'></i> تعديل</button>
         <button id='save-invoice-edit' style='background:#1976d2;color:#fff;padding:10px 28px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #1976d222;transition:all 0.3s;display:flex;align-items:center;gap:8px;'><i class='fa fa-save'></i> حفظ</button>
       </div>
@@ -896,13 +1115,14 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
   `;
   modal.appendChild(hiddenEditFields);
 
-  document.getElementById('invoice-payment-method-trigger').onclick = async () => {
+  const paymentMethodTrigger = document.getElementById('invoice-payment-method-trigger');
+  if (paymentMethodTrigger) paymentMethodTrigger.onclick = async () => {
     const payment = await choosePaymentMethod(inv.payment || 'نقدي');
     if (!payment) return;
     try {
       const targetCollection = sourceCollection;
       const paymentData = isPortalRegistration
-        ? { paymentMethod: payment, payment: payment, paymentStatus: 'paid' }
+        ? { paymentMethod: payment, payment: payment }
         : { payment };
       await updateDoc(doc(db, targetCollection, id), paymentData);
       inv.payment = payment;
@@ -1318,105 +1538,17 @@ async function showInvoiceModal(id, isPortalRegistration = false, isVipRegistrat
 
   const confirmPaymentBtn = document.getElementById('confirm-payment-btn');
   if (confirmPaymentBtn) {
-    confirmPaymentBtn.onclick = async () => {
-      // إنشاء نافذة تأكيد لإدخال المبلغ المتبقي
-      const dialog = document.createElement('div');
-      dialog.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-        z-index: 99999;
-        min-width: 300px;
-        direction: rtl;
-        text-align: right;
-        font-family: Arial, sans-serif;
-      `;
-
-      const totalAmount = (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0);
-      const paidAmount = inv.installment?.paid || 0;
-      const remainingAmount = totalAmount - paidAmount;
-
-      dialog.innerHTML = `
-        <h3 style='color:#1976d2;margin-top:0;'>تأكيد استكمال الدفع</h3>
-        <div style='margin:15px 0;line-height:1.8;'>
-          <div><b>الإجمالي:</b> <span style='color:#388e3c;font-weight:bold;'>${totalAmount} ج</span></div>
-          <div><b>المدفوع:</b> <span style='color:#f57f17;font-weight:bold;'>${paidAmount} ج</span></div>
-          <div><b>المتبقي:</b> <span style='color:#e65100;font-weight:bold;'>${remainingAmount} ج</span></div>
-        </div>
-        <div style='margin:15px 0;'>
-          <label style='display:block;margin-bottom:8px;'><b>المبلغ المدفوع الآن:</b></label>
-          <input type='number' id='confirm-paid-amount' min='0' max='${remainingAmount}' value='${remainingAmount}' style='width:100%;padding:8px;border:2px solid #1976d2;border-radius:6px;font-size:14px;'>
-        </div>
-        <div style='display:flex;gap:10px;justify-content:center;'>
-          <button id='confirm-yes' style='background:#43a047;color:#fff;padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>تأكيد</button>
-          <button id='confirm-no' style='background:#e53935;color:#fff;padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;'>إلغاء</button>
-        </div>
-      `;
-
-      const overlay = document.createElement('div');
-      overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 99998;
-      `;
-
-      document.body.appendChild(overlay);
-      document.body.appendChild(dialog);
-
-      document.getElementById('confirm-no').onclick = () => {
-        overlay.remove();
-        dialog.remove();
-      };
-
-      document.getElementById('confirm-yes').onclick = async () => {
-        const rawNewPaidAmount = document.getElementById('confirm-paid-amount').value;
-        const newPaidAmount = rawNewPaidAmount === '' ? NaN : Number(rawNewPaidAmount);
-        if (!Number.isFinite(newPaidAmount) || newPaidAmount <= 0 || newPaidAmount > remainingAmount) {
-          showNotification('\u0623\u062f\u062e\u0644 \u0642\u0633\u0637\u064b\u0627 \u0635\u0627\u0644\u062d\u064b\u0627 \u0644\u0627 \u064a\u062a\u062c\u0627\u0648\u0632 \u0627\u0644\u0645\u062a\u0628\u0642\u064a.', 'error');
-          return;
-        }
-        const newRemainingAmount = totalAmount - (paidAmount + newPaidAmount);
-
-        // تحديث الفاتورة
-        const updatedInstallment = {
-          total: totalAmount,
-          paid: paidAmount + newPaidAmount,
-          remaining: Math.max(0, newRemainingAmount)
-        };
-        const invoiceRef = doc(db, 'invoices', id);
-        const registrationId = inv.vipRegistrationId;
-        await runTransaction(db, async transaction => {
-          const invoiceSnapshot = await transaction.get(invoiceRef);
-          const registrationRef = registrationId ? doc(db, 'vipRegistrations', registrationId) : null;
-          const registrationSnapshot = registrationRef ? await transaction.get(registrationRef) : null;
-          if (!invoiceSnapshot.exists()) throw new Error('Invoice not found.');
-          if (registrationRef && !registrationSnapshot.exists()) throw new Error('VIP registration not found.');
-          const totalCollected = updatedInstallment.paid;
-          transaction.update(invoiceRef, {
-            payment: updatedInstallment.remaining <= 0 ? '\u0645\u062f\u0641\u0648\u0639 \u0643\u0627\u0645\u0644' : '\u062a\u0642\u0633\u064a\u0637',
-            paymentStatus: 'paid', installment: updatedInstallment, paidAmount: totalCollected, amountCollected: totalCollected
-          });
-          if (registrationRef) transaction.update(registrationRef, {
-            paymentStatus: 'paid', installment: updatedInstallment, paidAmount: totalCollected, amountCollected: totalCollected,
-            subscriptionAmount: totalAmount
-          });
-        });
-
-        overlay.remove();
-        dialog.remove();
-        showNotification('تم تحديث حالة الدفع بنجاح', 'success');
-        setTimeout(() => showInvoiceModal(id), 300);
-      };
-    };
+    confirmPaymentBtn.onclick = () => showInstallmentPaymentDialog(inv, {
+      invoiceId: id,
+      collectionName: sourceCollection,
+      linkedRegistrationId: inv.vipRegistrationId || '',
+      receivedBy: currentRecipient,
+      onSuccess: async result => {
+        showNotification(`تم تسجيل ${result.paymentEntry.amount.toFixed(2)} ج بطريقة ${result.paymentEntry.method}`, 'success');
+        await loadInvoices();
+        setTimeout(() => showInvoiceModal(id, isPortalRegistration, isVipRegistration), 250);
+      }
+    });
   }
 }
 
@@ -1466,14 +1598,15 @@ if (exportExcelBtn) {
         'رقم الفاتورة': inv.num,
         'اسم الطالب': inv.student,
         'رقم الهاتف': inv.phone,
-        'العناصر': (inv.items || []).map(x => x.name + " (" + x.price + " ج)").join('، '),
+        'العناصر': (inv.items || []).map(x => inv.isCustomBookletSubscription ? x.name : x.name + " (" + x.price + " ج)").join('، '),
         'نوع الاشتراك': inv.subType,
         'الفرقة': inv.grade,
-        'المبلغ المدفوع': (inv.items || []).reduce((sum, x) => sum + (x.price || 0), 0),
-        'نوع الفاتورة': inv.payment,
+        'المبلغ المدفوع': invoiceFinancialSummary(inv).paid,
+        'المتبقي': invoiceFinancialSummary(inv).remaining,
+        'نوع الفاتورة': invoicePaymentLabel(inv),
         'انتظام/انتساب': inv.studyType,
         'التاريخ': inv.date,
-        'الملاحظات': inv.notes || '-'
+        'الملاحظات': cleanGeneratedBookletNote(inv.notes) || '-'
       }));
       // إنشاء ملف Excel
       const ws = XLSX.utils.json_to_sheet(data);
@@ -1486,6 +1619,14 @@ if (exportExcelBtn) {
     }
   };
 }
+
+document.querySelectorAll('[data-invoice-view]').forEach(button => {
+  button.addEventListener('click', () => {
+    invoiceViewMode = button.dataset.invoiceView === 'cards' ? 'cards' : 'table';
+    localStorage.setItem('invoicesViewMode', invoiceViewMode);
+    renderInvoicesTable();
+  });
+});
 
 window.addEventListener("DOMContentLoaded", loadInvoices);
 // تفعيل اختصارات لوحة المفاتيح

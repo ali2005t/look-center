@@ -1,0 +1,211 @@
+  <!doctype html>
+  <html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f172a">
+    <title>لا يوجد اتصال بالإنترنت</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4f8;
+        --card: rgba(255, 255, 255, .94);
+        --text: #10233f;
+        --muted: #617089;
+        --primary: #0f766e;
+        --primary-dark: #115e59;
+        --border: #d9e4ed;
+        --shadow: 0 24px 70px rgba(15, 35, 63, .14);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0b1220;
+          --card: rgba(19, 32, 52, .96);
+          --text: #f2f7fb;
+          --muted: #aebdd0;
+          --primary: #2dd4bf;
+          --primary-dark: #14b8a6;
+          --border: #263b56;
+          --shadow: 0 24px 70px rgba(0, 0, 0, .28);
+        }
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        overflow: hidden;
+        color: var(--text);
+        font-family: Tahoma, Arial, sans-serif;
+        background:
+          radial-gradient(circle at 12% 18%, rgba(45, 212, 191, .22), transparent 28%),
+          radial-gradient(circle at 86% 80%, rgba(59, 130, 246, .17), transparent 30%),
+          var(--bg);
+      }
+
+      .offline-card {
+        width: min(100%, 520px);
+        padding: 42px 34px 32px;
+        text-align: center;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .signal-icon {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        margin: 0 auto 24px;
+        display: grid;
+        place-items: center;
+        color: var(--primary);
+        border: 10px solid color-mix(in srgb, var(--primary) 16%, transparent);
+        border-radius: 50%;
+      }
+
+      .signal-icon::before,
+      .signal-icon::after {
+        content: "";
+        position: absolute;
+        border: 4px solid currentColor;
+        border-bottom: 0;
+        border-radius: 90px 90px 0 0;
+        transform: translateY(10px);
+      }
+
+      .signal-icon::before { width: 52px; height: 32px; }
+      .signal-icon::after { width: 28px; height: 18px; }
+
+      .signal-dot {
+        position: absolute;
+        bottom: 20px;
+        width: 9px;
+        height: 9px;
+        background: currentColor;
+        border-radius: 50%;
+      }
+
+      .signal-slash {
+        position: absolute;
+        width: 94px;
+        height: 6px;
+        background: #ef4444;
+        border-radius: 999px;
+        transform: rotate(-45deg);
+      }
+
+      h1 { margin: 0 0 12px; font-size: clamp(24px, 5vw, 34px); }
+
+      .description {
+        max-width: 380px;
+        margin: 0 auto 24px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.9;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 22px;
+        padding: 8px 14px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-size: 13px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        background: #ef4444;
+        border-radius: 50%;
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, .14);
+      }
+
+      button {
+        width: 100%;
+        padding: 14px 20px;
+        color: #fff;
+        background: var(--primary);
+        border: 0;
+        border-radius: 14px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform .2s ease, background .2s ease;
+      }
+
+      button:hover { background: var(--primary-dark); transform: translateY(-2px); }
+      button:disabled { cursor: wait; opacity: .7; transform: none; }
+
+      .hint {
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main class="offline-card" aria-labelledby="page-title">
+      <div class="signal-icon" aria-hidden="true">
+        <span class="signal-dot"></span>
+        <span class="signal-slash"></span>
+      </div>
+
+      <h1 id="page-title">لا يوجد اتصال بالإنترنت</h1>
+      <p class="description">
+        تعذّر تحميل الصفحة الآن. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.
+      </p>
+
+      <div class="status" id="connection-status" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        غير متصل حاليًا
+      </div>
+
+      <button id="retry-button" type="button">إعادة المحاولة</button>
+      <p class="hint">سيتم تحديث الصفحة تلقائيًا عند عودة الاتصال.</p>
+    </main>
+
+    <script>
+      const retryButton = document.getElementById('retry-button');
+      const status = document.getElementById('connection-status');
+
+      function reloadPage() {
+        retryButton.disabled = true;
+        retryButton.textContent = 'جارٍ المحاولة...';
+
+        if (window.gonative?.webview?.reload) {
+          window.gonative.webview.reload();
+        } else {
+          window.location.reload();
+        }
+      }
+
+      function updateConnectionStatus() {
+        const online = navigator.onLine;
+        status.innerHTML = online
+          ? '<span class="status-dot" style="background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.14)" aria-hidden="true"></span>الاتصال متاح'
+          : '<span class="status-dot" aria-hidden="true"></span>غير متصل حاليًا';
+
+        if (online) window.setTimeout(reloadPage, 500);
+      }
+
+      retryButton.addEventListener('click', reloadPage);
+      window.addEventListener('online', updateConnectionStatus);
+      updateConnectionStatus();
+    </script>
+  </body>
+  </html>

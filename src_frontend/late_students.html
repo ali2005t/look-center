@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>الطلاب المتأخرين في الدفع</title>
+  <title>طلاب التقسيط</title>
   <link rel="stylesheet" href="css/main.css?v=sidebar-v5" />
-  <link rel="stylesheet" href="css/late_students.css" />
+  <link rel="stylesheet" href="css/late_students.css?v=installments-v3" />
   <link rel="stylesheet" href="css/look-theme.css?v=look-v6" />
   <link rel="stylesheet" href="css/mobile-nav.css" />
   <link rel="stylesheet" href="css/mobile-dropdown-menu.css" />
@@ -48,7 +48,7 @@
       <li><a href="daily_closing.html"><i class="fas fa-calendar-check"></i><span>التقفيل اليومي</span></a></li>
       <li><a href="invoices.html"><i class="fas fa-file-invoice"></i><span>الطلاب المشتركين</span></a></li>
       <li><a href="unsubscribed_students.html"><i class="fas fa-user-minus"></i><span>فواتير فردية</span></a></li>
-      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>الطلاب المتأخرين</span></a></li>
+      <li><a href="late_students.html"><i class="fas fa-clock"></i><span>طلاب التقسيط</span></a></li>
       <li><a href="subscriptions.html"><i class="fas fa-credit-card"></i><span>الاشتراكات والأسعار</span></a></li>
       <li><a href="users.html"><i class="fas fa-users"></i><span>إدارة المستخدمين</span></a></li>
       <li><a href="reports.html"><i class="fas fa-chart-bar"></i><span>التقارير</span></a></li>
@@ -65,7 +65,7 @@
 
   <li data-link="invoices.html"><a href="invoices.html"><span class="sidebar-icon"><i class="fas fa-file-invoice" style="color:#fbc02d;"></i></span><span>الطلاب المشتركين</span></a></li>
   <li data-link="unsubscribed_students.html"><a href="unsubscribed_students.html"><span class="sidebar-icon"><i class="fas fa-user-minus" style="color:#e53935;"></i></span><span>فواتير فردية</span></a></li>
-  <li data-link="late_students.html" class="active"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock" style="color:#8e24aa;"></i></span><span>الطلاب المتأخرين في الدفع</span></a></li>
+  <li data-link="late_students.html" class="active"><a href="late_students.html"><span class="sidebar-icon"><i class="fas fa-clock" style="color:#8e24aa;"></i></span><span>طلاب التقسيط</span></a></li>
   <li data-link="subscriptions.html"><a href="subscriptions.html"><span class="sidebar-icon"><i class="fas fa-credit-card" style="color:#00897b;"></i></span><span>الاشتراكات والأسعار</span></a></li>
   <li data-link="users.html"><a href="users.html"><span class="sidebar-icon"><i class="fas fa-users" style="color:#f57c00;"></i></span><span>إدارة المستخدمين</span></a></li>
   <li data-link="reports.html"><a href="reports.html"><span class="sidebar-icon"><i class="fas fa-chart-bar" style="color:#0288d1;"></i></span><span>التقارير</span></a></li>
@@ -74,14 +74,29 @@
   <li data-link="help.html"><a href="help.html"><span class="sidebar-icon"><i class="fas fa-question-circle" style="color:#7e57c2;"></i></span><span>دليل المساعدة</span></a></li>
     </ul>
   </aside>
-  <main class="late-students-content" style="margin-right:220px;padding:40px 30px 30px 30px;min-height:100vh;">
-    <h2 style="color:#e53935;margin-bottom:24px;">الطلاب المتأخرين في الدفع</h2>
-    <div id="late-students-summary" style="margin-bottom:12px;font-weight:bold;color:#1976d2;"></div>
-    <button onclick="window.exportLateStudentsToExcel()" style="background:#43a047;color:#fff;padding:8px 18px;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 8px #43a04722;margin-bottom:18px;">تصدير إلى Excel</button>
+  <main class="late-students-content">
+    <section class="installment-page-header">
+      <div>
+        <span class="installment-page-eyebrow"><i class="fas fa-wallet" aria-hidden="true"></i> متابعة التحصيل</span>
+        <h1>طلاب التقسيط</h1>
+        <p>تابع الأقساط المتبقية وسجّل الدفعات الجزئية أو سدّد المتبقي بالكامل.</p>
+      </div>
+      <button class="installment-export-btn" aria-label="تصدير إلى Excel" title="تصدير إلى Excel" onclick="window.exportLateStudentsToExcel()">
+        <i class="fas fa-file-export" aria-hidden="true"></i><span>تصدير Excel</span>
+      </button>
+    </section>
+    <div id="late-students-summary" class="installment-summary-grid" aria-live="polite"></div>
     <section class="late-students-report">
-      <div id="late-students-table-box">
+      <div class="installment-report-heading">
+        <div>
+          <h2>الأقساط المستحقة</h2>
+          <p>اضغط على صف الطالب لعرض تفاصيل الفاتورة.</p>
+        </div>
+        <span class="installment-report-icon"><i class="fas fa-receipt" aria-hidden="true"></i></span>
+      </div>
+      <div id="late-students-table-box" class="installment-table-wrap">
         <table class="report-table late-students-table">
-          <thead style="position:sticky;top:0;z-index:2;">
+          <thead>
             <tr>
               <th>#</th>
               <th>اسم الطالب</th>
@@ -90,19 +105,20 @@
               <th>إجمالي المبلغ</th>
               <th>المدفوع</th>
               <th>المتبقي</th>
-              <th>الحالة</th>
+              <th>طريقة آخر دفعة</th>
+              <th>إجراء</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="8" style="text-align:center;color:#b3b3b3;">لا يوجد طلاب لديهم فواتير تقسيط</td></tr>
+            <tr><td colspan="9" class="installment-empty-cell">لا توجد أقساط متبقية</td></tr>
           </tbody>
         </table>
       </div>
     </section>
   </main>
   <footer style="text-align:center;font-size:13px;color:#1976d2;margin:30px 0 10px 0;font-family:Arial, sans-serif; font-weight:bold; letter-spacing:1px;"><b>Powered by Eng. Lol</b></footer>
-  <script type="module" src="js/late_students.js?v=vip-separation-v1"></script>
-    <script type="module" src="js/header.js?v=permissions-v10"></script>
+  <script type="module" src="js/late_students.js?v=installments-v4"></script>
+    <script type="module" src="js/header.js?v=permissions-v11"></script>
   <script type="module" src="js/firebase.js"></script>
   <div id="logout-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(25, 118, 210, 0.18);z-index:999;align-items:center;justify-content:center;">
     <div style="background:linear-gradient(135deg,#fff 80%,#e3f2fd 100%);padding:38px 28px;border-radius:22px;box-shadow:0 8px 32px #1976d288,0 2px 8px #101c2c44;text-align:center;max-width:370px;margin:auto;position:relative;">

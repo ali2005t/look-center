@@ -512,10 +512,62 @@ body {
   border-top: 1px solid #edf1f3;
 }
 
-.student-profile-invoice-footer > strong {
+.student-profile-invoice-total {
+  display: grid;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.student-profile-invoice-total small {
+  color: #718493;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.student-profile-invoice-total strong {
   color: #205f49;
   font-size: 14px;
 }
+
+.student-profile-installment-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid #e7eef0;
+  border-radius: 10px;
+  background: #f8fafb;
+}
+
+.student-profile-installment-metric {
+  display: grid;
+  gap: 3px;
+}
+
+.student-profile-installment-metric small { color: #718493; font-size: 10px; }
+.student-profile-installment-metric strong { color: #31536a; font-size: 12px; font-variant-numeric: tabular-nums; }
+.student-profile-installment-metric.is-paid strong { color: #247348; }
+.student-profile-installment-metric.is-remaining strong { color: #a36213; }
+.student-profile-installment-progress { grid-column: 1 / -1; height: 5px; overflow: hidden; border-radius: 99px; background: #e3e9ec; direction: rtl; }
+.student-profile-installment-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #32a56e, #56bd79); }
+
+.student-profile-record-installment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid #147b70;
+  border-radius: 8px;
+  background: #147b70;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.student-profile-record-installment:hover { background: #0e655c; }
 
 .student-profile-print-invoice {
   display: inline-flex;
@@ -656,6 +708,66 @@ body {
 .subscriptions-section {
   justify-content: center !important;
   margin-bottom: 28px;
+}
+
+.booklet-subscription-tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -16px 0 18px;
+}
+
+.booklet-subscription-tools[hidden],
+.booklet-subscription-price-wrap[hidden] {
+  display: none !important;
+}
+
+.booklet-mode-toggle {
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 1px solid #9bc5e8;
+  border-radius: 9px;
+  background: #fff;
+  color: #155a8a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.booklet-mode-toggle:hover {
+  border-color: #1976d2;
+  background: #edf6ff;
+  color: #0d4f83;
+}
+
+.booklet-subscription-price-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #28475d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.booklet-subscription-price-wrap input {
+  width: 150px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid #c8d9e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #183c54;
+  font: inherit;
+}
+
+.booklet-subscription-price-wrap input:focus {
+  border-color: #3a91c4;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(58, 145, 196, 0.12);
 }
 
 .grade-btn, .sub-btn {

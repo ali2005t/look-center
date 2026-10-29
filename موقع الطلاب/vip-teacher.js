@@ -65,7 +65,7 @@ function applyChargeMode(row, mode) {
     if (total <= 0) {
       row.querySelector('.charge-mode[value="free"]').checked = true;
       invoiceInput.value = '0'; paidInput.value = '0';
-    } else if (paid <= 0 || paid >= total) paidInput.value = String(Number((total / 2).toFixed(2)) || 0.01);
+    } else if (paid <= 0 || paid >= total) paidInput.value = '';
   }
   updateRemaining(row);
 }
@@ -87,7 +87,10 @@ async function loadRequests() {
       const items = Array.isArray(item.selectedSubscriptions) ? item.selectedSubscriptions : [];
       const isPaid = item.paymentStatus === 'paid';
       const invoiceAmount = Number(item.teacherReportedAmount ?? item.subscriptionAmount ?? item.requestedAmount ?? 0);
-      const paidNow = Number(item.teacherReportedPaidAmount ?? item.amountCollected ?? item.paidAmount ?? invoiceAmount);
+      const hasRecordedPaid = item.teacherReportedPaidAmount !== undefined
+        || item.amountCollected !== undefined
+        || item.paidAmount !== undefined;
+      const paidNow = Number(item.teacherReportedPaidAmount ?? item.amountCollected ?? item.paidAmount ?? (isPaid ? invoiceAmount : 0));
       const mode = selectedMode(item, invoiceAmount, paidNow);
       const remaining = mode === 'free' ? 0 : Number(item.installment?.remaining ?? Math.max(0, invoiceAmount - paidNow));
       const date = item.registeredAt?.toDate ? item.registeredAt.toDate().toLocaleString('ar-EG') : '\u2014';
@@ -105,8 +108,8 @@ async function loadRequests() {
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="full" ' + (mode === 'full' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062f\u0641\u0639 \u0643\u0627\u0645\u0644</span></label>' +
         '<label class="mode-option"><input class="charge-mode" type="radio" name="' + radioName + '" value="installment" ' + (mode === 'installment' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u062a\u0642\u0633\u064a\u0637</span></label>' +
         '<label class="mode-option free"><input class="charge-mode" type="radio" name="' + radioName + '" value="free" ' + (mode === 'free' ? 'checked' : '') + ' ' + (isPaid ? 'disabled' : '') + '><span>\u0645\u062c\u0627\u0646\u064a</span></label></div>' +
-        '<div class="amount-grid"><label class="amount-field">\u0642\u064a\u0645\u0629 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629<input class="invoice-amount" type="number" min="0" step="0.01" value="' + safeText(mode === 'free' ? 0 : invoiceAmount) + '" ' + (isPaid ? 'disabled' : '') + '></label>' +
-        '<label class="amount-field">\u0627\u0644\u0645\u062f\u0641\u0648\u0639 \u0627\u0644\u0622\u0646<input class="paid-now" type="number" min="0" step="0.01" value="' + safeText(mode === 'free' ? 0 : paidNow) + '" ' + (isPaid ? 'disabled' : '') + '></label>' +
+        '<div class="amount-grid"><label class="amount-field">\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 (\u062a\u0644\u0642\u0627\u0626\u064a)<input class="invoice-amount" type="number" min="0" step="0.01" value="' + safeText(mode === 'free' ? 0 : invoiceAmount) + '" readonly ' + (isPaid ? 'disabled' : '') + '></label>' +
+        '<label class="amount-field">\u0627\u0644\u0645\u062f\u0641\u0648\u0639 \u0627\u0644\u0622\u0646<input class="paid-now" type="number" min="0" step="0.01" placeholder="\u0627\u0643\u062a\u0628 \u0645\u0628\u0644\u063a \u0627\u0644\u062f\u0641\u0639\u0629" value="' + safeText(mode === 'free' ? 0 : (mode === 'installment' && !hasRecordedPaid ? '' : paidNow)) + '" ' + (isPaid ? 'disabled' : '') + '></label>' +
         '<label class="amount-field">\u0627\u0644\u0645\u062a\u0628\u0642\u064a<output class="remaining-amount">' + formatMoney(remaining) + '</output></label></div>' +
         '<div class="request-actions"><button class="save-amount secondary" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u062d\u0641\u0638 \u0627\u0644\u0645\u0628\u0627\u0644\u063a</button><button class="approve-payment" ' + (isPaid || !items.length ? 'disabled' : '') + '>\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062f\u0641\u0639 \u0648\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629</button></div></div></article>';
     }).join('') : '<p class="card empty-state">\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u0645\u0631\u062a\u0628\u0637\u0629 \u0628\u062d\u0633\u0627\u0628\u0643.</p>';

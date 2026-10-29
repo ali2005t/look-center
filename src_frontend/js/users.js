@@ -21,7 +21,7 @@ const allPages = [
   { key: 'daily_closing', label: 'التقفيل اليومي', file: 'daily_closing.html' },
   { key: 'invoices', label: 'الطلاب المشتركين', file: 'invoices.html' },
   { key: 'unsubscribed', label: 'فواتير فردية', file: 'unsubscribed_students.html' },
-  { key: 'late_students', label: 'الطلاب المتأخرين', file: 'late_students.html' },
+  { key: 'late_students', label: 'طلاب التقسيط', file: 'late_students.html' },
   { key: 'subscriptions', label: 'الاشتراكات والأسعار', file: 'subscriptions.html' },
   { key: 'users', label: 'إدارة المستخدمين', file: 'users.html' },
   { key: 'reports', label: 'التقارير', file: 'reports.html' },

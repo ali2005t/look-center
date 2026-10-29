@@ -569,7 +569,7 @@ async function loadReports() {
     select.onchange = renderRecipientTable;
     renderRecipientTable();
   }
-  // تفعيل تقرير الطلاب المتأخرين في الدفع
+  // تفعيل تقرير طلاب التقسيط
   renderLateStudentsTable();
 
   // --- تعبئة جدول ربح كل مستلم (اليوم فقط) ---
@@ -797,27 +797,20 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// --- جدول الطلاب المتأخرين في الدفع ---
+// --- جدول طلاب التقسيط ---
 function renderLateStudentsTable() {
-  // ابحث عن جميع الفواتير التي بها تقسيط وحالة القسط غير مدفوع وتاريخ الاستحقاق أقل من اليوم
   const lateTableBody = document.querySelector('#late-students-table tbody');
   if (!lateTableBody) return;
-  const today = new Date();
-  // --- تشخيص: طباعة جميع الفواتير التي بها installment ---
-  if (typeof allInvoices !== 'undefined') {
-    const withInstallment = allInvoices.filter(inv => inv.installment);
-    console.log('الفواتير التي بها installment:', withInstallment);
-    withInstallment.forEach(inv => {
-      console.log('inst.status:', inv.installment.status, 'inst.dueDate:', inv.installment.dueDate, 'inv:', inv);
-    });
-    if (!withInstallment.length) {
-      alert('لا توجد أي فواتير بها بيانات تقسيط (installment) في قاعدة البيانات!');
-    }
-  }
-  // اجمع الفواتير التي بها تقسيط فقط (بدون شرط تاريخ الاستحقاق)
   const lateInvoices = allInvoices.filter(inv => {
-    // أي فاتورة payment = "تقسيط" تظهر في الجدول
-    return inv.payment === 'تقسيط';
+    const total = Number(inv.installment?.total ?? inv.installment?.amount ?? inv.subscriptionAmount
+      ?? inv.vipFinalPrice ?? (inv.items || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0)) || 0;
+    const paid = Number(inv.installment?.paid ?? inv.installment?.paidAmount ?? inv.paidAmount ?? 0) || 0;
+    const rawRemaining = inv.installment?.remaining;
+    const remaining = rawRemaining !== undefined && rawRemaining !== null && rawRemaining !== ''
+      ? Number(rawRemaining)
+      : total - paid;
+    return (inv.payment === '\u062a\u0642\u0633\u064a\u0637' || Boolean(inv.installment))
+      && Number.isFinite(remaining) && remaining > 0;
   });
   if (!lateInvoices.length) {
     lateTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b3b3b3;">لا يوجد طلاب لديهم فواتير تقسيط</td></tr>';

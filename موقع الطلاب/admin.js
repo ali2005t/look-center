@@ -28,6 +28,16 @@ const formatDate = (value) => { const date = toDate(value); return date && !Numb
 const isToday = (value) => value?.toDate && value.toDate().toDateString() === new Date().toDateString();
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
 
+function registrationSubscriptionAmount(registration) {
+  const subscriptions = registration?.selectedSubscriptions || registration?.subscriptions || registration?.selectedItems || [];
+  const selectedAmount = Array.isArray(subscriptions)
+    ? subscriptions.reduce((sum, item) => sum + (Number(item?.price) || 0), 0)
+    : 0;
+  const amounts = [registration?.requestedAmount, registration?.subscriptionAmount, selectedAmount, registration?.installment?.total]
+    .map(Number).filter(amount => Number.isFinite(amount) && amount > 0);
+  return amounts[0] || 0;
+}
+
 function uniquePayments(items) {
   const sorted = [...items].sort((left, right) => {
     const canonical = Number(right.id === right.registrationId) - Number(left.id === left.registrationId);
@@ -396,18 +406,26 @@ function renderStudents() {
     const row = document.createElement('tr');
     const legacyMethod = item.paymentMethod && !['نقدي', 'فودافون كاش', 'تقسيط'].includes(item.paymentMethod)
       ? `<option value="${escapeHtml(item.paymentMethod)}" selected>${escapeHtml(item.paymentMethod)}</option>` : '';
-    row.innerHTML = `<td data-label="الطالب">${escapeHtml(item.studentName || '-')}</td><td data-label="الهاتف">${escapeHtml(item.phone || '-')}</td><td data-label="الفرقة">${escapeHtml(item.grade || '-')} / ${escapeHtml(item.studyType || '-')}</td><td data-label="المسؤول">${escapeHtml(names.get(item.agentId) || '-')}</td><td data-label="التسجيل">${escapeHtml(formatDate(item.registeredAt))}</td><td data-label="المبلغ المحصل"><input class="payment-amount" type="number" min="0" step="0.01" value="${Number(item.paidAmount ?? item.requestedAmount ?? 0) || ''}" data-id="${escapeHtml(item.id)}" placeholder="المبلغ"></td><td data-label="طريقة الدفع"><select class="payment-method-select" data-id="${escapeHtml(item.id)}"><option value="">اختر الطريقة</option><option value="نقدي" ${item.paymentMethod === 'نقدي' ? 'selected' : ''}>نقدي</option><option value="فودافون كاش" ${item.paymentMethod === 'فودافون كاش' ? 'selected' : ''}>فودافون كاش</option><option value="تقسيط" ${item.paymentMethod === 'تقسيط' ? 'selected' : ''}>تقسيط</option>${legacyMethod}</select></td><td class="payment-actions" data-label="حالة الدفع"><select class="status-select ${item.paymentStatus === 'paid' ? 'status-paid' : 'status-unpaid'}" data-id="${escapeHtml(item.id)}"><option value="unpaid" ${item.paymentStatus !== 'paid' ? 'selected' : ''} ${item.paymentStatus === 'paid' ? 'disabled' : ''}>لم يدفع</option><option value="paid" ${item.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select><button class="save-payment" data-id="${escapeHtml(item.id)}">${item.paymentStatus === 'paid' ? 'حفظ التعديل' : 'تسجيل الدفع'}</button></td>`;
+    const dueAmount = registrationSubscriptionAmount(item);
+    const enteredAmount = [item.paidAmount, item.amountCollected].map(Number).find(amount => Number.isFinite(amount) && amount > 0);
+    const displayedAmount = item.paymentStatus === 'paid' ? (enteredAmount || dueAmount) : (dueAmount || enteredAmount || 0);
+    row.innerHTML = `<td data-label="الطالب">${escapeHtml(item.studentName || '-')}</td><td data-label="الهاتف">${escapeHtml(item.phone || '-')}</td><td data-label="الفرقة">${escapeHtml(item.grade || '-')} / ${escapeHtml(item.studyType || '-')}</td><td data-label="المسؤول">${escapeHtml(names.get(item.agentId) || '-')}</td><td data-label="التسجيل">${escapeHtml(formatDate(item.registeredAt))}</td><td data-label="المبلغ المحصل"><input class="payment-amount" type="number" min="0" step="0.01" value="${displayedAmount || ''}" data-id="${escapeHtml(item.id)}" placeholder="المبلغ"></td><td data-label="طريقة الدفع"><select class="payment-method-select" data-id="${escapeHtml(item.id)}"><option value="">اختر الطريقة</option><option value="نقدي" ${item.paymentMethod === 'نقدي' ? 'selected' : ''}>نقدي</option><option value="فودافون كاش" ${item.paymentMethod === 'فودافون كاش' ? 'selected' : ''}>فودافون كاش</option><option value="تقسيط" ${item.paymentMethod === 'تقسيط' ? 'selected' : ''}>تقسيط</option>${legacyMethod}</select></td><td class="payment-actions" data-label="حالة الدفع"><select class="status-select ${item.paymentStatus === 'paid' ? 'status-paid' : 'status-unpaid'}" data-id="${escapeHtml(item.id)}"><option value="unpaid" ${item.paymentStatus !== 'paid' ? 'selected' : ''} ${item.paymentStatus === 'paid' ? 'disabled' : ''}>لم يدفع</option><option value="paid" ${item.paymentStatus === 'paid' ? 'selected' : ''}>تم الدفع</option></select><button class="save-payment" data-id="${escapeHtml(item.id)}">${item.paymentStatus === 'paid' ? 'حفظ التعديل' : 'تسجيل الدفع'}</button></td>`;
     studentsBody.appendChild(row);
   });
   studentsBody.querySelectorAll('.save-payment').forEach(button => button.addEventListener('click', async () => {
     const id = button.dataset.id;
     const row = button.closest('tr');
     const status = row.querySelector('.status-select').value;
-    const amount = Number(row.querySelector('.payment-amount').value || 0);
-    const paymentMethod = row.querySelector('.payment-method-select').value;
+    const amountInput = row.querySelector('.payment-amount').value.trim();
+    let amount = amountInput === '' ? 0 : Number(amountInput);
+    let paymentMethod = row.querySelector('.payment-method-select').value;
     const registration = registrations.find(item => item.id === id);
     if (status !== 'paid') { alert('اختر «تم الدفع» بعد استلام المبلغ.'); return; }
+    if (!paymentMethod) paymentMethod = 'نقدي';
     if (!paymentMethod) { alert('اختر طريقة الدفع أولاً.'); return; }
+    if ((!Number.isFinite(amount) || amount <= 0) && paymentMethod === 'نقدي') {
+      amount = registrationSubscriptionAmount(registration);
+    }
     if (!Number.isFinite(amount) || amount <= 0) { alert('أدخل المبلغ الذي تم تحصيله.'); return; }
     button.disabled = true;
     try {
@@ -420,15 +438,26 @@ function renderStudents() {
         if (!currentSnapshot.exists()) throw new Error('التسجيل غير موجود. حدّث الصفحة وحاول مرة أخرى.');
         const current = currentSnapshot.data();
         if (current.paymentStatus === 'paid' && !wasAlreadyPaid) throw new Error('تم اعتماد الدفع من مستخدم آخر بالفعل. حدّث الصفحة للمراجعة.');
-        transaction.update(registrationRef, { paymentStatus: 'paid', paidAmount: amount, paymentMethod, payment: paymentMethod, paidAt });
+        transaction.update(registrationRef, {
+          paymentStatus: 'paid',
+          paidAmount: amount,
+          amountCollected: amount,
+          paymentMethod,
+          payment: paymentMethod,
+          paidBy: signedInUser?.id || signedInUser?.email || '-',
+          recordedBy: signedInUser?.id || signedInUser?.email || '-',
+          paidAt
+        });
         transaction.set(paymentRef, {
           registrationId: id,
           invoiceNumber: current.invoiceNumber || null,
           agentId: current.agentId || registration?.agentId || '-',
           studentName: current.studentName || registration?.studentName || '-',
           amount,
+          amountCollected: amount,
           paymentMethod,
           payment: paymentMethod,
+          paidBy: signedInUser?.id || signedInUser?.email || '-',
           paidAt,
           source: 'student-portal-admin',
           recordedBy: signedInUser?.id || signedInUser?.email || '-'
